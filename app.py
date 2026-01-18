@@ -238,8 +238,13 @@ def trigger_repair():
     if not os.path.exists(abs_path):
         return jsonify({'error': 'Path not found'}), 404
 
+    # Handle file selection (convert to parent directory)
+    work_dir = abs_path
+    if not os.path.isdir(abs_path):
+        work_dir = os.path.dirname(abs_path)
+
     # Run repair in a separate thread to not block the response
-    thread = threading.Thread(target=RepairManager.run_repair_job, args=(abs_path,))
+    thread = threading.Thread(target=RepairManager.run_repair_job, args=(work_dir,))
     thread.start()
 
     return jsonify({'status': 'started', 'message': f'Repair job started for {target_path}'})
