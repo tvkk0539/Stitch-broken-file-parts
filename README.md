@@ -1,15 +1,23 @@
-# ParFix Web Utility
+# ParFix & Archive Utility
 
-A lightweight, automated repair tool for scrambled Usenet/Debrid downloads.
-Designed to solve the specific "Scrambled RARs with Correct PAR2" issue.
+A lightweight web utility for **Repairing** and **Creating** archives.
 
 ## Features
 
-- **Wildcard Repair:** Forces `par2` to scan all files in a directory, fixing cases where filenames don't match.
-- **Smart Cleanup:** Renames scrambled files to match the Master PAR2 name.
-- **Auto-Extract:** Automatically extracts the archive after successful repair.
+### 🔧 Repair & Extract
+Designed to solve the "Scrambled RARs" issue often found with Debrid/Usenet downloads.
+- **Wildcard Repair:** Forces `par2` to scan all files, fixing scrambled filenames.
+- **Auto-Extract:** Automatically extracts the movie/game after repair.
+
+### 📦 Create Archives (Packer)
+Easily create multi-part archives from large files or folders.
+- **Split Archives:** Create `.part001.rar` files (e.g., 500MB, 1GB, 2GB chunks).
+- **Store Mode:** Uses zero compression (`-m0`) for maximum speed.
+- **Password Protection:** Optional encryption for your archives.
+
+### ⚡ General
 - **Lightweight:** Uses Python Flask and raw HTML/JS. No heavy frameworks.
-- **Dockerized:** Pre-configured with non-free `unrar` and `par2`.
+- **Dockerized:** Pre-configured with `unrar` and `rar`.
 
 ## 🚀 Deployment Guide (Detailed)
 
@@ -77,11 +85,19 @@ If you are using Nginx Proxy Manager (included in many Arr stacks):
 1. Open the tool in your browser.
 2. Navigate to the folder containing the scrambled files.
    - *Note: You will see the scrambled RAR names (e.g., `6rLT...rar`) and the correct PAR2 name.*
-3. Click **"Repair & Extract Here"**.
+3. Click **"Repair & Extract"**.
 4. Watch the logs. The tool will:
    - Run `par2` on all files.
    - Fix the filenames.
    - Extract the video file.
+
+### Creating an Archive
+1. Navigate to the file or folder you want to pack.
+2. Click **"Create Archive"**.
+3. Select your options:
+   - **Split Size:** e.g., 1GB.
+   - **Password:** Optional.
+4. Click **"Start Packing"**.
 
 ## 📦 Bare Metal Installation (Debian/Ubuntu)
 

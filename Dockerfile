@@ -11,6 +11,7 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     apt-get install -y --no-install-recommends \
     par2 \
     unrar \
+    rar \
     procps \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*

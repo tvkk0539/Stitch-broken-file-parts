@@ -100,6 +100,102 @@ def trigger_repair():
 
     return jsonify({'status': 'started', 'message': f'Repair job started for {target_path}'})
 
+@app.route('/api/archive', methods=['POST'])
+def trigger_archive():
+    """Triggers the creation of a multi-part archive."""
+    data = request.json
+    target_path = data.get('path')
+    name = data.get('name')
+    split_size = data.get('split_size', '1024M') # Default 1GB
+    password = data.get('password')
+
+    if not target_path or not name:
+        return jsonify({'error': 'Path and Name are required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, target_path)
+
+    # Security check
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied'}), 403
+
+    if not os.path.exists(abs_path):
+        return jsonify({'error': 'Path not found'}), 404
+
+    # Run archiving in a separate thread
+    thread = threading.Thread(
+        target=ArchiveManager.run_archive_job,
+        args=(abs_path, name, split_size, password)
+    )
+    thread.start()
+
+    return jsonify({'status': 'started', 'message': f'Archiving started for {name}'})
+
+class ArchiveManager:
+    @staticmethod
+    def run_archive_job(source_path, archive_name, split_size, password):
+        # Determine directory and target
+        # source_path is the file/folder to archive
+        # We want the archive to be created IN the parent directory of the source
+        # OR inside the directory if it's a directory?
+        # Usually: Archive created NEXT TO the source.
+
+        parent_dir = os.path.dirname(source_path)
+        base_name = os.path.basename(source_path)
+
+        # Output archive name (e.g. MovieName.rar)
+        if not archive_name.endswith('.rar'):
+            archive_name += '.rar'
+
+        log(f"Starting Archive Job: Packing '{base_name}' into '{archive_name}'")
+        log(f"Split Size: {split_size}, Password: {'YES' if password else 'NO'}")
+
+        # Build RAR command
+        # rar a -m0 -v{size} -hp{password} -ep1 "{archive_name}" "{source_path}"
+        # -m0: Store (no compression)
+        # -v: Volume size
+        # -hp: Encrypt headers + data
+        # -ep1: Exclude base dir path from names inside archive
+
+        cmd = ['rar', 'a', '-m0', f'-v{split_size}', '-ep1']
+
+        if password:
+            cmd.append(f'-hp{password}')
+
+        cmd.append(archive_name)
+        cmd.append(source_path)
+
+        try:
+            log(f"Running command: {' '.join(cmd).replace(password, '******') if password else ' '.join(cmd)}")
+
+            process = subprocess.Popen(
+                cmd,
+                cwd=parent_dir, # Run from parent dir so relative paths work nicely
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True
+            )
+
+            for line in process.stdout:
+                line = line.strip()
+                if line:
+                    # Filter for progress or errors
+                    if "Creating archive" in line or "%" in line or "Done" in line:
+                         log(f"[RAR] {line}")
+                    elif "Error" in line:
+                         log(f"[RAR ERROR] {line}")
+
+            process.wait()
+
+            if process.returncode == 0:
+                log("Archive created successfully.")
+            else:
+                log(f"Archiving failed with code {process.returncode}")
+
+        except Exception as e:
+            log(f"CRITICAL ERROR during archiving: {str(e)}")
+            import traceback
+            log(traceback.format_exc())
+
 class RepairManager:
     @staticmethod
     def run_repair_job(directory):
