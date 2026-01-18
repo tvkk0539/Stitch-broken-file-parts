@@ -228,6 +228,13 @@
                 <input type="text" id="arc-name" placeholder="Movie.Name">
             </div>
             <div class="form-group">
+                <label>Format:</label>
+                <select id="arc-fmt">
+                    <option value="rar" selected>RAR (Recommended)</option>
+                    <option value="7z">7-Zip</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>Split Size:</label>
                 <select id="arc-size">
                     <option value="500M">500 MB</option>
@@ -239,6 +246,12 @@
             <div class="form-group">
                 <label>Password (Optional):</label>
                 <input type="text" id="arc-pass" placeholder="Leave empty for none">
+            </div>
+            <div class="form-group">
+                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="arc-par2" checked>
+                    Create PAR2 Recovery Files (Recommended)
+                </label>
             </div>
             <div class="modal-actions">
                 <button id="cancel-arc" style="background:#f7768e">Cancel</button>
@@ -262,6 +275,8 @@
         const arcNameInput = document.getElementById('arc-name');
         const arcSizeInput = document.getElementById('arc-size');
         const arcPassInput = document.getElementById('arc-pass');
+        const arcFmtInput = document.getElementById('arc-fmt');
+        const arcPar2Input = document.getElementById('arc-par2');
 
         // Initial Load
         loadPath('');
@@ -411,6 +426,8 @@
             const name = arcNameInput.value;
             const size = arcSizeInput.value;
             const password = arcPassInput.value;
+            const fmt = arcFmtInput.value;
+            const createPar2 = arcPar2Input.checked;
 
             if (!name) { alert("Name is required"); return; }
 
@@ -426,7 +443,9 @@
                         path: currentPath,
                         name: name,
                         split_size: size,
-                        password: password
+                        password: password,
+                        format: fmt,
+                        create_par2: createPar2
                     })
                 });
                 const data = await res.json();

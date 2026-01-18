@@ -11,13 +11,15 @@ Designed to solve the "Scrambled RARs" issue often found with Debrid/Usenet down
 
 ### 📦 Create Archives (Packer)
 Easily create multi-part archives from large files or folders.
+- **Format:** Choose between **RAR** (Industry Standard) or **7-Zip**.
+- **PAR2 Protection:** Automatically generates `.par2` recovery files (10%) to protect against future data corruption (Bit rot).
 - **Split Archives:** Create `.part001.rar` files (e.g., 500MB, 1GB, 2GB chunks).
 - **Store Mode:** Uses zero compression (`-m0`) for maximum speed.
 - **Password Protection:** Optional encryption for your archives.
 
 ### ⚡ General
 - **Lightweight:** Uses Python Flask and raw HTML/JS. No heavy frameworks.
-- **Dockerized:** Pre-configured with `unrar` and `rar`.
+- **Dockerized:** Pre-configured with `unrar`, `rar`, and `7z`.
 
 ## 🚀 Deployment Guide (Detailed)
 
@@ -95,8 +97,10 @@ If you are using Nginx Proxy Manager (included in many Arr stacks):
 1. Navigate to the file or folder you want to pack.
 2. Click **"Create Archive"**.
 3. Select your options:
+   - **Format:** RAR (Recommended for Usenet/Scene) or 7-Zip.
    - **Split Size:** e.g., 1GB.
    - **Password:** Optional.
+   - **PAR2:** Check "Create PAR2 Recovery Files" (Recommended for long-term storage).
 4. Click **"Start Packing"**.
 
 ## 📦 Bare Metal Installation (Debian/Ubuntu)

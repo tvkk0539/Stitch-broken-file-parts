@@ -12,6 +12,7 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     par2 \
     unrar \
     rar \
+    p7zip-full \
     procps \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
