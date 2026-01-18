@@ -50,14 +50,19 @@ Use this to simply add the tool to your existing stack without downloading the s
           memory: 200M
 ```
 
-## 🔒 Firewall & Ports
+## 💻 Accessing the Tool
 
-**Which port needs to be open?**
-- **Port 5001 (TCP)**
+### Local Computer (Laptop/PC)
+If you are running this on your own computer (Windows/Mac/Linux with Docker Desktop):
+- **URL:** [http://localhost:5001](http://localhost:5001)
 
-**Scenario 1: Direct Access**
-If you want to access the tool directly via `http://YOUR_SERVER_IP:5001`, you **MUST open Port 5001** in your VPS Firewall (GCP Firewall, AWS Security Group, UFW, etc.).
-- *GCP Example:* Create a firewall rule allowing `tcp:5001` on Ingress.
+### Remote Server (VPS)
+If you are running this on a cloud server (GCP, AWS, DigitalOcean):
+- **URL:** `http://YOUR_SERVER_IP:5001`
+- **Firewall:** You **MUST open Port 5001** in your VPS Firewall (GCP Firewall, AWS Security Group, UFW, etc.).
+  - *GCP Example:* Create a firewall rule allowing `tcp:5001` on Ingress.
+
+## 🔒 Security & Reverse Proxy
 
 **Scenario 2: Using a Reverse Proxy (Nginx Proxy Manager)**
 If you are using Nginx Proxy Manager (included in many Arr stacks):
