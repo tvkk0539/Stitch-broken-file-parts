@@ -232,7 +232,13 @@
     <div id="file-browser" class="panel">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <h2>File Browser</h2>
-            <button id="new-folder-btn" class="icon-btn" style="background:none; border:1px solid #414868; color:var(--accent-color);" title="New Folder">📂+</button>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <label style="cursor:pointer; font-size:0.9em; user-select:none; color:#a9b1d6;" title="Select All / None">
+                    <input type="checkbox" id="select-all-check"> All
+                </label>
+                <button id="refresh-btn" class="icon-btn" style="background:none; border:1px solid #414868; color:var(--accent-color);" title="Refresh">🔄</button>
+                <button id="new-folder-btn" class="icon-btn" style="background:none; border:1px solid #414868; color:var(--accent-color);" title="New Folder">📂+</button>
+            </div>
         </div>
         <div id="current-path" class="breadcrumb">/</div>
         <ul id="file-list">
@@ -423,6 +429,8 @@
         const deleteBtn = document.getElementById('delete-btn');
         const settingsBtn = document.getElementById('settings-btn');
         const newFolderBtn = document.getElementById('new-folder-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const selectAllCheck = document.getElementById('select-all-check');
         const consoleDiv = document.getElementById('console');
 
         // Archive Modal Elements
@@ -493,6 +501,7 @@
 
                 currentPath = data.current_path;
                 selectedPaths = []; // Reset selection on nav
+                selectAllCheck.checked = false; // Reset master check
                 updateButtonState();
 
                 renderBreadcrumb(currentPath);
@@ -576,6 +585,7 @@
                 // Checkbox
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
+                checkbox.dataset.path = item.path; // Store path for Select All
                 checkbox.onclick = (e) => {
                     e.stopPropagation();
                     toggleSelection(item.path, checkbox.checked);
@@ -619,9 +629,36 @@
                 selectedPaths.push(path);
             } else {
                 selectedPaths = selectedPaths.filter(p => p !== path);
+                selectAllCheck.checked = false; // Uncheck master if any item is unchecked
             }
             updateButtonState();
         }
+
+        // --- Refresh Logic ---
+        refreshBtn.onclick = () => loadPath(currentPath);
+
+        // --- Select All Logic ---
+        selectAllCheck.onclick = () => {
+            const isChecked = selectAllCheck.checked;
+            const checkboxes = fileList.querySelectorAll('input[type="checkbox"]');
+
+            selectedPaths = []; // Reset and rebuild
+
+            checkboxes.forEach(cb => {
+                cb.checked = isChecked;
+                if (isChecked) {
+                    // We store the path in a data attribute or derive it?
+                    // The 'renderFiles' loop uses closure for onclick,
+                    // but we need the path here.
+                    // Let's add data-path to the checkbox in renderFiles or just rely on DOM order?
+                    // Safer: renderFiles attaches the path to the element.
+                    if (cb.dataset.path) {
+                        selectedPaths.push(cb.dataset.path);
+                    }
+                }
+            });
+            updateButtonState();
+        };
 
         function updateButtonState() {
             const count = selectedPaths.length;
