@@ -1,0 +1,59 @@
+Yes, absolutely.
+The app itself (the web interface) will be tiny. It acts just like a "remote control." A remote control doesn't use much battery; the TV uses the electricity.
+Here is the breakdown of why it is lightweight and how to ensure Jules builds it that way:
+1. Resource Usage Breakdown
+ * The Web App (Idle): ~30MB to 50MB of RAM.
+   * It just sits there waiting for you to click a button. It consumes almost zero CPU when you aren't using it.
+ * The Repair Process (Active): High RAM/CPU.
+   * Crucial Point: This usage comes from the par2 tool, NOT the web app. This is the exact same amount of RAM you would use if you typed the command manually in the terminal. The web app adds no extra weight to the heavy lifting.
+2. How to keep it lightweight
+To ensure Jules doesn't build something heavy (like a complex React app), we should tell him to use Python Flask or FastAPI with simple HTML.
+ * Good (Lightweight): Python Flask + Simple HTML templates. (Uses tiny RAM, runs instantly).
+ * Bad (Heavy): Node.js + React + huge libraries. (Uses more RAM, requires building/compiling).
+3. Updated "Lightweight" Instruction for Jules
+I have added a "Technical Stack" section to the prompt below. This forces Jules to use the lightest possible tools.
+Updated Master Prompt (Copy this one)
+Project Title: "ParFix Web Utility" – An Automated Repair Tool for Scrambled Usenet/Debrid Downloads
+Role: You are a Senior Full-Stack Developer and Linux Systems Architect.
+The Problem Context:
+I frequently download large media files (movies/games) via "Debrid" services using JDownloader on a Debian VPS.
+These downloads result in a specific "corrupted" state:
+ * The PAR2 files (recovery volumes) have the correct, readable filename (e.g., Movie.Name.Year.par2).
+ * The RAR files (data volumes) have scrambled, random filenames (e.g., 6rLTjKV5LOw....part01.rar).
+ * Because of this mismatch, standard extraction fails.
+ * Standard repair tools fail because they expect filenames to match.
+ * unrar is often missing or the wrong version (free vs. non-free) on Debian systems.
+The Goal:
+Build a ultra-lightweight Web Application that allows me to browse directories on my VPS, select a folder containing these problem files, and click a single "Repair & Extract" button.
+Technical Constraints (CRITICAL):
+ * Stack: Python with Flask (or FastAPI). Do not use Node.js or complex frontend frameworks like React. Use simple server-side rendered HTML/Jinja2.
+ * Resource Usage: The app must consume minimal RAM (<100MB) when idle.
+ * OS: Debian Linux (headless VPS).
+ * Permissions: The backend needs sudo or root privileges to install dependencies and modify file names.
+Core Functionality & Logic (The "Secret Sauce"):
+The app must execute the following automated workflow on the server backend when triggered:
+Step 1: Dependency Check & Install (Setup)
+ * The app must check if par2 and unrar are installed.
+ * Crucial Edge Case: On Debian, unrar is in the non-free repository. The app needs a setup script that ensures the non-free repo is enabled and the official unrar (not 7-zip) is installed.
+Step 2: The "Wildcard" Repair Strategy
+ * The Issue: par2 normally fails because Movie.par2 looks for Movie.rar, but finds 6rLT...rar.
+ * The Fix: The app must identify the .par2 file and run the repair command using a wildcard for the RARs.
+ * Command Logic: par2 r "CorrectName.vol-01.par2" *.rar (forcing it to check all RARs in the folder regardless of name).
+Step 3: Post-Repair Cleanup & Renaming
+ * After repair, the folder often contains a mix of broken files (original scrambled names) and fixed files (repaired readable names).
+ * The app must:
+   * Delete the broken scrambled files.
+   * Rename any remaining scrambled files to match the "Master" name found in the PAR2 file.
+   * Normalization: Ensure numbering is consistent (convert part1.rar or part01.rar to part001.rar) to prevent sort-order extraction errors.
+Step 4: Extraction
+ * Run unrar x FirstPart.rar.
+ * Verify the output (look for "All OK").
+ * Optional: Offer to delete the source RAR/PAR2 files after successful extraction to save space.
+User Interface Requirements:
+ * Simple File Browser: A visual directory tree to navigate the VPS file system (/home/user/downloads, etc.).
+ * Status Dashboard: A real-time log window showing the terminal output (so I can see "Repair complete" or "Computing Reed Solomon matrix").
+ * Success/Error Indicators: distinct visual cues when the movie is ready.
+Deliverables:
+ * The complete source code for the Flask App (app.py, templates/index.html).
+ * A setup.sh script to handle the initial environment configuration (installing python, pip, unrar-nonfree, par2).
+ * Instructions on how to run this as a background service (systemd) so it stays alive but quiet.
