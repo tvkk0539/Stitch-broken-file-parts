@@ -1,0 +1,21 @@
+# Master Prompt: Smart Default Upload Paths
+
+**Project Context:**
+The user wants to streamline the Rclone upload process and prevent "Root Clutter" on their cloud storage. Instead of building a complex remote browser, we will implement intelligent default paths.
+
+**The Goal:**
+Pre-fill the "Upload Path" input with a safe, organized directory structure so the user doesn't have to type anything, but can still edit it if needed.
+
+**Core Requirements:**
+1.  **Frontend Update (`index.html`):**
+    *   **Manual Upload Modal:**
+        *   When opened, the "Remote Path" input should default to: `ParFix_Uploads/{Current_Folder_Name}/` (if uploading a folder) or `ParFix_Uploads/{File_Name_Folder}/` (if uploading a file).
+    *   **Packer Modal (Auto-Upload):**
+        *   When "Upload" is checked, the path input should default to `ParFix_Uploads/Archives/`.
+
+2.  **Logic:**
+    *   Ensure the path always ends in a slash `/` if it's a directory target, to ensure Rclone treats it as a folder.
+    *   Dynamic JavaScript to grab the name of the item being acted upon and insert it into the path string.
+
+**Deliverables:**
+*   Updated `index.html` with smart path generation logic.

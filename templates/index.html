@@ -544,6 +544,10 @@
             const parts = currentPath.split('/');
             const defaultName = parts[parts.length-1] || 'Archive';
             arcNameInput.value = defaultName;
+
+            // Smart Default Path
+            arcUploadPath.value = `ParFix_Uploads/Archives/${defaultName}/`;
+
             modal.style.display = "block";
         };
 
@@ -605,6 +609,12 @@
         // --- Manual Upload Logic ---
         uploadBtn.onclick = () => {
             loadRemotes();
+
+            // Smart Default Path
+            const parts = currentPath.split('/');
+            const itemName = parts[parts.length-1] || 'Upload';
+            upPathInput.value = `ParFix_Uploads/${itemName}/`;
+
             upModal.style.display = "block";
         };
 
