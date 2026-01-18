@@ -250,6 +250,7 @@
             <button id="upload-btn" class="purple-btn" disabled>Upload</button>
             <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
             <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
+            <button id="rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
             <button id="delete-btn" class="danger" disabled>🗑️</button>
             <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
         </div>
@@ -346,7 +347,11 @@
             </div>
             <div class="form-group">
                 <label>Remote Path:</label>
-                <input type="text" id="up-path" placeholder="Uploads/">
+                <input type="text" id="up-path" placeholder="ParFix_Uploads/">
+            </div>
+            <div class="form-group">
+                <label>Parallel Transfers (Concurrency):</label>
+                <input type="number" id="up-transfers" value="4" min="1" max="16">
             </div>
             <div class="modal-actions">
                 <button id="cancel-up" style="background:#f7768e">Cancel</button>
@@ -382,18 +387,41 @@
 
     <!-- Move/Copy Modal -->
     <div id="move-copy-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="width: 500px;">
             <div class="modal-header">
                 <h3 id="mc-title">Move Items</h3>
             </div>
             <div class="form-group">
-                <label>Destination Folder (Relative to Root):</label>
-                <input type="text" id="mc-dest" placeholder="Movies/NewFolder">
-                <small style="color:#565f89">Current: <span id="mc-current-path-display"></span></small>
+                <label>Select Destination Folder:</label>
+                <div id="mc-browser" style="border: 1px solid #414868; height: 200px; overflow-y: auto; background: #15161e; padding: 5px; margin-bottom: 10px;">
+                    <!-- Folder list -->
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="color:#737aa2;">Current:</span>
+                    <strong id="mc-selected-path" style="color:#7aa2f7;">/</strong>
+                    <button id="mc-up-btn" class="icon-btn" style="padding: 2px 8px; min-width: 30px;">⬆️</button>
+                </div>
             </div>
             <div class="modal-actions">
                 <button id="cancel-mc" style="background:#f7768e">Cancel</button>
-                <button id="confirm-mc" class="secondary">Confirm</button>
+                <button id="confirm-mc" class="secondary">Confirm Here</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div id="rename-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Rename Item</h3>
+            </div>
+            <div class="form-group">
+                <label>New Name:</label>
+                <input type="text" id="rename-input" placeholder="NewName.ext">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-rename" style="background:#f7768e">Cancel</button>
+                <button id="confirm-rename" class="secondary">Rename</button>
             </div>
         </div>
     </div>
@@ -426,6 +454,7 @@
         const uploadBtn = document.getElementById('upload-btn');
         const moveBtn = document.getElementById('move-btn');
         const copyBtn = document.getElementById('copy-btn');
+        const renameBtn = document.getElementById('rename-btn');
         const deleteBtn = document.getElementById('delete-btn');
         const settingsBtn = document.getElementById('settings-btn');
         const newFolderBtn = document.getElementById('new-folder-btn');
@@ -451,6 +480,7 @@
         const upModal = document.getElementById('upload-modal');
         const upRemoteSelect = document.getElementById('up-remote');
         const upPathInput = document.getElementById('up-path');
+        const upTransfersInput = document.getElementById('up-transfers');
         const startUpBtn = document.getElementById('start-up');
         const cancelUpBtn = document.getElementById('cancel-up');
 
@@ -465,11 +495,19 @@
         // Move/Copy Modal Elements
         const mcModal = document.getElementById('move-copy-modal');
         const mcTitle = document.getElementById('mc-title');
-        const mcDestInput = document.getElementById('mc-dest');
-        const mcCurrentDisplay = document.getElementById('mc-current-path-display');
+        const mcBrowser = document.getElementById('mc-browser');
+        const mcSelectedPath = document.getElementById('mc-selected-path');
+        const mcUpBtn = document.getElementById('mc-up-btn');
         const confirmMcBtn = document.getElementById('confirm-mc');
         const cancelMcBtn = document.getElementById('cancel-mc');
         let mcAction = 'move'; // 'move' or 'copy'
+        let mcCurrentBrowserPath = '';
+
+        // Rename Modal Elements
+        const renameModal = document.getElementById('rename-modal');
+        const renameInput = document.getElementById('rename-input');
+        const confirmRenameBtn = document.getElementById('confirm-rename');
+        const cancelRenameBtn = document.getElementById('cancel-rename');
 
         // Mkdir Modal Elements
         const mkdirModal = document.getElementById('mkdir-modal');
@@ -673,6 +711,7 @@
             // Single Item actions
             repairBtn.disabled = count !== 1;
             archiveBtn.disabled = count !== 1;
+            renameBtn.disabled = count !== 1;
         }
 
         repairBtn.onclick = async () => {
@@ -782,22 +821,42 @@
         uploadBtn.onclick = () => {
             loadRemotes();
 
-            // Smart Default Path logic for batch?
-            // If multiple items, use the folder name?
-            // If single item, use item name.
+            // Fix Default Path Logic
+            // If file(s) selected, default to base folder: ParFix_Uploads/
+            // If FOLDER selected, use ParFix_Uploads/FolderName/ ??
+            // User requested: "make remote path default to this ParFix_Uploads/" and complained about file names being added.
 
-            let itemName = "Batch_Upload";
+            // Checking if we selected files or folders
+            // We only have paths. We can guess by extension or just use a generic default.
+
+            // Simplest approach per request: Default to ParFix_Uploads/
+            // If the user wants a subfolder, they can add it.
+            // But if they select a FOLDER, they might expect that folder to be the container.
+            // Rclone copy src dest: If src is folder, contents go to dest.
+            // So if I select "MovieFolder" and dest is "ParFix_Uploads/", contents of MovieFolder go to ParFix_Uploads/.
+            // That mixes files.
+            // Rclone copy "MovieFolder" "remote:ParFix_Uploads/MovieFolder" -> Correct.
+
+            // Refined Logic:
+            // If single selection and it looks like a file (has extension), use ParFix_Uploads/
+            // If single selection and no extension (likely folder), use ParFix_Uploads/FolderName/
+            // If multiple selection, use ParFix_Uploads/ (User can organize)
+
+            let defaultPath = "ParFix_Uploads/";
+
             if (selectedPaths.length === 1) {
-                const parts = selectedPaths[0].split('/');
-                itemName = parts[parts.length-1];
-            } else {
-                // If inside a folder, use that folder name?
-                const parts = currentPath.split('/');
-                itemName = parts[parts.length-1] || "Batch";
+                const p = selectedPaths[0];
+                const parts = p.split('/');
+                const name = parts[parts.length-1];
+
+                // Heuristic: If it has an extension, treat as file.
+                if (!name.includes('.')) {
+                    // Likely a folder
+                    defaultPath = `ParFix_Uploads/${name}/`;
+                }
             }
 
-            upPathInput.value = `ParFix_Uploads/${itemName}/`;
-
+            upPathInput.value = defaultPath;
             upModal.style.display = "block";
         };
 
@@ -806,6 +865,7 @@
         startUpBtn.onclick = async () => {
             const remote = upRemoteSelect.value;
             const path = upPathInput.value;
+            const transfers = upTransfersInput.value;
 
             if (!remote) { alert("Select remote"); return; }
 
@@ -817,7 +877,8 @@
                     body: JSON.stringify({
                         paths: selectedPaths,
                         remote: remote,
-                        upload_path: path
+                        upload_path: path,
+                        transfers: transfers
                     })
                 });
             } catch (e) { alert("Upload request failed"); }
@@ -870,14 +931,71 @@
             setModal.style.display = "none";
         };
 
-        // --- Move/Copy Logic ---
+        // --- Move/Copy Logic (Enhanced with Browser) ---
+        async function loadMcBrowser(path) {
+             mcCurrentBrowserPath = path;
+             mcSelectedPath.textContent = path || '/';
+             mcBrowser.innerHTML = '<div style="color:#565f89; padding:5px;">Loading...</div>';
+
+             try {
+                const response = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                mcBrowser.innerHTML = '';
+
+                // Show directories only usually, but list sends all. Filter for is_dir
+                const dirs = data.items.filter(i => i.is_dir);
+
+                if (dirs.length === 0) {
+                    mcBrowser.innerHTML = '<div style="color:#565f89; padding:5px;">No subfolders</div>';
+                    return;
+                }
+
+                const ul = document.createElement('ul');
+                ul.style.listStyle = 'none';
+                ul.style.padding = '0';
+                ul.style.margin = '0';
+
+                dirs.forEach(d => {
+                    const li = document.createElement('li');
+                    li.style.padding = '5px 10px';
+                    li.style.cursor = 'pointer';
+                    li.style.borderBottom = '1px solid #2f3549';
+                    li.style.display = 'flex';
+                    li.style.alignItems = 'center';
+                    li.innerHTML = '<span style="margin-right:10px;">📁</span> ' + d.name;
+
+                    li.onclick = () => loadMcBrowser(d.path);
+                    li.onmouseover = () => li.style.background = '#2f3549';
+                    li.onmouseout = () => li.style.background = 'transparent';
+
+                    ul.appendChild(li);
+                });
+                mcBrowser.appendChild(ul);
+
+             } catch(e) {
+                 mcBrowser.textContent = "Error loading path";
+             }
+        }
+
         function openMcModal(action) {
             mcAction = action;
             mcTitle.textContent = action === 'move' ? 'Move Items' : 'Copy Items';
-            mcDestInput.value = currentPath; // Default to current
-            mcCurrentDisplay.textContent = currentPath || '/';
+            // Start browser at root or current?
+            // Usually easier to start at root to find target, or current if moving short distance.
+            // Let's start at Root to allow easy navigation elsewhere.
+            loadMcBrowser('');
             mcModal.style.display = 'block';
         }
+
+        mcUpBtn.onclick = () => {
+             // Calculate parent path
+             if (!mcCurrentBrowserPath) return; // Already at root
+             const parts = mcCurrentBrowserPath.split('/').filter(Boolean);
+             parts.pop();
+             const parent = parts.join('/');
+             loadMcBrowser(parent);
+        };
 
         moveBtn.onclick = () => openMcModal('move');
         copyBtn.onclick = () => openMcModal('copy');
@@ -885,7 +1003,7 @@
         cancelMcBtn.onclick = () => mcModal.style.display = 'none';
 
         confirmMcBtn.onclick = async () => {
-            const dest = mcDestInput.value;
+            const dest = mcCurrentBrowserPath; // Use the path selected in browser
             const endpoint = mcAction === 'move' ? '/api/move' : '/api/copy';
 
             mcModal.style.display = 'none';
@@ -906,13 +1024,50 @@
                     loadPath(currentPath);
                 } else {
                     alert('Error: ' + (data.error || 'Unknown error'));
-                    if (data.errors && data.errors.length > 0) {
-                        console.error(data.errors);
-                    }
                 }
             } catch (e) {
                 alert('Request failed');
             }
+        };
+
+        // --- Rename Logic ---
+        renameBtn.onclick = () => {
+            if (selectedPaths.length !== 1) return;
+            const target = selectedPaths[0];
+            const parts = target.split('/');
+            const currentName = parts[parts.length-1];
+
+            renameInput.value = currentName;
+            renameModal.style.display = 'block';
+        };
+
+        cancelRenameBtn.onclick = () => renameModal.style.display = 'none';
+
+        confirmRenameBtn.onclick = async () => {
+             const newName = renameInput.value;
+             if (!newName) return;
+
+             renameModal.style.display = 'none';
+             const target = selectedPaths[0];
+
+             try {
+                 const res = await fetch('/api/rename', {
+                     method: 'POST',
+                     headers: {'Content-Type': 'application/json'},
+                     body: JSON.stringify({
+                         path: target,
+                         new_name: newName
+                     })
+                 });
+                 const data = await res.json();
+                 if (data.status === 'renamed') {
+                     loadPath(currentPath);
+                 } else {
+                     alert("Rename Failed: " + data.error);
+                 }
+             } catch(e) {
+                 alert("Request failed");
+             }
         };
 
         // --- New Folder Logic ---

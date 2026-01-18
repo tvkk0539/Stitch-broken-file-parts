@@ -1,6 +1,6 @@
 # ParFix & Archive Utility
 
-A lightweight web utility for **Repairing** and **Creating** archives.
+A lightweight web utility for **Repairing** and **Creating** archives, managing files, and syncing to the cloud.
 
 ## Features
 
@@ -17,19 +17,19 @@ Easily create multi-part archives from large files or folders.
 - **Store Mode:** Uses zero compression (`-m0`) for maximum speed.
 - **Password Protection:** Optional encryption for your archives.
 
-### ⚡ General
-- **Lightweight:** Uses Python Flask and raw HTML/JS. No heavy frameworks.
-- **Dockerized:** Pre-configured with `unrar`, `rar`, `7z`, and `rclone`.
-
 ### ☁️ Cloud & Alerts
 - **Rclone Integration:** Manually or Automatically upload your files to the cloud (Google Drive, OneDrive, etc.).
-- **Smart Uploads:** Automatically organizes uploads into `ParFix_Uploads/{Name}/`.
+- **Parallel Uploads:** Support for concurrent file transfers (default: 4) for faster uploads.
+- **Smart Uploads:** Automatically organizes uploads into `ParFix_Uploads/` to keep your cloud clean.
 - **Notifications:** Get alerts on Discord or Telegram when jobs complete or fail.
 
 ### 📂 File Management
-- **Multi-Select:** Check multiple files/folders to perform batch actions.
-- **Batch Upload:** Upload multiple selected items to the cloud at once.
-- **Delete:** Manually delete files/folders from the UI to clean up space.
+- **Full File Browser:** Navigate your mapped directories easily.
+- **Move & Copy:** Organize files with a built-in **Folder Browser** to select destinations easily.
+- **Rename:** Quickly rename files or folders directly from the UI.
+- **Create Folder:** Create new directories for better organization.
+- **Delete:** Manually delete files/folders to clean up space.
+- **Multi-Select:** Check multiple files/folders to perform batch actions (Upload, Move, Delete, etc.).
 
 ## 🚀 Deployment Guide (Detailed)
 
@@ -114,6 +114,13 @@ If you are using Nginx Proxy Manager (included in many Arr stacks):
    - **Password:** Optional.
    - **PAR2:** Check "Create PAR2 Recovery Files" (Recommended for long-term storage).
 4. Click **"Start Packing"**.
+
+### Cloud Upload
+1. Select the file(s) or folder(s) you want to upload.
+2. Click **"Upload"**.
+3. Select your Rclone Remote (requires `rclone.conf` mounted).
+4. (Optional) Adjust concurrency settings for faster parallel uploads.
+5. Click **"Start Upload"**. Logs will show detailed progress.
 
 ## 📦 Bare Metal Installation (Debian/Ubuntu)
 

@@ -81,16 +81,41 @@ class RcloneManager:
             return []
 
     @staticmethod
-    def run_upload(source_files, remote, upload_path):
+    def run_upload(source_files, remote, upload_path, transfers=4):
         # source_files is a list of file paths
-        log(f"Starting Rclone Upload to {remote}:{upload_path}")
+        log(f"Starting Rclone Upload to {remote}:{upload_path} (Parallel: {transfers})")
+
+        if not source_files:
+            return True
+
+        # Optimization: If multiple files are in the same directory, run a single rclone command
+        # This allows rclone to use parallel transfers
+
+        # Group files by parent directory
+        from collections import defaultdict
+        grouped_files = defaultdict(list)
+
+        for f in source_files:
+            parent = os.path.dirname(f)
+            grouped_files[parent].append(os.path.basename(f))
 
         failed = False
-        for file_path in source_files:
-            file_name = os.path.basename(file_path)
-            log(f"Uploading {file_name}...")
 
-            cmd = ['rclone', 'copy', file_path, f"{remote}:{upload_path}", '-v']
+        for parent_dir, filenames in grouped_files.items():
+            log(f"Processing batch of {len(filenames)} files from {parent_dir}...")
+
+            # rclone copy source remote:path --include f1 --include f2 --transfers N --stats 1s -v
+            cmd = ['rclone', 'copy', parent_dir, f"{remote}:{upload_path}",
+                   '--transfers', str(transfers),
+                   '--stats', '2s',
+                   '-v']
+
+            # Add includes
+            # Note: rclone filters are relative to the root of the transfer
+            # If we transfer 'parent_dir', the files are at root relative to transfer
+            for name in filenames:
+                cmd.append('--include')
+                cmd.append(name)
 
             try:
                 process = subprocess.Popen(
@@ -100,30 +125,36 @@ class RcloneManager:
                     universal_newlines=True
                 )
 
-                # Capture all output to help debug failures
+                # Capture output
                 for line in process.stdout:
                     line = line.strip()
                     if not line: continue
 
-                    # Log errors/failures explicitly
+                    # Log errors/failures
                     if "error" in line.lower() or "failed" in line.lower():
                         log(f"[RCLONE ERROR] {line}")
-                    # Log progress periodically or important status
-                    elif "Transferred" in line:
-                        # Only log every few lines or just ignore to keep logs clean
-                        # For debugging, we might want to see it starts
-                        if "Transferred:" in line and " 0 B" not in line:
-                             pass
+                    # Log progress
+                    elif "Transferred:" in line or "Errors:" in line or "Checks:" in line:
+                        # Clean up progress lines
+                        if "Transferred:" in line:
+                             log(f"[UPLOAD] {line}")
+                    elif "100%" in line:
+                         log(f"[UPLOAD] {line}")
                     else:
-                        # Log everything else during debug phase to catch "413" or other non-error codes
-                        log(f"[RCLONE] {line}")
+                        # Verbose info
+                        if "INFO" in line:
+                            # Keep it cleaner?
+                            pass
+                        else:
+                            # log(f"[RCLONE] {line}")
+                            pass
 
                 process.wait()
                 if process.returncode != 0:
-                    log(f"Failed to upload {file_name} (Code {process.returncode})")
+                    log(f"Batch upload failed for {parent_dir} (Code {process.returncode})")
                     failed = True
                 else:
-                    log(f"Uploaded {file_name}")
+                    log(f"Batch upload completed for {parent_dir}")
 
             except Exception as e:
                 log(f"Rclone Execution Error: {e}")
@@ -284,12 +315,51 @@ def trigger_manual_upload():
     if not abs_paths:
         return jsonify({'error': 'No valid paths found'}), 400
 
+    transfers = data.get('transfers', 4) # Default concurrency
+    try:
+        transfers = int(transfers)
+    except:
+        transfers = 4
+
     thread = threading.Thread(
         target=RcloneManager.run_upload,
-        args=(abs_paths, remote, upload_path)
+        args=(abs_paths, remote, upload_path, transfers)
     )
     thread.start()
     return jsonify({'status': 'started'})
+
+@app.route('/api/rename', methods=['POST'])
+def rename_item():
+    data = request.json
+    target_path = data.get('path')
+    new_name = data.get('new_name')
+
+    if not target_path or not new_name:
+        return jsonify({'error': 'Path and new name required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, target_path)
+    parent_dir = os.path.dirname(abs_path)
+    new_abs_path = os.path.join(parent_dir, new_name)
+
+    # Security Checks
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied'}), 403
+    if not os.path.abspath(new_abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied (New Path)'}), 403
+
+    if not os.path.exists(abs_path):
+        return jsonify({'error': 'Item not found'}), 404
+
+    if os.path.exists(new_abs_path):
+        return jsonify({'error': 'Destination already exists'}), 400
+
+    try:
+        os.rename(abs_path, new_abs_path)
+        log(f"Renamed {target_path} -> {os.path.join(os.path.dirname(target_path), new_name)}")
+        return jsonify({'status': 'renamed'})
+    except Exception as e:
+        log(f"Rename Error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/delete', methods=['POST'])
 def trigger_delete():
@@ -637,8 +707,16 @@ class RepairManager:
             # Step 2: The Wildcard Repair Strategy
             # par2 r "Master.par2" *
             # This forces par2 to scan ALL files in the dir
+            # NOTE: subprocess doesn't expand '*', so we must do it manually
             log("Step 2: Running PAR2 Repair (This may take a while)...")
-            cmd = ['par2', 'r', master_par2, '*']
+
+            # Get all files in directory to simulate shell expansion
+            import glob
+            all_files = glob.glob(os.path.join(directory, '*'))
+            # Filter out the master par2 itself to avoid redundancy, though par2 handles it
+            all_files = [os.path.basename(f) for f in all_files]
+
+            cmd = ['par2', 'r', master_par2] + all_files
 
             process = subprocess.Popen(
                 cmd,
@@ -787,4 +865,5 @@ if __name__ == '__main__':
         except OSError:
             pass # Might be permission issue in Docker if mapped to host
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Disable debug for production safety
+    app.run(host='0.0.0.0', port=5000, debug=False)
