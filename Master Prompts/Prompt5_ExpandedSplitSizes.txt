@@ -1,0 +1,17 @@
+# Master Prompt: Expanded Split Size Options
+
+**Project Context:**
+The user wants more granular control over the archive split sizes in the "Packer" module.
+
+**The Goal:**
+Update the UI dropdown to include a comprehensive list of split sizes ranging from 100MB to 5GB.
+
+**Core Requirements:**
+1.  **Update `templates/index.html`:**
+    *   Replace the current limited `<select>` options for `arc-size` with the full requested list.
+    *   **New Options:** 100MB, 200MB, 300MB, 400MB, 500MB, 600MB, 700MB, 800MB, 900MB, 1GB, 1.5GB, 2GB, 2.5GB, 5GB.
+    *   **Values:** Must be in MB (e.g., `100M`) or appropriate format for the backend logic (Backend accepts strings like `1024M`).
+
+**Deliverables:**
+*   Updated `index.html` with the long list of options.
+*   (No backend changes needed as the backend just passes the string to `rar`/`7z`, which understand `M` and `G` suffixes).
