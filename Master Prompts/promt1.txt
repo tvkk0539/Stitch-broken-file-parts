@@ -1,0 +1,49 @@
+This is a fantastic idea. You have discovered a very specific, repeatable logic hole in how Debrid services, JDownloader, and Usenet interact. Automating this into a web tool would be incredibly useful for anyone running a media server.
+Here is a comprehensive Master Prompt designed for Jules (or any AI coding agent). It synthesizes every error we faced, the specific "wildcard" solution we found, and the exact logic required to build the webapp.
+Master Prompt for Jules
+Project Title: "ParFix Web Utility" – An Automated Repair Tool for Scrambled Usenet/Debrid Downloads
+Role: You are a Senior Full-Stack Developer and Linux Systems Architect.
+The Problem Context:
+I frequently download large media files (movies/games) via "Debrid" services using JDownloader on a Debian VPS.
+These downloads result in a specific "corrupted" state:
+ * The PAR2 files (recovery volumes) have the correct, readable filename (e.g., Movie.Name.Year.par2).
+ * The RAR files (data volumes) have scrambled, random filenames (e.g., 6rLTjKV5LOw....part01.rar).
+ * Because of this mismatch, standard extraction fails.
+ * Standard repair tools fail because they expect filenames to match.
+ * unrar is often missing or the wrong version (free vs. non-free) on Debian systems.
+The Goal:
+Build a lightweight Web Application (Python/Flask or Node.js) that allows me to browse directories on my VPS, select a folder containing these problem files, and click a single "Repair & Extract" button.
+Core Functionality & Logic (The "Secret Sauce"):
+The app must execute the following automated workflow on the server backend when triggered:
+Step 1: Dependency Check & Install (Setup)
+ * The app must check if par2 and unrar are installed.
+ * Crucial Edge Case: On Debian, unrar is in the non-free repository. The app needs a setup script that ensures the non-free repo is enabled and the official unrar (not 7-zip) is installed.
+Step 2: The "Wildcard" Repair Strategy
+ * The Issue: par2 normally fails because Movie.par2 looks for Movie.rar, but finds 6rLT...rar.
+ * The Fix: The app must identify the .par2 file and run the repair command using a wildcard for the RARs.
+ * Command Logic: par2 r "CorrectName.vol-01.par2" *.rar (forcing it to check all RARs in the folder regardless of name).
+Step 3: Post-Repair Cleanup & Renaming
+ * After repair, the folder often contains a mix of broken files (original scrambled names) and fixed files (repaired readable names).
+ * The app must:
+   * Delete the broken scrambled files.
+   * Rename any remaining scrambled files to match the "Master" name found in the PAR2 file.
+   * Normalization: Ensure numbering is consistent (convert part1.rar or part01.rar to part001.rar) to prevent sort-order extraction errors.
+Step 4: Extraction
+ * Run unrar x FirstPart.rar.
+ * Verify the output (look for "All OK").
+ * Optional: Offer to delete the source RAR/PAR2 files after successful extraction to save space.
+User Interface Requirements:
+ * File Browser: A visual directory tree to navigate the VPS file system (/home/user/downloads, etc.).
+ * Status Dashboard: A real-time log window showing the terminal output (so I can see "Repair complete" or "Computing Reed Solomon matrix").
+ * Success/Error Indicators: distinct visual cues when the movie is ready.
+Technical Constraints:
+ * OS: Debian Linux (headless VPS).
+ * Permissions: The backend needs sudo or root privileges to install dependencies and modify file names.
+ * Error Handling: Must handle "CRC Errors," "Missing Blocks," and "Command Not Found" gracefully.
+Deliverables:
+ * The complete source code for the Webapp.
+ * A setup.sh script to handle the initial environment configuration (installing python, pip, unrar-nonfree, par2).
+ * Instructions on how to deploy this using Docker or a simple systemd service.
+Next Step for You
+Copy and paste the text above directly to Jules. It contains all the "tribal knowledge" we just learned (the non-free repo issue, the wildcard par2 command, and the specific renaming logic).
+Would you like me to add a specific feature to this prompt, like automatically moving the finished movie to a "Plex" folder?
