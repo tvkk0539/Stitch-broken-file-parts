@@ -12,7 +12,8 @@ app = Flask(__name__)
 # Configuration
 # Default download directory. In Docker, this should be mapped to the host's download folder.
 DOWNLOAD_ROOT = os.environ.get('DOWNLOAD_ROOT', '/data/downloads')
-CONFIG_FILE = os.path.join('/app', 'config.json')
+# Support external config mapping or default location
+CONFIG_FILE = os.environ.get('CONFIG_FILE', '/app/config.json')
 
 # Global queue for log streaming
 log_queue = queue.Queue()
