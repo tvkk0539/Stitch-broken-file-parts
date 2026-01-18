@@ -54,7 +54,7 @@ Use this to simply add the tool to your existing stack without downloading the s
 ```yaml
   parfix:
     # This pulls the ready-made image from GitHub
-    image: ghcr.io/tvkk0539/rclone-arr-setup-with-jules-customised/parfix:latest
+    image: ghcr.io/tvkk0539/parfix:latest
     container_name: parfix
     ports:
       - "5001:5000"  # Access via http://YOUR_IP:5001
