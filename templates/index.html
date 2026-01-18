@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParFix Web Utility</title>
+    <style>
+        :root {
+            --bg-color: #1a1b26;
+            --text-color: #a9b1d6;
+            --accent-color: #7aa2f7;
+            --success-color: #9ece6a;
+            --error-color: #f7768e;
+            --panel-bg: #24283b;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            height: 100vh;
+            box-sizing: border-box;
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #file-browser {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #414868;
+        }
+
+        #log-panel {
+            flex: 2;
+            border: 1px solid #414868;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--accent-color);
+            border-bottom: 1px solid #414868;
+            padding-bottom: 10px;
+        }
+
+        /* File List Styles */
+        #file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .file-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #2f3549;
+            display: flex;
+            align-items: center;
+        }
+
+        .file-item:hover {
+            background-color: #2f3549;
+        }
+
+        .file-item.selected {
+            background-color: #3b4261;
+            color: var(--accent-color);
+        }
+
+        .icon {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .dir-icon { color: var(--accent-color); }
+        .file-icon { color: #565f89; }
+        .par2-icon { color: var(--success-color); }
+
+        /* Controls */
+        #controls {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: #15161e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+        }
+
+        button:disabled {
+            background-color: #414868;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        /* Log Console */
+        #console {
+            background-color: #15161e;
+            color: #c0caf5;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+
+        .breadcrumb {
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            color: #737aa2;
+        }
+
+        .breadcrumb span:hover {
+            color: var(--accent-color);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Left Panel: File Browser -->
+    <div id="file-browser" class="panel">
+        <h2>File Browser</h2>
+        <div id="current-path" class="breadcrumb">/</div>
+        <ul id="file-list">
+            <!-- Items injected via JS -->
+        </ul>
+        <div id="controls">
+            <button id="repair-btn" disabled>Repair & Extract Here</button>
+        </div>
+    </div>
+
+    <!-- Right Panel: Logs -->
+    <div id="log-panel" class="panel">
+        <h2>System Logs</h2>
+        <div id="console">Waiting for jobs...</div>
+    </div>
+
+    <script>
+        let currentPath = '';
+        const fileList = document.getElementById('file-list');
+        const breadcrumb = document.getElementById('current-path');
+        const repairBtn = document.getElementById('repair-btn');
+        const consoleDiv = document.getElementById('console');
+
+        // Initial Load
+        loadPath('');
+
+        // Listen for logs
+        const evtSource = new EventSource("/api/logs");
+        evtSource.onmessage = function(event) {
+            const newLog = document.createElement('div');
+            newLog.textContent = event.data;
+            consoleDiv.appendChild(newLog);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        };
+
+        async function loadPath(path) {
+            try {
+                const response = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                currentPath = data.current_path;
+                renderBreadcrumb(currentPath);
+                renderFiles(data.items, data.parent_path);
+
+                // Enable repair button only if current directory has .par2 files
+                // Actually, logic is: user is IN the folder they want to repair
+                // We should check if this folder looks repairable?
+                // For now, let user decide.
+                repairBtn.disabled = false;
+
+            } catch (err) {
+                console.error('Failed to load path', err);
+            }
+        }
+
+        function renderBreadcrumb(path) {
+            breadcrumb.innerHTML = '';
+            const parts = path.split('/').filter(Boolean);
+
+            let accumulated = '';
+
+            // Root
+            const rootSpan = document.createElement('span');
+            rootSpan.textContent = 'ROOT / ';
+            rootSpan.onclick = () => loadPath('');
+            breadcrumb.appendChild(rootSpan);
+
+            parts.forEach((part, index) => {
+                accumulated += (accumulated ? '/' : '') + part;
+                const span = document.createElement('span');
+                span.textContent = part + (index < parts.length - 1 ? ' / ' : '');
+                const target = accumulated; // closure capture
+                span.onclick = () => loadPath(target);
+                breadcrumb.appendChild(span);
+            });
+        }
+
+        function renderFiles(items, parentPath) {
+            fileList.innerHTML = '';
+
+            // Parent link
+            if (parentPath !== null) {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.innerHTML = '<span class="icon dir-icon">📁</span> ..';
+                li.onclick = () => loadPath(parentPath);
+                fileList.appendChild(li);
+            }
+
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+
+                let icon = '📄';
+                let iconClass = 'file-icon';
+
+                if (item.is_dir) {
+                    icon = '📁';
+                    iconClass = 'dir-icon';
+                    li.onclick = () => loadPath(item.path);
+                } else {
+                    if (item.name.endsWith('.par2')) {
+                        icon = '🔧';
+                        iconClass = 'par2-icon';
+                    } else if (item.name.endsWith('.rar')) {
+                        icon = '📦';
+                    }
+                }
+
+                li.innerHTML = `<span class="icon ${iconClass}">${icon}</span> ${item.name}`;
+                fileList.appendChild(li);
+            });
+        }
+
+        repairBtn.onclick = async () => {
+            if (!confirm(`Are you sure you want to run repair in:\n${currentPath || 'ROOT'}?`)) return;
+
+            repairBtn.disabled = true;
+            repairBtn.textContent = "Starting...";
+
+            try {
+                const res = await fetch('/api/repair', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ path: currentPath })
+                });
+                const data = await res.json();
+                if (data.status === 'started') {
+                     // Logs will appear automatically
+                     repairBtn.textContent = "Repairing...";
+                } else {
+                    alert('Error: ' + data.error);
+                    repairBtn.disabled = false;
+                    repairBtn.textContent = "Repair & Extract Here";
+                }
+            } catch (err) {
+                alert('Request failed');
+                repairBtn.disabled = false;
+                repairBtn.textContent = "Repair & Extract Here";
+            }
+        };
+
+    </script>
+</body>
+</html>
