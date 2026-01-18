@@ -131,3 +131,20 @@ If you prefer not to use Docker:
    ```bash
    python app.py
    ```
+
+## 💡 Advanced: Mapping Multiple Folders
+
+Do you have Movies on one drive and Games on another? You can map **multiple** folders into the tool by nesting them inside `/data/downloads`.
+
+**Example `docker-compose.yml`:**
+
+```yaml
+    volumes:
+      # Map Drive A to a subfolder "Movies"
+      - /mnt/drive_a/movies:/data/downloads/movies
+
+      # Map Drive B to a subfolder "Games"
+      - /mnt/drive_b/games:/data/downloads/games
+```
+
+Now when you open ParFix, you will see two folders: `movies` and `games`.
