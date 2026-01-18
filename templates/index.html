@@ -113,6 +113,12 @@
             background-color: #9ece6a; /* Green */
         }
 
+        button.icon-btn {
+            flex: 0;
+            padding: 10px 15px;
+            min-width: 50px;
+        }
+
         button:disabled {
             background-color: #414868;
             cursor: not-allowed;
@@ -208,6 +214,8 @@
         <div id="controls">
             <button id="repair-btn" disabled>Repair & Extract</button>
             <button id="archive-btn" class="secondary" disabled>Create Archive</button>
+            <button id="upload-btn" class="secondary" disabled style="background:#bb9af7">Upload</button>
+            <button id="settings-btn" class="icon-btn">⚙️</button>
         </div>
     </div>
 
@@ -267,9 +275,71 @@
                     Create PAR2 Recovery Files (Recommended)
                 </label>
             </div>
+            <div class="form-group">
+                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="arc-upload">
+                    Upload to Cloud after Packing
+                </label>
+            </div>
+            <div id="arc-upload-opts" style="display:none; padding-left:20px; border-left: 2px solid #414868;">
+                <div class="form-group">
+                    <label>Remote:</label>
+                    <select id="arc-remote"></select>
+                </div>
+                <div class="form-group">
+                    <label>Upload Path:</label>
+                    <input type="text" id="arc-upload-path" placeholder="Backups/Movies">
+                </div>
+            </div>
             <div class="modal-actions">
                 <button id="cancel-arc" style="background:#f7768e">Cancel</button>
                 <button id="start-arc" class="secondary">Start Packing</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Upload Modal -->
+    <div id="upload-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Manual Cloud Upload</h3>
+            </div>
+            <div class="form-group">
+                <label>Target Remote:</label>
+                <select id="up-remote"></select>
+            </div>
+            <div class="form-group">
+                <label>Remote Path:</label>
+                <input type="text" id="up-path" placeholder="Uploads/">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-up" style="background:#f7768e">Cancel</button>
+                <button id="start-up" class="secondary">Start Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings (Notifications)</h3>
+            </div>
+            <div class="form-group">
+                <label>Discord Webhook URL:</label>
+                <input type="text" id="set-discord" placeholder="https://discord.com/api/webhooks/...">
+            </div>
+            <div class="form-group">
+                <label>Telegram Bot Token:</label>
+                <input type="text" id="set-tg-token" placeholder="123456:ABC-DEF...">
+            </div>
+            <div class="form-group">
+                <label>Telegram Chat ID:</label>
+                <input type="text" id="set-tg-chat" placeholder="123456789">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-set" style="background:#f7768e">Cancel</button>
+                <button id="save-set" class="secondary">Save Settings</button>
             </div>
         </div>
     </div>
@@ -280,9 +350,11 @@
         const breadcrumb = document.getElementById('current-path');
         const repairBtn = document.getElementById('repair-btn');
         const archiveBtn = document.getElementById('archive-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+        const settingsBtn = document.getElementById('settings-btn');
         const consoleDiv = document.getElementById('console');
 
-        // Modal Elements
+        // Archive Modal Elements
         const modal = document.getElementById('archive-modal');
         const startArcBtn = document.getElementById('start-arc');
         const cancelArcBtn = document.getElementById('cancel-arc');
@@ -291,6 +363,25 @@
         const arcPassInput = document.getElementById('arc-pass');
         const arcFmtInput = document.getElementById('arc-fmt');
         const arcPar2Input = document.getElementById('arc-par2');
+        const arcUploadCheck = document.getElementById('arc-upload');
+        const arcUploadOpts = document.getElementById('arc-upload-opts');
+        const arcRemoteSelect = document.getElementById('arc-remote');
+        const arcUploadPath = document.getElementById('arc-upload-path');
+
+        // Upload Modal Elements
+        const upModal = document.getElementById('upload-modal');
+        const upRemoteSelect = document.getElementById('up-remote');
+        const upPathInput = document.getElementById('up-path');
+        const startUpBtn = document.getElementById('start-up');
+        const cancelUpBtn = document.getElementById('cancel-up');
+
+        // Settings Modal Elements
+        const setModal = document.getElementById('settings-modal');
+        const setDiscordInput = document.getElementById('set-discord');
+        const setTgTokenInput = document.getElementById('set-tg-token');
+        const setTgChatInput = document.getElementById('set-tg-chat');
+        const saveSetBtn = document.getElementById('save-set');
+        const cancelSetBtn = document.getElementById('cancel-set');
 
         // Initial Load
         loadPath('');
@@ -318,15 +409,45 @@
                 renderBreadcrumb(currentPath);
                 renderFiles(data.items, data.parent_path);
 
-                // Enable repair button only if current directory has .par2 files
-                // Actually, logic is: user is IN the folder they want to repair
-                // We should check if this folder looks repairable?
-                // For now, let user decide.
+                // Enable buttons
                 repairBtn.disabled = false;
                 archiveBtn.disabled = false;
+                uploadBtn.disabled = false;
 
             } catch (err) {
                 console.error('Failed to load path', err);
+            }
+        }
+
+        async function loadRemotes() {
+            try {
+                const res = await fetch('/api/remotes');
+                const remotes = await res.json();
+
+                // Populate both dropdowns
+                [arcRemoteSelect, upRemoteSelect].forEach(select => {
+                    select.innerHTML = '';
+                    remotes.forEach(r => {
+                        const opt = document.createElement('option');
+                        opt.value = r;
+                        opt.textContent = r;
+                        select.appendChild(opt);
+                    });
+                });
+            } catch (err) {
+                console.error("Failed to load remotes", err);
+            }
+        }
+
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                setDiscordInput.value = data.discord_webhook || '';
+                setTgTokenInput.value = data.telegram_token || '';
+                setTgChatInput.value = data.telegram_chat_id || '';
+            } catch (err) {
+                console.error("Failed to load settings", err);
             }
         }
 
@@ -417,23 +538,19 @@
             }
         };
 
-        // Archive Modal Logic
+        // --- Archive Modal Logic ---
         archiveBtn.onclick = () => {
-            // Default name: current folder name or file name
+            loadRemotes();
             const parts = currentPath.split('/');
             const defaultName = parts[parts.length-1] || 'Archive';
             arcNameInput.value = defaultName;
             modal.style.display = "block";
         };
 
-        cancelArcBtn.onclick = () => {
-            modal.style.display = "none";
-        };
+        cancelArcBtn.onclick = () => modal.style.display = "none";
 
-        window.onclick = (event) => {
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
+        arcUploadCheck.onchange = () => {
+            arcUploadOpts.style.display = arcUploadCheck.checked ? 'block' : 'none';
         };
 
         startArcBtn.onclick = async () => {
@@ -442,8 +559,12 @@
             const password = arcPassInput.value;
             const fmt = arcFmtInput.value;
             const createPar2 = arcPar2Input.checked;
+            const upload = arcUploadCheck.checked;
+            const remote = arcRemoteSelect.value;
+            const upPath = arcUploadPath.value;
 
             if (!name) { alert("Name is required"); return; }
+            if (upload && !remote) { alert("Select a remote for upload"); return; }
 
             modal.style.display = "none";
             archiveBtn.disabled = true;
@@ -459,7 +580,10 @@
                         split_size: size,
                         password: password,
                         format: fmt,
-                        create_par2: createPar2
+                        create_par2: createPar2,
+                        upload: upload,
+                        remote: remote,
+                        upload_path: upPath
                     })
                 });
                 const data = await res.json();
@@ -476,6 +600,64 @@
                 archiveBtn.disabled = false;
                 archiveBtn.textContent = "Create Archive";
             }
+        };
+
+        // --- Manual Upload Logic ---
+        uploadBtn.onclick = () => {
+            loadRemotes();
+            upModal.style.display = "block";
+        };
+
+        cancelUpBtn.onclick = () => upModal.style.display = "none";
+
+        startUpBtn.onclick = async () => {
+            const remote = upRemoteSelect.value;
+            const path = upPathInput.value;
+
+            if (!remote) { alert("Select remote"); return; }
+
+            upModal.style.display = "none";
+            try {
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        path: currentPath,
+                        remote: remote,
+                        upload_path: path
+                    })
+                });
+            } catch (e) { alert("Upload request failed"); }
+        };
+
+        // --- Settings Logic ---
+        settingsBtn.onclick = () => {
+            loadSettings();
+            setModal.style.display = "block";
+        };
+
+        cancelSetBtn.onclick = () => setModal.style.display = "none";
+
+        saveSetBtn.onclick = async () => {
+            const payload = {
+                discord_webhook: setDiscordInput.value,
+                telegram_token: setTgTokenInput.value,
+                telegram_chat_id: setTgChatInput.value
+            };
+
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            setModal.style.display = "none";
+        };
+
+        // Close Modals on click outside
+        window.onclick = (event) => {
+            if (event.target == modal) modal.style.display = "none";
+            if (event.target == upModal) upModal.style.display = "none";
+            if (event.target == setModal) setModal.style.display = "none";
         };
 
     </script>

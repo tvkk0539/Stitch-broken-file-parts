@@ -19,7 +19,11 @@ Easily create multi-part archives from large files or folders.
 
 ### ⚡ General
 - **Lightweight:** Uses Python Flask and raw HTML/JS. No heavy frameworks.
-- **Dockerized:** Pre-configured with `unrar`, `rar`, and `7z`.
+- **Dockerized:** Pre-configured with `unrar`, `rar`, `7z`, and `rclone`.
+
+### ☁️ Cloud & Alerts
+- **Rclone Integration:** Manually or Automatically upload your files to the cloud (Google Drive, OneDrive, etc.).
+- **Notifications:** Get alerts on Discord or Telegram when jobs complete or fail.
 
 ## 🚀 Deployment Guide (Detailed)
 
@@ -53,6 +57,8 @@ Use this to simply add the tool to your existing stack without downloading the s
     volumes:
       # CRITICAL: Change the left side to match your real downloads folder!
       - /path/to/your/real/downloads:/data/downloads
+      # OPTIONAL: Mount your rclone.conf for Cloud Upload features
+      # - /home/user/.config/rclone/rclone.conf:/root/.config/rclone/rclone.conf
     restart: unless-stopped
     deploy:
       resources:

@@ -3,6 +3,8 @@ import time
 import subprocess
 import threading
 import queue
+import json
+import requests
 from flask import Flask, render_template, jsonify, request, Response
 
 app = Flask(__name__)
@@ -10,6 +12,7 @@ app = Flask(__name__)
 # Configuration
 # Default download directory. In Docker, this should be mapped to the host's download folder.
 DOWNLOAD_ROOT = os.environ.get('DOWNLOAD_ROOT', '/data/downloads')
+CONFIG_FILE = os.path.join('/app', 'config.json')
 
 # Global queue for log streaming
 log_queue = queue.Queue()
@@ -20,6 +23,102 @@ def log(message):
     formatted_message = f"[{timestamp}] {message}"
     print(formatted_message)  # Also print to stdout for container logs
     log_queue.put(formatted_message)
+
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_config(config):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f)
+
+class NotificationManager:
+    @staticmethod
+    def send_notification(message):
+        config = load_config()
+
+        # Discord
+        discord_url = config.get('discord_webhook')
+        if discord_url:
+            try:
+                requests.post(discord_url, json={"content": message})
+            except Exception as e:
+                log(f"Failed to send Discord notification: {e}")
+
+        # Telegram
+        tg_token = config.get('telegram_token')
+        tg_chat = config.get('telegram_chat_id')
+        if tg_token and tg_chat:
+            try:
+                url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+                requests.post(url, json={"chat_id": tg_chat, "text": message})
+            except Exception as e:
+                log(f"Failed to send Telegram notification: {e}")
+
+class RcloneManager:
+    @staticmethod
+    def list_remotes():
+        try:
+            # rclone listremotes
+            # Note: rclone.conf must be mounted at /config/rclone/rclone.conf usually or ~/.config/rclone/rclone.conf
+            # We assume user mounts config to /root/.config/rclone/rclone.conf or we set env var
+            # RCLONE_CONFIG is standard env var.
+
+            result = subprocess.run(['rclone', 'listremotes'], capture_output=True, text=True)
+            if result.returncode != 0:
+                return []
+
+            remotes = [r.strip().rstrip(':') for r in result.stdout.split('\n') if r.strip()]
+            return remotes
+        except FileNotFoundError:
+            return []
+
+    @staticmethod
+    def run_upload(source_files, remote, upload_path):
+        # source_files is a list of file paths
+        log(f"Starting Rclone Upload to {remote}:{upload_path}")
+
+        failed = False
+        for file_path in source_files:
+            file_name = os.path.basename(file_path)
+            log(f"Uploading {file_name}...")
+
+            cmd = ['rclone', 'copy', file_path, f"{remote}:{upload_path}", '-v']
+
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True
+                )
+
+                for line in process.stdout:
+                    if "Transferred" in line or "100%" in line:
+                        pass # too verbose?
+                    elif "Error" in line:
+                        log(f"[RCLONE ERROR] {line.strip()}")
+
+                process.wait()
+                if process.returncode != 0:
+                    log(f"Failed to upload {file_name}")
+                    failed = True
+                else:
+                    log(f"Uploaded {file_name}")
+
+            except Exception as e:
+                log(f"Rclone Error: {e}")
+                failed = True
+
+        if not failed:
+            log("All uploads completed successfully.")
+            return True
+        return False
 
 @app.route('/')
 def index():
@@ -111,6 +210,11 @@ def trigger_archive():
     fmt = data.get('format', 'rar') # rar or 7z
     create_par2 = data.get('create_par2', True) # Default True
 
+    # Upload Options
+    upload = data.get('upload', False)
+    remote = data.get('remote')
+    upload_path = data.get('upload_path', '')
+
     if not target_path or not name:
         return jsonify({'error': 'Path and Name are required'}), 400
 
@@ -126,15 +230,47 @@ def trigger_archive():
     # Run archiving in a separate thread
     thread = threading.Thread(
         target=ArchiveManager.run_archive_job,
-        args=(abs_path, name, split_size, password, fmt, create_par2)
+        args=(abs_path, name, split_size, password, fmt, create_par2, upload, remote, upload_path)
     )
     thread.start()
 
     return jsonify({'status': 'started', 'message': f'Archiving started for {name}'})
 
+@app.route('/api/settings', methods=['GET', 'POST'])
+def settings():
+    if request.method == 'POST':
+        data = request.json
+        save_config(data)
+        return jsonify({'status': 'saved'})
+    else:
+        return jsonify(load_config())
+
+@app.route('/api/remotes')
+def get_remotes():
+    return jsonify(RcloneManager.list_remotes())
+
+@app.route('/api/upload', methods=['POST'])
+def trigger_manual_upload():
+    data = request.json
+    target_path = data.get('path')
+    remote = data.get('remote')
+    upload_path = data.get('upload_path', '')
+
+    if not target_path or not remote:
+        return jsonify({'error': 'Path and Remote are required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, target_path)
+
+    thread = threading.Thread(
+        target=RcloneManager.run_upload,
+        args=([abs_path], remote, upload_path)
+    )
+    thread.start()
+    return jsonify({'status': 'started'})
+
 class ArchiveManager:
     @staticmethod
-    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True):
+    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path=''):
         parent_dir = os.path.dirname(source_path)
         base_name = os.path.basename(source_path)
 
@@ -144,7 +280,7 @@ class ArchiveManager:
             archive_name += ext
 
         log(f"Starting Archive Job: Packing '{base_name}' into '{archive_name}'")
-        log(f"Format: {fmt}, Split: {split_size}, PAR2: {create_par2}")
+        log(f"Format: {fmt}, Split: {split_size}, PAR2: {create_par2}, Upload: {upload}")
 
         cmd = []
 
@@ -194,31 +330,19 @@ class ArchiveManager:
 
             if process.returncode != 0:
                 log(f"Archiving failed with code {process.returncode}")
+                NotificationManager.send_notification(f"❌ ParFix: Archiving Failed for {archive_name}")
                 return
 
             log("Archive created successfully.")
+
+            # Collect generated files for potential upload
+            generated_files = []
 
             # --- PHASE 2: PAR2 GENERATION ---
             if create_par2:
                 log("Starting PAR2 Recovery File Generation...")
 
-                # We need to find the created parts.
-                # RAR parts: Name.part001.rar OR Name.rar (if single)
-                # 7z parts: Name.7z.001
-
-                # PAR2 Command: par2 c -r10 -n1 "Name.par2" "Name.part*"
-                # We want to protect ALL parts.
-
                 par2_base = archive_name + ".par2"
-
-                # Wildcard for input files
-                # RAR: Name.part*.rar or Name.rar
-                # 7Z: Name.7z.*
-
-                # Safe approach: pass the base archive name pattern to par2
-                # But par2 needs file list.
-                # We can use shell globbing if we run via shell=True, but safer to pass specific wildcard string
-                # if the tool supports it. par2 supports wildcards in CLI.
 
                 target_pattern = ""
                 if fmt == 'rar':
@@ -230,11 +354,6 @@ class ArchiveManager:
                          target_pattern = archive_name
                 else:
                     target_pattern = archive_name + ".*"
-
-                # Par2 command
-                # par2 c -r10 "Name.par2" "target_pattern"
-                # Using shell=True for wildcard expansion is easiest here,
-                # OR we list dir and find matches manually.
 
                 # Manual match is safer for Python
                 import glob
@@ -248,42 +367,59 @@ class ArchiveManager:
 
                 if not files_to_protect:
                     log("Warning: Could not find archive files to protect with PAR2.")
-                    return
-
-                files_to_protect.sort()
-
-                # Limit command length if too many files?
-                # Usually fine.
-
-                par2_cmd = ['par2', 'c', '-r10']
-                par2_cmd.append(par2_base)
-                par2_cmd.extend([os.path.basename(f) for f in files_to_protect])
-
-                log(f"Creating PAR2 for {len(files_to_protect)} files...")
-
-                p2_process = subprocess.Popen(
-                    par2_cmd,
-                    cwd=parent_dir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True
-                )
-
-                for line in p2_process.stdout:
-                    if "Compute" in line or "Constructing" in line:
-                         log(f"[PAR2] {line.strip()}")
-
-                p2_process.wait()
-
-                if p2_process.returncode == 0:
-                    log("PAR2 Recovery files created successfully.")
                 else:
-                    log(f"PAR2 creation failed with code {p2_process.returncode}")
+                    files_to_protect.sort()
+                    generated_files.extend(files_to_protect)
+
+                    par2_cmd = ['par2', 'c', '-r10']
+                    par2_cmd.append(par2_base)
+                    par2_cmd.extend([os.path.basename(f) for f in files_to_protect])
+
+                    log(f"Creating PAR2 for {len(files_to_protect)} files...")
+
+                    p2_process = subprocess.Popen(
+                        par2_cmd,
+                        cwd=parent_dir,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        universal_newlines=True
+                    )
+
+                    for line in p2_process.stdout:
+                        if "Compute" in line or "Constructing" in line:
+                             log(f"[PAR2] {line.strip()}")
+
+                    p2_process.wait()
+
+                    if p2_process.returncode == 0:
+                        log("PAR2 Recovery files created successfully.")
+                        # Add par2 files to list
+                        # par2 creates .par2, .volXX.par2
+                        par2_pattern = par2_base.replace('.par2', '.*.par2')
+                        # Wait, simple glob for par2 files matching base
+                        # Just grab all par2s created?
+                        # Assuming base name match
+                        par2_files = glob.glob(os.path.join(parent_dir, archive_name + "*.par2"))
+                        generated_files.extend(par2_files)
+                    else:
+                        log(f"PAR2 creation failed with code {p2_process.returncode}")
+
+            # --- PHASE 3: CLOUD UPLOAD ---
+            if upload and remote:
+                log("Starting Automatic Cloud Upload...")
+                success = RcloneManager.run_upload(generated_files, remote, upload_path)
+                if success:
+                    NotificationManager.send_notification(f"✅ ParFix: Packed & Uploaded {archive_name} to {remote}")
+                else:
+                    NotificationManager.send_notification(f"⚠️ ParFix: Packed {archive_name} but Upload Failed")
+            else:
+                NotificationManager.send_notification(f"✅ ParFix: Packing Complete for {archive_name}")
 
         except Exception as e:
             log(f"CRITICAL ERROR during archiving: {str(e)}")
             import traceback
             log(traceback.format_exc())
+            NotificationManager.send_notification(f"❌ ParFix: Critical Error processing {archive_name}")
 
 class RepairManager:
     @staticmethod
@@ -345,11 +481,13 @@ class RepairManager:
             RepairManager.extract_archive(directory)
 
             log("Job Complete!")
+            NotificationManager.send_notification(f"✅ ParFix: Repair & Extract Complete for {os.path.basename(directory)}")
 
         except Exception as e:
             log(f"CRITICAL ERROR: {str(e)}")
             import traceback
             log(traceback.format_exc())
+            NotificationManager.send_notification(f"❌ ParFix: Repair Failed for {os.path.basename(directory)}")
 
     @staticmethod
     def cleanup_and_rename(directory, master_par2_name):

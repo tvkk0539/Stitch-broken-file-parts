@@ -28,7 +28,7 @@ fi
 
 echo "[2/4] Updating package lists and installing dependencies..."
 apt-get update
-apt-get install -y par2 unrar rar p7zip-full python3 python3-pip python3-venv
+apt-get install -y par2 unrar rar p7zip-full rclone curl python3 python3-pip python3-venv
 
 # Verify unrar installation
 if unrar | grep -q "unrar-free"; then
