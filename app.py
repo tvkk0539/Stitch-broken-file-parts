@@ -100,21 +100,33 @@ class RcloneManager:
                     universal_newlines=True
                 )
 
+                # Capture all output to help debug failures
                 for line in process.stdout:
-                    if "Transferred" in line or "100%" in line:
-                        pass # too verbose?
-                    elif "Error" in line:
-                        log(f"[RCLONE ERROR] {line.strip()}")
+                    line = line.strip()
+                    if not line: continue
+
+                    # Log errors/failures explicitly
+                    if "error" in line.lower() or "failed" in line.lower():
+                        log(f"[RCLONE ERROR] {line}")
+                    # Log progress periodically or important status
+                    elif "Transferred" in line:
+                        # Only log every few lines or just ignore to keep logs clean
+                        # For debugging, we might want to see it starts
+                        if "Transferred:" in line and " 0 B" not in line:
+                             pass
+                    else:
+                        # Log everything else during debug phase to catch "413" or other non-error codes
+                        log(f"[RCLONE] {line}")
 
                 process.wait()
                 if process.returncode != 0:
-                    log(f"Failed to upload {file_name}")
+                    log(f"Failed to upload {file_name} (Code {process.returncode})")
                     failed = True
                 else:
                     log(f"Uploaded {file_name}")
 
             except Exception as e:
-                log(f"Rclone Error: {e}")
+                log(f"Rclone Execution Error: {e}")
                 failed = True
 
         if not failed:
