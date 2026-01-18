@@ -1,0 +1,20 @@
+# Master Prompt: Token Rename and Size Expansion
+
+**Project Context:**
+The user requested a specific naming convention for the GitHub Secret token and further expansion of the split size options.
+
+**The Goal:**
+1.  **Rename Token:** Change `GITHUB_TOKEN` to `MY_GITHUB_TOKEN` in the GitHub Actions workflow.
+2.  **Add More Sizes:** Add 3GB, 3.5GB, 4GB, 4.5GB to the split size dropdown.
+
+**Core Requirements:**
+1.  **Update `.github/workflows/docker-publish.yml`:**
+    *   Change `${{ secrets.GITHUB_TOKEN }}` to `${{ secrets.MY_GITHUB_TOKEN }}`.
+    *   *Note:* The standard `GITHUB_TOKEN` is automatically provided by GitHub Actions, but if the user wants to use a personal access token (PAT) stored as a secret named `MY_GITHUB_TOKEN`, we should respect that.
+2.  **Update `templates/index.html`:**
+    *   Add the missing intermediate sizes between 2.5GB and 5GB.
+    *   **New Options:** 3 GB (`3072M`), 3.5 GB (`3584M`), 4 GB (`4096M`), 4.5 GB (`4608M`).
+
+**Deliverables:**
+*   Updated workflow file.
+*   Updated `index.html` with the complete size list.
