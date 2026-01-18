@@ -333,6 +333,31 @@ def trigger_manual_upload():
     thread.start()
     return jsonify({'status': 'started'})
 
+@app.route('/api/extract', methods=['POST'])
+def trigger_extract():
+    data = request.json
+    target_path = data.get('path')
+    method = data.get('method', 'unrar')
+    password = data.get('password')
+
+    if not target_path:
+        return jsonify({'error': 'Path required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, target_path)
+    if not os.path.exists(abs_path):
+        return jsonify({'error': 'Path not found'}), 404
+
+    # Security check
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied'}), 403
+
+    thread = threading.Thread(
+        target=ExtractManager.run_extract_job,
+        args=(abs_path, method, password)
+    )
+    thread.start()
+    return jsonify({'status': 'started'})
+
 @app.route('/api/rename', methods=['POST'])
 def rename_item():
     data = request.json
@@ -861,6 +886,95 @@ class RepairManager:
             log("Unrar finished successfully.")
         else:
             log(f"Unrar failed with code {process.returncode}")
+
+class ExtractManager:
+    @staticmethod
+    def run_extract_job(target_path, method='unrar', password=None):
+        # Determine if target is file or dir
+        work_dir = target_path
+        archive_file = None
+
+        if os.path.isfile(target_path):
+            work_dir = os.path.dirname(target_path)
+            archive_file = os.path.basename(target_path)
+        else:
+            # It's a directory, find the archive
+            files = sorted(os.listdir(target_path))
+
+            # Smart detection based on method
+            if method == 'unrar':
+                for f in files:
+                    if f.endswith('.rar') and not '.part' in f:
+                        archive_file = f
+                        break
+                if not archive_file:
+                    for f in files:
+                        if (f.endswith('.part01.rar') or f.endswith('.part001.rar')):
+                            archive_file = f
+                            break
+            elif method == '7z':
+                for f in files:
+                    if f.endswith('.7z') or f.endswith('.001'):
+                        archive_file = f
+                        break
+
+        if not archive_file:
+            log(f"Extraction Error: No suitable archive found in {work_dir} for method {method}")
+            return
+
+        log(f"Starting Extraction: {archive_file} using {method}")
+
+        cmd = []
+        if method == 'unrar':
+            # unrar x -y -pPASSWORD archive.rar
+            cmd = ['unrar', 'x', '-y']
+            if password:
+                cmd.append(f'-p{password}')
+            cmd.append(archive_file)
+
+        elif method == '7z':
+            # 7z x -y -pPASSWORD archive.7z
+            cmd = ['7z', 'x', '-y']
+            if password:
+                cmd.append(f'-p{password}')
+            cmd.append(archive_file)
+
+        try:
+            process = subprocess.Popen(
+                cmd,
+                cwd=work_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True
+            )
+
+            for line in process.stdout:
+                line = line.strip()
+                if not line: continue
+
+                # Filter noise
+                if "Extracting from" in line or "Creating" in line or "Inflating" in line:
+                    continue
+
+                if "All OK" in line or "Everything is Ok" in line:
+                     log(f"[{method.upper()}] {line}")
+                elif "Error" in line or "Wrong password" in line:
+                     log(f"[{method.upper()} ERROR] {line}")
+                else:
+                    # Show periodic progress or important info
+                    pass
+
+            process.wait()
+
+            if process.returncode == 0:
+                log(f"Extraction with {method} completed successfully.")
+                NotificationManager.send_notification(f"✅ ParFix: Extracted {archive_file}")
+            else:
+                log(f"Extraction failed with code {process.returncode}")
+                NotificationManager.send_notification(f"❌ ParFix: Extraction Failed for {archive_file}")
+
+        except Exception as e:
+            log(f"Extraction Exception: {e}")
 
 if __name__ == '__main__':
     # Ensure download root exists (useful for local testing)

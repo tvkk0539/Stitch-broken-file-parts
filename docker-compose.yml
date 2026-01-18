@@ -8,11 +8,12 @@ services:
       - "5001:5000"
     environment:
       - DOWNLOAD_ROOT=/data/downloads
+      - CONFIG_FILE=/config/config.json
     volumes:
       # Map your actual download folder
       - ./downloads:/data/downloads
       # Map config for persistent settings
-      - ./config:/app/config.json
+      - ./config:/config
       # Map Rclone config for Cloud Uploads (Optional)
       # - ~/.config/rclone/rclone.conf:/root/.config/rclone/rclone.conf
     restart: unless-stopped

@@ -98,6 +98,11 @@
             flex-wrap: wrap; /* Fix: Allow wrapping on small screens */
         }
 
+        /* Hover effect for manually grayed out settings button to show color */
+        #settings-btn:hover {
+            background-color: var(--accent-color) !important;
+        }
+
         button {
             background-color: var(--accent-color);
             color: #15161e;
@@ -144,7 +149,8 @@
         }
 
         button:disabled {
-            background-color: #414868;
+            background-color: dimgray !important;
+            color: #ccc;
             cursor: not-allowed;
         }
 
@@ -246,13 +252,14 @@
         </ul>
         <div id="controls">
             <button id="repair-btn" disabled>Repair</button>
+            <button id="extract-btn" style="background-color:#00d9ff;" disabled>Extract</button>
             <button id="archive-btn" class="secondary" disabled>Pack</button>
             <button id="upload-btn" class="purple-btn" disabled>Upload</button>
             <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
             <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
             <button id="rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
             <button id="delete-btn" class="danger" disabled>🗑️</button>
-            <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+            <button id="settings-btn" class="icon-btn" title="Settings" style="background-color:dimgray; color:white;">⚙️</button>
         </div>
     </div>
 
@@ -409,6 +416,30 @@
         </div>
     </div>
 
+    <!-- Extract Modal -->
+    <div id="extract-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Extract Archive</h3>
+            </div>
+            <div class="form-group">
+                <label>Method:</label>
+                <select id="ext-method">
+                    <option value="unrar" selected>UnRAR (Default)</option>
+                    <option value="7z">7-Zip</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Password (Optional):</label>
+                <input type="text" id="ext-pass" placeholder="Password if protected">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-ext" style="background:#f7768e">Cancel</button>
+                <button id="confirm-ext" class="secondary">Extract Here</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Rename Modal -->
     <div id="rename-modal" class="modal">
         <div class="modal-content">
@@ -450,6 +481,7 @@
         const fileList = document.getElementById('file-list');
         const breadcrumb = document.getElementById('current-path');
         const repairBtn = document.getElementById('repair-btn');
+        const extractBtn = document.getElementById('extract-btn');
         const archiveBtn = document.getElementById('archive-btn');
         const uploadBtn = document.getElementById('upload-btn');
         const moveBtn = document.getElementById('move-btn');
@@ -514,6 +546,13 @@
         const mkdirNameInput = document.getElementById('mkdir-name');
         const confirmMkdirBtn = document.getElementById('confirm-mkdir');
         const cancelMkdirBtn = document.getElementById('cancel-mkdir');
+
+        // Extract Modal Elements
+        const extModal = document.getElementById('extract-modal');
+        const extMethod = document.getElementById('ext-method');
+        const extPass = document.getElementById('ext-pass');
+        const confirmExtBtn = document.getElementById('confirm-ext');
+        const cancelExtBtn = document.getElementById('cancel-ext');
 
         // Initial Load
         loadPath('');
@@ -712,6 +751,7 @@
             repairBtn.disabled = count !== 1;
             archiveBtn.disabled = count !== 1;
             renameBtn.disabled = count !== 1;
+            extractBtn.disabled = count !== 1;
         }
 
         repairBtn.onclick = async () => {
@@ -1103,6 +1143,59 @@
             }
         };
 
+        // --- Extract Logic ---
+        extractBtn.onclick = () => {
+            if (selectedPaths.length !== 1) return;
+            extModal.style.display = "block";
+        };
+
+        cancelExtBtn.onclick = () => extModal.style.display = "none";
+
+        confirmExtBtn.onclick = async () => {
+             const method = extMethod.value;
+             const password = extPass.value;
+
+             extModal.style.display = "none";
+             const target = selectedPaths[0];
+
+             extractBtn.disabled = true;
+             extractBtn.textContent = "Extracting...";
+
+             try {
+                 const res = await fetch('/api/extract', {
+                     method: 'POST',
+                     headers: {'Content-Type': 'application/json'},
+                     body: JSON.stringify({
+                         path: target,
+                         method: method,
+                         password: password
+                     })
+                 });
+                 const data = await res.json();
+
+                 if (data.status === 'started') {
+                     // logs
+                 } else {
+                     alert("Extraction Request Failed: " + data.error);
+                     extractBtn.disabled = false;
+                     extractBtn.textContent = "Extract";
+                 }
+
+                 // Reset button after short delay or leave disabled?
+                 // Re-enabling logic is complex due to SSE logs not calling back here.
+                 // We rely on refresh or manual navigation to reset state usually.
+                 setTimeout(() => {
+                     extractBtn.disabled = selectedPaths.length !== 1;
+                     extractBtn.textContent = "Extract";
+                 }, 3000);
+
+             } catch(e) {
+                 alert("Request failed");
+                 extractBtn.disabled = false;
+                 extractBtn.textContent = "Extract";
+             }
+        };
+
         // Close Modals on click outside
         window.onclick = (event) => {
             if (event.target == modal) modal.style.display = "none";
@@ -1110,6 +1203,7 @@
             if (event.target == setModal) setModal.style.display = "none";
             if (event.target == mcModal) mcModal.style.display = "none";
             if (event.target == mkdirModal) mkdirModal.style.display = "none";
+            if (event.target == extModal) extModal.style.display = "none";
         };
 
     </script>
