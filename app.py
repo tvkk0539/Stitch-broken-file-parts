@@ -5,6 +5,7 @@ import threading
 import queue
 import json
 import requests
+import shutil
 from flask import Flask, render_template, jsonify, request, Response
 
 app = Flask(__name__)
@@ -253,21 +254,70 @@ def get_remotes():
 @app.route('/api/upload', methods=['POST'])
 def trigger_manual_upload():
     data = request.json
-    target_path = data.get('path')
+    target_paths = data.get('paths') # Expecting list
     remote = data.get('remote')
     upload_path = data.get('upload_path', '')
 
-    if not target_path or not remote:
-        return jsonify({'error': 'Path and Remote are required'}), 400
+    if not target_paths or not remote:
+        return jsonify({'error': 'Paths and Remote are required'}), 400
 
-    abs_path = os.path.join(DOWNLOAD_ROOT, target_path)
+    abs_paths = []
+    for p in target_paths:
+        abs_p = os.path.join(DOWNLOAD_ROOT, p)
+        # Security check
+        if not os.path.abspath(abs_p).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+            continue
+        abs_paths.append(abs_p)
+
+    if not abs_paths:
+        return jsonify({'error': 'No valid paths found'}), 400
 
     thread = threading.Thread(
         target=RcloneManager.run_upload,
-        args=([abs_path], remote, upload_path)
+        args=(abs_paths, remote, upload_path)
     )
     thread.start()
     return jsonify({'status': 'started'})
+
+@app.route('/api/delete', methods=['POST'])
+def trigger_delete():
+    data = request.json
+    target_paths = data.get('paths')
+
+    if not target_paths:
+        return jsonify({'error': 'No paths provided'}), 400
+
+    success_count = 0
+    errors = []
+
+    for p in target_paths:
+        abs_path = os.path.join(DOWNLOAD_ROOT, p)
+
+        # Security Check
+        if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+            errors.append(f"Access denied: {p}")
+            continue
+
+        if not os.path.exists(abs_path):
+            errors.append(f"Not found: {p}")
+            continue
+
+        try:
+            if os.path.isdir(abs_path):
+                shutil.rmtree(abs_path)
+            else:
+                os.remove(abs_path)
+            success_count += 1
+            log(f"Deleted: {p}")
+        except Exception as e:
+            errors.append(f"Failed to delete {p}: {str(e)}")
+            log(f"Delete Error for {p}: {str(e)}")
+
+    return jsonify({
+        'status': 'completed',
+        'deleted': success_count,
+        'errors': errors
+    })
 
 class ArchiveManager:
     @staticmethod

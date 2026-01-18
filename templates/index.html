@@ -113,10 +113,21 @@
             background-color: #9ece6a; /* Green */
         }
 
+        button.danger {
+            background-color: #f7768e; /* Red */
+        }
+
         button.icon-btn {
             flex: 0;
             padding: 10px 15px;
             min-width: 50px;
+        }
+
+        /* Checkbox styling */
+        .file-item input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+            cursor: pointer;
         }
 
         button:disabled {
@@ -212,9 +223,10 @@
             <!-- Items injected via JS -->
         </ul>
         <div id="controls">
-            <button id="repair-btn" disabled>Repair & Extract</button>
-            <button id="archive-btn" class="secondary" disabled>Create Archive</button>
+            <button id="repair-btn" disabled>Repair</button>
+            <button id="archive-btn" class="secondary" disabled>Pack</button>
             <button id="upload-btn" class="secondary" disabled style="background:#bb9af7">Upload</button>
+            <button id="delete-btn" class="danger" disabled>🗑️</button>
             <button id="settings-btn" class="icon-btn">⚙️</button>
         </div>
     </div>
@@ -346,11 +358,14 @@
 
     <script>
         let currentPath = '';
+        let selectedPaths = []; // Track selections
+
         const fileList = document.getElementById('file-list');
         const breadcrumb = document.getElementById('current-path');
         const repairBtn = document.getElementById('repair-btn');
         const archiveBtn = document.getElementById('archive-btn');
         const uploadBtn = document.getElementById('upload-btn');
+        const deleteBtn = document.getElementById('delete-btn');
         const settingsBtn = document.getElementById('settings-btn');
         const consoleDiv = document.getElementById('console');
 
@@ -406,13 +421,11 @@
                 }
 
                 currentPath = data.current_path;
+                selectedPaths = []; // Reset selection on nav
+                updateButtonState();
+
                 renderBreadcrumb(currentPath);
                 renderFiles(data.items, data.parent_path);
-
-                // Enable buttons
-                repairBtn.disabled = false;
-                archiveBtn.disabled = false;
-                uploadBtn.disabled = false;
 
             } catch (err) {
                 console.error('Failed to load path', err);
@@ -489,29 +502,75 @@
                 const li = document.createElement('li');
                 li.className = 'file-item';
 
+                // Checkbox
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleSelection(item.path, checkbox.checked);
+                };
+
                 let icon = '📄';
                 let iconClass = 'file-icon';
 
+                const span = document.createElement('span');
+                span.className = `icon ${iconClass}`;
+
                 if (item.is_dir) {
                     icon = '📁';
-                    iconClass = 'dir-icon';
-                    li.onclick = () => loadPath(item.path);
+                    span.className = `icon dir-icon`;
+                    // Clicking the row (not checkbox) navigates
+                    li.onclick = (e) => {
+                        if (e.target !== checkbox) loadPath(item.path);
+                    };
                 } else {
                     if (item.name.endsWith('.par2')) {
                         icon = '🔧';
-                        iconClass = 'par2-icon';
+                        span.className = `icon par2-icon`;
                     } else if (item.name.endsWith('.rar')) {
                         icon = '📦';
                     }
                 }
+                span.textContent = icon;
 
-                li.innerHTML = `<span class="icon ${iconClass}">${icon}</span> ${item.name}`;
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = item.name;
+
+                li.appendChild(checkbox);
+                li.appendChild(span);
+                li.appendChild(nameSpan);
                 fileList.appendChild(li);
             });
         }
 
+        function toggleSelection(path, checked) {
+            if (checked) {
+                selectedPaths.push(path);
+            } else {
+                selectedPaths = selectedPaths.filter(p => p !== path);
+            }
+            updateButtonState();
+        }
+
+        function updateButtonState() {
+            const count = selectedPaths.length;
+
+            // Delete & Upload work on 1 or more
+            deleteBtn.disabled = count === 0;
+            uploadBtn.disabled = count === 0;
+
+            // Repair & Pack work on exactly 1 item usually to keep logic simple
+            // Or we allow pack on 1 folder.
+            // Let's restrict Repair/Pack to single selection for safety.
+            repairBtn.disabled = count !== 1;
+            archiveBtn.disabled = count !== 1;
+        }
+
         repairBtn.onclick = async () => {
-            if (!confirm(`Are you sure you want to run repair in:\n${currentPath || 'ROOT'}?`)) return;
+            const target = selectedPaths[0]; // Logic works on selection now
+            if (!target) return;
+
+            if (!confirm(`Are you sure you want to run repair in:\n${target}?`)) return;
 
             repairBtn.disabled = true;
             repairBtn.textContent = "Starting...";
@@ -520,7 +579,7 @@
                 const res = await fetch('/api/repair', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ path: currentPath })
+                    body: JSON.stringify({ path: target })
                 });
                 const data = await res.json();
                 if (data.status === 'started') {
@@ -529,19 +588,22 @@
                 } else {
                     alert('Error: ' + data.error);
                     repairBtn.disabled = false;
-                    repairBtn.textContent = "Repair & Extract Here";
+                    repairBtn.textContent = "Repair";
                 }
             } catch (err) {
                 alert('Request failed');
                 repairBtn.disabled = false;
-                repairBtn.textContent = "Repair & Extract Here";
+                repairBtn.textContent = "Repair";
             }
         };
 
         // --- Archive Modal Logic ---
         archiveBtn.onclick = () => {
             loadRemotes();
-            const parts = currentPath.split('/');
+            const target = selectedPaths[0]; // Assume single selection for packing
+            if (!target) return;
+
+            const parts = target.split('/');
             const defaultName = parts[parts.length-1] || 'Archive';
             arcNameInput.value = defaultName;
 
@@ -558,6 +620,7 @@
         };
 
         startArcBtn.onclick = async () => {
+            const target = selectedPaths[0]; // Assume single selection
             const name = arcNameInput.value;
             const size = arcSizeInput.value;
             const password = arcPassInput.value;
@@ -579,7 +642,7 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        path: currentPath,
+                        path: target,
                         name: name,
                         split_size: size,
                         password: password,
@@ -610,9 +673,20 @@
         uploadBtn.onclick = () => {
             loadRemotes();
 
-            // Smart Default Path
-            const parts = currentPath.split('/');
-            const itemName = parts[parts.length-1] || 'Upload';
+            // Smart Default Path logic for batch?
+            // If multiple items, use the folder name?
+            // If single item, use item name.
+
+            let itemName = "Batch_Upload";
+            if (selectedPaths.length === 1) {
+                const parts = selectedPaths[0].split('/');
+                itemName = parts[parts.length-1];
+            } else {
+                // If inside a folder, use that folder name?
+                const parts = currentPath.split('/');
+                itemName = parts[parts.length-1] || "Batch";
+            }
+
             upPathInput.value = `ParFix_Uploads/${itemName}/`;
 
             upModal.style.display = "block";
@@ -632,12 +706,36 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        path: currentPath,
+                        paths: selectedPaths,
                         remote: remote,
                         upload_path: path
                     })
                 });
             } catch (e) { alert("Upload request failed"); }
+        };
+
+        // --- Delete Logic ---
+        deleteBtn.onclick = async () => {
+            if (selectedPaths.length === 0) return;
+
+            if (!confirm(`Are you sure you want to PERMANENTLY DELETE ${selectedPaths.length} items?`)) return;
+
+            deleteBtn.disabled = true;
+            try {
+                const res = await fetch('/api/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ paths: selectedPaths })
+                });
+                const data = await res.json();
+
+                // Refresh logic?
+                alert(`Deleted ${data.deleted} items.`);
+                loadPath(currentPath); // Refresh view
+
+            } catch(e) {
+                alert("Delete failed");
+            }
         };
 
         // --- Settings Logic ---

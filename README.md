@@ -23,7 +23,13 @@ Easily create multi-part archives from large files or folders.
 
 ### ☁️ Cloud & Alerts
 - **Rclone Integration:** Manually or Automatically upload your files to the cloud (Google Drive, OneDrive, etc.).
+- **Smart Uploads:** Automatically organizes uploads into `ParFix_Uploads/{Name}/`.
 - **Notifications:** Get alerts on Discord or Telegram when jobs complete or fail.
+
+### 📂 File Management
+- **Multi-Select:** Check multiple files/folders to perform batch actions.
+- **Batch Upload:** Upload multiple selected items to the cloud at once.
+- **Delete:** Manually delete files/folders from the UI to clean up space.
 
 ## 🚀 Deployment Guide (Detailed)
 
