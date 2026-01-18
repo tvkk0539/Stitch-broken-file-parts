@@ -1,0 +1,16 @@
+# Copy and paste this block into your main docker-compose.yml under 'services:'
+  parfix:
+    image: ghcr.io/tvkk0539/rclone-arr-setup-with-jules-customised/parfix:latest
+    container_name: parfix
+    ports:
+      - "5001:5000"
+    environment:
+      - DOWNLOAD_ROOT=/data/downloads
+    volumes:
+      # CHANGE THIS PATH to match your actual downloads folder
+      - /path/to/your/real/downloads:/data/downloads
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 200M

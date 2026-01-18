@@ -11,41 +11,65 @@ Designed to solve the specific "Scrambled RARs with Correct PAR2" issue.
 - **Lightweight:** Uses Python Flask and raw HTML/JS. No heavy frameworks.
 - **Dockerized:** Pre-configured with non-free `unrar` and `par2`.
 
-## 🚀 How to Add to Your Existing Stack
+## 🚀 Deployment Guide (Detailed)
 
-If you are using the `Rclone-Arr-Setup` (or any Docker-based media stack), follow these steps to add ParFix.
+You have two options to deploy this. Choose **Option B** if you want the easiest setup.
 
-### 1. Copy the Files
-Clone this repository or copy the files (`Dockerfile`, `app.py`, `requirements.txt`, `templates/`) into a folder named `parfix` next to your existing `docker-compose.yml`.
+### Option A: Build it Yourself (Clone & Build)
+Use this if you want to modify the code.
 
-### 2. Update Your `docker-compose.yml`
-Add the following service block to your existing `docker-compose.yml`.
+1. **Clone this repo** onto your server.
+2. **Build and Run:**
+   ```bash
+   docker-compose up -d --build
+   ```
 
-**CRITICAL:** Ensure the `volumes` match what your qBittorrent/Radarr containers use!
+### Option B: Use the Pre-Built Image (Recommended)
+Use this to simply add the tool to your existing stack without downloading the source code manually.
+
+1. Open your `Rclone-Arr-Setup`'s `docker-compose.yml`.
+2. Add the service block below.
+3. Run `docker-compose up -d`.
 
 ```yaml
   parfix:
-    build: ./parfix  # Path to where you put these files
+    # This pulls the ready-made image from GitHub
+    image: ghcr.io/tvkk0539/rclone-arr-setup-with-jules-customised/parfix:latest
     container_name: parfix
     ports:
-      - "5001:5000"  # Access via http://localhost:5001
+      - "5001:5000"  # Access via http://YOUR_IP:5001
     environment:
       - DOWNLOAD_ROOT=/data/downloads
     volumes:
-      # MAP THIS TO YOUR EXISTING DOWNLOADS FOLDER!
-      # Example: If qBittorrent saves to /mnt/data/torrents, use that here.
+      # CRITICAL: Change the left side to match your real downloads folder!
       - /path/to/your/real/downloads:/data/downloads
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 200M
 ```
 
-### 3. Build and Run
-```bash
-docker-compose up -d --build
-```
+## 🔒 Firewall & Ports
+
+**Which port needs to be open?**
+- **Port 5001 (TCP)**
+
+**Scenario 1: Direct Access**
+If you want to access the tool directly via `http://YOUR_SERVER_IP:5001`, you **MUST open Port 5001** in your VPS Firewall (GCP Firewall, AWS Security Group, UFW, etc.).
+- *GCP Example:* Create a firewall rule allowing `tcp:5001` on Ingress.
+
+**Scenario 2: Using a Reverse Proxy (Nginx Proxy Manager)**
+If you are using Nginx Proxy Manager (included in many Arr stacks):
+1. **Do NOT** open port 5001 to the public internet.
+2. In Nginx Proxy Manager, create a new Proxy Host:
+   - **Forward Hostname:** `parfix` (or the container IP)
+   - **Forward Port:** `5000` (Note: The internal container port is 5000)
+3. This is more secure as only Nginx handles the traffic.
 
 ## 🛠 Usage
 
-1. Open `http://localhost:5001` in your browser.
+1. Open the tool in your browser.
 2. Navigate to the folder containing the scrambled files.
    - *Note: You will see the scrambled RAR names (e.g., `6rLT...rar`) and the correct PAR2 name.*
 3. Click **"Repair & Extract Here"**.
