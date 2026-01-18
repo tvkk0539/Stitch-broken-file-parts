@@ -60,9 +60,12 @@ Use this to simply add the tool to your existing stack without downloading the s
       - "5001:5000"  # Access via http://YOUR_IP:5001
     environment:
       - DOWNLOAD_ROOT=/data/downloads
+      - CONFIG_FILE=/config/config.json
     volumes:
       # CRITICAL: Change the left side to match your real downloads folder!
       - /path/to/your/real/downloads:/data/downloads
+      # OPTIONAL: Mount a local folder to persist Notification Settings
+      - ./parfix-config:/config
       # OPTIONAL: Mount your rclone.conf for Cloud Upload features
       # - /home/user/.config/rclone/rclone.conf:/root/.config/rclone/rclone.conf
     restart: unless-stopped
