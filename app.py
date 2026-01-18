@@ -331,6 +331,134 @@ def trigger_delete():
         'errors': errors
     })
 
+@app.route('/api/mkdir', methods=['POST'])
+def make_directory():
+    data = request.json
+    parent_path = data.get('path', '')
+    name = data.get('name')
+
+    if not name:
+        return jsonify({'error': 'Folder name required'}), 400
+
+    abs_parent = os.path.join(DOWNLOAD_ROOT, parent_path)
+    new_dir_path = os.path.join(abs_parent, name)
+
+    # Security Check
+    if not os.path.abspath(new_dir_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        os.makedirs(new_dir_path, exist_ok=True)
+        log(f"Created directory: {os.path.join(parent_path, name)}")
+        return jsonify({'status': 'created'})
+    except Exception as e:
+        log(f"Mkdir Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/move', methods=['POST'])
+def move_items():
+    data = request.json
+    paths = data.get('paths', [])
+    dest_path = data.get('destination', '')
+
+    if not paths:
+        return jsonify({'error': 'No items selected'}), 400
+
+    abs_dest = os.path.join(DOWNLOAD_ROOT, dest_path)
+
+    # Ensure destination exists
+    if not os.path.exists(abs_dest):
+        return jsonify({'error': 'Destination folder does not exist'}), 404
+
+    # Security Check (Destination)
+    if not os.path.abspath(abs_dest).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied (Destination)'}), 403
+
+    success_count = 0
+    errors = []
+
+    for p in paths:
+        abs_src = os.path.join(DOWNLOAD_ROOT, p)
+
+        # Security Check (Source)
+        if not os.path.abspath(abs_src).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+            errors.append(f"Access denied: {p}")
+            continue
+
+        if not os.path.exists(abs_src):
+            errors.append(f"Not found: {p}")
+            continue
+
+        try:
+            shutil.move(abs_src, abs_dest)
+            success_count += 1
+            log(f"Moved {p} to {dest_path}")
+        except Exception as e:
+            errors.append(f"Failed to move {p}: {str(e)}")
+            log(f"Move Error for {p}: {str(e)}")
+
+    return jsonify({
+        'status': 'completed',
+        'moved': success_count,
+        'errors': errors
+    })
+
+@app.route('/api/copy', methods=['POST'])
+def copy_items():
+    data = request.json
+    paths = data.get('paths', [])
+    dest_path = data.get('destination', '')
+
+    if not paths:
+        return jsonify({'error': 'No items selected'}), 400
+
+    abs_dest = os.path.join(DOWNLOAD_ROOT, dest_path)
+
+    # Ensure destination exists
+    if not os.path.exists(abs_dest):
+        return jsonify({'error': 'Destination folder does not exist'}), 404
+
+    # Security Check (Destination)
+    if not os.path.abspath(abs_dest).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied (Destination)'}), 403
+
+    success_count = 0
+    errors = []
+
+    for p in paths:
+        abs_src = os.path.join(DOWNLOAD_ROOT, p)
+
+        # Security Check (Source)
+        if not os.path.abspath(abs_src).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+            errors.append(f"Access denied: {p}")
+            continue
+
+        if not os.path.exists(abs_src):
+            errors.append(f"Not found: {p}")
+            continue
+
+        try:
+            # Determine destination path (keep filename)
+            basename = os.path.basename(abs_src)
+            final_dest = os.path.join(abs_dest, basename)
+
+            if os.path.isdir(abs_src):
+                shutil.copytree(abs_src, final_dest, dirs_exist_ok=True)
+            else:
+                shutil.copy2(abs_src, final_dest)
+
+            success_count += 1
+            log(f"Copied {p} to {dest_path}")
+        except Exception as e:
+            errors.append(f"Failed to copy {p}: {str(e)}")
+            log(f"Copy Error for {p}: {str(e)}")
+
+    return jsonify({
+        'status': 'completed',
+        'copied': success_count,
+        'errors': errors
+    })
+
 class ArchiveManager:
     @staticmethod
     def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path=''):

@@ -95,6 +95,7 @@
             justify-content: space-between;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap; /* Fix: Allow wrapping on small screens */
         }
 
         button {
@@ -119,6 +120,14 @@
 
         button.purple-btn {
             background-color: #bb9af7; /* Purple */
+        }
+
+        button.info-btn {
+            background-color: #7dcfff; /* Cyan */
+        }
+
+        button.warning-btn {
+            background-color: #e0af68; /* Orange */
         }
 
         button.icon-btn {
@@ -221,7 +230,10 @@
 
     <!-- Left Panel: File Browser -->
     <div id="file-browser" class="panel">
-        <h2>File Browser</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>File Browser</h2>
+            <button id="new-folder-btn" class="icon-btn" style="background:none; border:1px solid #414868; color:var(--accent-color);" title="New Folder">📂+</button>
+        </div>
         <div id="current-path" class="breadcrumb">/</div>
         <ul id="file-list">
             <!-- Items injected via JS -->
@@ -230,8 +242,10 @@
             <button id="repair-btn" disabled>Repair</button>
             <button id="archive-btn" class="secondary" disabled>Pack</button>
             <button id="upload-btn" class="purple-btn" disabled>Upload</button>
+            <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
+            <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
             <button id="delete-btn" class="danger" disabled>🗑️</button>
-            <button id="settings-btn" class="icon-btn">⚙️</button>
+            <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
         </div>
     </div>
 
@@ -360,6 +374,41 @@
         </div>
     </div>
 
+    <!-- Move/Copy Modal -->
+    <div id="move-copy-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="mc-title">Move Items</h3>
+            </div>
+            <div class="form-group">
+                <label>Destination Folder (Relative to Root):</label>
+                <input type="text" id="mc-dest" placeholder="Movies/NewFolder">
+                <small style="color:#565f89">Current: <span id="mc-current-path-display"></span></small>
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-mc" style="background:#f7768e">Cancel</button>
+                <button id="confirm-mc" class="secondary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Folder Modal -->
+    <div id="mkdir-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Folder</h3>
+            </div>
+            <div class="form-group">
+                <label>Folder Name:</label>
+                <input type="text" id="mkdir-name" placeholder="New Folder">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-mkdir" style="background:#f7768e">Cancel</button>
+                <button id="confirm-mkdir" class="secondary">Create</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentPath = '';
         let selectedPaths = []; // Track selections
@@ -369,8 +418,11 @@
         const repairBtn = document.getElementById('repair-btn');
         const archiveBtn = document.getElementById('archive-btn');
         const uploadBtn = document.getElementById('upload-btn');
+        const moveBtn = document.getElementById('move-btn');
+        const copyBtn = document.getElementById('copy-btn');
         const deleteBtn = document.getElementById('delete-btn');
         const settingsBtn = document.getElementById('settings-btn');
+        const newFolderBtn = document.getElementById('new-folder-btn');
         const consoleDiv = document.getElementById('console');
 
         // Archive Modal Elements
@@ -401,6 +453,21 @@
         const setTgChatInput = document.getElementById('set-tg-chat');
         const saveSetBtn = document.getElementById('save-set');
         const cancelSetBtn = document.getElementById('cancel-set');
+
+        // Move/Copy Modal Elements
+        const mcModal = document.getElementById('move-copy-modal');
+        const mcTitle = document.getElementById('mc-title');
+        const mcDestInput = document.getElementById('mc-dest');
+        const mcCurrentDisplay = document.getElementById('mc-current-path-display');
+        const confirmMcBtn = document.getElementById('confirm-mc');
+        const cancelMcBtn = document.getElementById('cancel-mc');
+        let mcAction = 'move'; // 'move' or 'copy'
+
+        // Mkdir Modal Elements
+        const mkdirModal = document.getElementById('mkdir-modal');
+        const mkdirNameInput = document.getElementById('mkdir-name');
+        const confirmMkdirBtn = document.getElementById('confirm-mkdir');
+        const cancelMkdirBtn = document.getElementById('cancel-mkdir');
 
         // Initial Load
         loadPath('');
@@ -559,13 +626,14 @@
         function updateButtonState() {
             const count = selectedPaths.length;
 
-            // Delete & Upload work on 1 or more
-            deleteBtn.disabled = count === 0;
-            uploadBtn.disabled = count === 0;
+            // Batch actions
+            const hasSelection = count > 0;
+            deleteBtn.disabled = !hasSelection;
+            uploadBtn.disabled = !hasSelection;
+            moveBtn.disabled = !hasSelection;
+            copyBtn.disabled = !hasSelection;
 
-            // Repair & Pack work on exactly 1 item usually to keep logic simple
-            // Or we allow pack on 1 folder.
-            // Let's restrict Repair/Pack to single selection for safety.
+            // Single Item actions
             repairBtn.disabled = count !== 1;
             archiveBtn.disabled = count !== 1;
         }
@@ -765,11 +833,91 @@
             setModal.style.display = "none";
         };
 
+        // --- Move/Copy Logic ---
+        function openMcModal(action) {
+            mcAction = action;
+            mcTitle.textContent = action === 'move' ? 'Move Items' : 'Copy Items';
+            mcDestInput.value = currentPath; // Default to current
+            mcCurrentDisplay.textContent = currentPath || '/';
+            mcModal.style.display = 'block';
+        }
+
+        moveBtn.onclick = () => openMcModal('move');
+        copyBtn.onclick = () => openMcModal('copy');
+
+        cancelMcBtn.onclick = () => mcModal.style.display = 'none';
+
+        confirmMcBtn.onclick = async () => {
+            const dest = mcDestInput.value;
+            const endpoint = mcAction === 'move' ? '/api/move' : '/api/copy';
+
+            mcModal.style.display = 'none';
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        paths: selectedPaths,
+                        destination: dest
+                    })
+                });
+                const data = await res.json();
+
+                if (data.status === 'completed') {
+                    alert(`${mcAction === 'move' ? 'Moved' : 'Copied'} ${data.moved || data.copied} items.`);
+                    loadPath(currentPath);
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                    if (data.errors && data.errors.length > 0) {
+                        console.error(data.errors);
+                    }
+                }
+            } catch (e) {
+                alert('Request failed');
+            }
+        };
+
+        // --- New Folder Logic ---
+        newFolderBtn.onclick = () => {
+            mkdirNameInput.value = '';
+            mkdirModal.style.display = 'block';
+        };
+
+        cancelMkdirBtn.onclick = () => mkdirModal.style.display = 'none';
+
+        confirmMkdirBtn.onclick = async () => {
+            const name = mkdirNameInput.value;
+            if (!name) return;
+
+            mkdirModal.style.display = 'none';
+            try {
+                const res = await fetch('/api/mkdir', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        path: currentPath,
+                        name: name
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'created') {
+                    loadPath(currentPath);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (e) {
+                alert('Request failed');
+            }
+        };
+
         // Close Modals on click outside
         window.onclick = (event) => {
             if (event.target == modal) modal.style.display = "none";
             if (event.target == upModal) upModal.style.display = "none";
             if (event.target == setModal) setModal.style.display = "none";
+            if (event.target == mcModal) mcModal.style.display = "none";
+            if (event.target == mkdirModal) mkdirModal.style.display = "none";
         };
 
     </script>
