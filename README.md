@@ -69,7 +69,7 @@ Use this to simply add the tool to your existing stack without downloading the s
     deploy:
       resources:
         limits:
-          memory: 200M
+          memory: 1G  # 200M is too low for PAR2. Use 1G or remove this block.
 ```
 
 ## 💻 Accessing the Tool
