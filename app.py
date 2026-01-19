@@ -782,21 +782,42 @@ class RepairManager:
 
             process.wait()
 
-            if process.returncode != 0:
-                 log(f"PAR2 finished with code {process.returncode}. Checking if repair was successful...")
+            # Check if repair was successful based on output/exit code
+            repair_success = False
+            if process.returncode == 0:
+                repair_success = True
             else:
-                 log("PAR2 Repair completed successfully.")
+                # If exit code non-zero, check logs for explicit success message
+                # PAR2 sometimes returns 1/2 but still repaired successfully?
+                # Usually exit 0 = OK.
+                log(f"PAR2 finished with code {process.returncode}.")
 
-            # Step 3: Cleanup and Renaming
-            log("Step 3: cleaning up and renaming files...")
-            RepairManager.cleanup_and_rename(directory, master_par2)
+            if not repair_success:
+                 # Be strict: if PAR2 didn't exit 0, assume it failed to repair enough blocks.
+                 log("CRITICAL: Repair failed. PAR2 exited with error code.")
+                 NotificationManager.send_notification(f"❌ ParFix: Repair Failed for {os.path.basename(directory)}")
+                 return
 
-            # Step 4: Extraction
-            log("Step 4: Extracting RAR archive...")
-            RepairManager.extract_archive(directory)
+            log("PAR2 Repair completed successfully.")
 
-            log("Job Complete!")
-            NotificationManager.send_notification(f"✅ ParFix: Repair & Extract Complete for {os.path.basename(directory)}")
+            # Step 3: Attempt Extraction (Attempt 1: As-Is)
+            log("Step 3: Extracting RAR archive (Attempt 1)...")
+            extract_success = RepairManager.extract_archive(directory)
+
+            if not extract_success:
+                log("Extraction failed. Attempting Rename fix (part01 -> part001)...")
+                # Step 4: Rename (Fallback)
+                RepairManager.cleanup_and_rename(directory, master_par2)
+
+                log("Step 5: Retrying Extraction (Attempt 2)...")
+                extract_success = RepairManager.extract_archive(directory)
+
+            if extract_success:
+                log("Job Complete!")
+                NotificationManager.send_notification(f"✅ ParFix: Repair & Extract Complete for {os.path.basename(directory)}")
+            else:
+                log("CRITICAL: Extraction failed after repair and rename.")
+                NotificationManager.send_notification(f"❌ ParFix: Extraction Failed for {os.path.basename(directory)}")
 
         except Exception as e:
             log(f"CRITICAL ERROR: {str(e)}")
@@ -806,34 +827,7 @@ class RepairManager:
 
     @staticmethod
     def cleanup_and_rename(directory, master_par2_name):
-        # The logic here is tricky.
-        # If PAR2 succeeded, it usually generates the correct files.
-        # However, the prompt specifies we might need to delete scrambled ones.
-        # But wait, 'par2 r' usually REPAIRS files in place or creates the corrected ones.
-        # If the filenames were scrambled, par2 might have created NEW files with correct names
-        # OR it might have just verified the blocks.
-
-        # If par2 worked, we should have files matching the par2 basename.
-        base_name = master_par2_name.replace('.par2', '')
-
-        files = os.listdir(directory)
-
-        # 1. Identify "Bad" scrambled files
-        # Heuristic: If we have "Movie.part01.rar" (Good) and "x8d7s...rar" (Bad), delete Bad.
-
-        # Let's count how many "Good" looking RARs we have
-        # Usually they start with the same prefix as the par2 file
-        # But par2 filename might not match rar filename perfectly (Scene rules).
-
-        # Simpler approach based on prompt: "Delete broken scrambled files."
-        # If par2 succeeded, it reconstructed the valid files.
-        # We can try to identify files that do NOT match the expected pattern.
-
-        log("Cleanup phase: Checking for leftover scrambled files...")
-        # (This is a simplified cleanup. In reality, par2 often leaves the scrambled files if it reconstructed new ones)
-
-        # Step 3b: Rename consistency (part1.rar -> part001.rar)
-        # This is important for unrar
+        log("Renaming phase: Normalizing part01.rar -> part001.rar...")
         import re
         files = os.listdir(directory)
         for f in files:
@@ -841,6 +835,7 @@ class RepairManager:
             match = re.search(r'\.part(\d+)\.rar$', f, re.IGNORECASE)
             if match:
                 num_str = match.group(1)
+                # Ensure 3 digits for compatibility
                 if len(num_str) < 3:
                     new_num = num_str.zfill(3)
                     new_name = f.replace(f".part{num_str}.rar", f".part{new_num}.rar")
@@ -872,7 +867,7 @@ class RepairManager:
 
         if not first_rar:
             log("ERROR: Could not find a suitable RAR file to extract.")
-            return
+            return False
 
         log(f"Found archive to extract: {first_rar}")
 
@@ -900,8 +895,10 @@ class RepairManager:
 
         if process.returncode == 0:
             log("Unrar finished successfully.")
+            return True
         else:
             log(f"Unrar failed with code {process.returncode}")
+            return False
 
 class ExtractManager:
     @staticmethod
