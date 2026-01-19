@@ -19,12 +19,45 @@ CONFIG_FILE = os.environ.get('CONFIG_FILE', '/app/config.json')
 # Global queue for log streaming
 log_queue = queue.Queue()
 
+# Job Queue System
+job_queue = queue.Queue()
+
 def log(message):
     """Adds a message to the log queue."""
     timestamp = time.strftime("%H:%M:%S")
     formatted_message = f"[{timestamp}] {message}"
     print(formatted_message)  # Also print to stdout for container logs
     log_queue.put(formatted_message)
+
+def worker():
+    """Background worker that processes jobs from the queue."""
+    while True:
+        try:
+            job = job_queue.get()
+            if job is None:
+                break
+
+            job_name = job.get('name', 'Unknown Job')
+            log(f"Starting Queued Job: {job_name}")
+
+            target = job.get('target')
+            args = job.get('args', ())
+
+            try:
+                target(*args)
+            except Exception as e:
+                log(f"Job {job_name} Failed: {e}")
+                import traceback
+                log(traceback.format_exc())
+            finally:
+                log(f"Finished Job: {job_name}")
+                job_queue.task_done()
+
+        except Exception as e:
+            log(f"Worker Error: {e}")
+
+# Start the worker thread
+threading.Thread(target=worker, daemon=True).start()
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -248,11 +281,14 @@ def trigger_repair():
         if abs_path.lower().endswith('.par2'):
             target_par2 = os.path.basename(abs_path)
 
-    # Run repair in a separate thread to not block the response
-    thread = threading.Thread(target=RepairManager.run_repair_job, args=(work_dir, target_par2))
-    thread.start()
+    # Add to Job Queue
+    job_queue.put({
+        'name': f"Repair {target_path}",
+        'target': RepairManager.run_repair_job,
+        'args': (work_dir, target_par2)
+    })
 
-    return jsonify({'status': 'started', 'message': f'Repair job started for {target_path}'})
+    return jsonify({'status': 'queued', 'message': f'Repair job queued for {target_path}'})
 
 @app.route('/api/archive', methods=['POST'])
 def trigger_archive():
@@ -282,14 +318,14 @@ def trigger_archive():
     if not os.path.exists(abs_path):
         return jsonify({'error': 'Path not found'}), 404
 
-    # Run archiving in a separate thread
-    thread = threading.Thread(
-        target=ArchiveManager.run_archive_job,
-        args=(abs_path, name, split_size, password, fmt, create_par2, upload, remote, upload_path)
-    )
-    thread.start()
+    # Add to Job Queue
+    job_queue.put({
+        'name': f"Pack {name}",
+        'target': ArchiveManager.run_archive_job,
+        'args': (abs_path, name, split_size, password, fmt, create_par2, upload, remote, upload_path)
+    })
 
-    return jsonify({'status': 'started', 'message': f'Archiving started for {name}'})
+    return jsonify({'status': 'queued', 'message': f'Archiving queued for {name}'})
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def settings():
@@ -331,12 +367,13 @@ def trigger_manual_upload():
     except:
         transfers = 4
 
-    thread = threading.Thread(
-        target=RcloneManager.run_upload,
-        args=(abs_paths, remote, upload_path, transfers)
-    )
-    thread.start()
-    return jsonify({'status': 'started'})
+    # Add to Job Queue
+    job_queue.put({
+        'name': f"Upload to {remote}",
+        'target': RcloneManager.run_upload,
+        'args': (abs_paths, remote, upload_path, transfers)
+    })
+    return jsonify({'status': 'queued'})
 
 @app.route('/api/extract', methods=['POST'])
 def trigger_extract():
@@ -356,12 +393,13 @@ def trigger_extract():
     if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
         return jsonify({'error': 'Access denied'}), 403
 
-    thread = threading.Thread(
-        target=ExtractManager.run_extract_job,
-        args=(abs_path, method, password)
-    )
-    thread.start()
-    return jsonify({'status': 'started'})
+    # Add to Job Queue
+    job_queue.put({
+        'name': f"Extract {os.path.basename(target_path)}",
+        'target': ExtractManager.run_extract_job,
+        'args': (abs_path, method, password)
+    })
+    return jsonify({'status': 'queued'})
 
 @app.route('/api/rename', methods=['POST'])
 def rename_item():

@@ -230,9 +230,42 @@
             cursor: pointer;
             text-decoration: underline;
         }
+
+        /* Toast Notification Styles */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background-color: var(--panel-bg);
+            border-left: 5px solid var(--accent-color);
+            color: #fff;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            min-width: 250px;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease-in-out;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast.error { border-left-color: var(--error-color); }
+        .toast.success { border-left-color: var(--success-color); }
     </style>
 </head>
 <body>
+    <div id="toast-container"></div>
 
     <!-- Left Panel: File Browser -->
     <div id="file-browser" class="panel">
@@ -566,13 +599,32 @@
             consoleDiv.scrollTop = consoleDiv.scrollHeight;
         };
 
+        // Toast Notification Function
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+
+            container.appendChild(toast);
+
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
         async function loadPath(path) {
             try {
                 const response = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
                 const data = await response.json();
 
                 if (data.error) {
-                    alert(data.error);
+                    showToast(data.error, 'error');
                     return;
                 }
 
@@ -770,16 +822,17 @@
                     body: JSON.stringify({ path: target })
                 });
                 const data = await res.json();
-                if (data.status === 'started') {
-                     // Logs will appear automatically
-                     repairBtn.textContent = "Repairing...";
+                if (data.status === 'queued' || data.status === 'started') {
+                     showToast("Repair job queued", "success");
+                     repairBtn.textContent = "Queued";
+                     setTimeout(() => repairBtn.textContent = "Repair", 2000);
                 } else {
-                    alert('Error: ' + data.error);
+                    showToast('Error: ' + data.error, 'error');
                     repairBtn.disabled = false;
                     repairBtn.textContent = "Repair";
                 }
             } catch (err) {
-                alert('Request failed');
+                showToast('Request failed', 'error');
                 repairBtn.disabled = false;
                 repairBtn.textContent = "Repair";
             }
@@ -843,15 +896,15 @@
                 });
                 const data = await res.json();
 
-                if (data.status === 'started') {
-                     // Logs will appear automatically
+                if (data.status === 'queued' || data.status === 'started') {
+                     showToast("Archive job queued", "success");
                 } else {
-                    alert('Error: ' + data.error);
+                    showToast('Error: ' + data.error, 'error');
                     archiveBtn.disabled = false;
                     archiveBtn.textContent = "Create Archive";
                 }
             } catch (err) {
-                alert('Request failed');
+                showToast('Request failed', 'error');
                 archiveBtn.disabled = false;
                 archiveBtn.textContent = "Create Archive";
             }
@@ -907,7 +960,7 @@
             const path = upPathInput.value;
             const transfers = upTransfersInput.value;
 
-            if (!remote) { alert("Select remote"); return; }
+            if (!remote) { showToast("Select remote", "error"); return; }
 
             upModal.style.display = "none";
             try {
@@ -921,7 +974,9 @@
                         transfers: transfers
                     })
                 });
-            } catch (e) { alert("Upload request failed"); }
+                const data = await res.json();
+                if (data.status === 'queued') showToast("Upload queued", "success");
+            } catch (e) { showToast("Upload request failed", "error"); }
         };
 
         // --- Delete Logic ---
@@ -939,12 +994,11 @@
                 });
                 const data = await res.json();
 
-                // Refresh logic?
-                alert(`Deleted ${data.deleted} items.`);
+                showToast(`Deleted ${data.deleted} items.`, 'success');
                 loadPath(currentPath); // Refresh view
 
             } catch(e) {
-                alert("Delete failed");
+                showToast("Delete failed", 'error');
             }
         };
 
@@ -1060,13 +1114,13 @@
                 const data = await res.json();
 
                 if (data.status === 'completed') {
-                    alert(`${mcAction === 'move' ? 'Moved' : 'Copied'} ${data.moved || data.copied} items.`);
+                    showToast(`${mcAction === 'move' ? 'Moved' : 'Copied'} ${data.moved || data.copied} items.`, 'success');
                     loadPath(currentPath);
                 } else {
-                    alert('Error: ' + (data.error || 'Unknown error'));
+                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
                 }
             } catch (e) {
-                alert('Request failed');
+                showToast('Request failed', 'error');
             }
         };
 
@@ -1103,10 +1157,10 @@
                  if (data.status === 'renamed') {
                      loadPath(currentPath);
                  } else {
-                     alert("Rename Failed: " + data.error);
+                     showToast("Rename Failed: " + data.error, 'error');
                  }
              } catch(e) {
-                 alert("Request failed");
+                 showToast("Request failed", 'error');
              }
         };
 
@@ -1136,10 +1190,10 @@
                 if (data.status === 'created') {
                     loadPath(currentPath);
                 } else {
-                    alert('Error: ' + data.error);
+                    showToast('Error: ' + data.error, 'error');
                 }
             } catch (e) {
-                alert('Request failed');
+                showToast('Request failed', 'error');
             }
         };
 
@@ -1173,24 +1227,22 @@
                  });
                  const data = await res.json();
 
-                 if (data.status === 'started') {
-                     // logs
+                 if (data.status === 'queued' || data.status === 'started') {
+                     showToast("Extract job queued", "success");
                  } else {
-                     alert("Extraction Request Failed: " + data.error);
+                     showToast("Extraction Request Failed: " + data.error, 'error');
                      extractBtn.disabled = false;
                      extractBtn.textContent = "Extract";
                  }
 
-                 // Reset button after short delay or leave disabled?
-                 // Re-enabling logic is complex due to SSE logs not calling back here.
-                 // We rely on refresh or manual navigation to reset state usually.
+                 // Reset button after short delay
                  setTimeout(() => {
                      extractBtn.disabled = selectedPaths.length !== 1;
                      extractBtn.textContent = "Extract";
                  }, 3000);
 
              } catch(e) {
-                 alert("Request failed");
+                 showToast("Request failed", 'error');
                  extractBtn.disabled = false;
                  extractBtn.textContent = "Extract";
              }
