@@ -19,8 +19,78 @@ CONFIG_FILE = os.environ.get('CONFIG_FILE', '/app/config.json')
 # Global queue for log streaming
 log_queue = queue.Queue()
 
-# Job Queue System
-job_queue = queue.Queue()
+# Job Queue System (Advanced)
+class JobManager:
+    def __init__(self):
+        self.queue = []
+        self.current_job = None
+        self.current_process = None # For killing subprocesses
+        self.lock = threading.Lock()
+        self.queue_event = threading.Event()
+
+    def add_job(self, name, target, args):
+        with self.lock:
+            # Simple ID generation
+            job_id = str(int(time.time() * 1000))
+            self.queue.append({
+                'id': job_id,
+                'name': name,
+                'target': target,
+                'args': args
+            })
+            self.queue_event.set()
+            return job_id
+
+    def cancel_job(self, job_id):
+        with self.lock:
+            # Check if pending
+            for i, job in enumerate(self.queue):
+                if job['id'] == job_id:
+                    del self.queue[i]
+                    log(f"Cancelled pending job: {job['name']}")
+                    return True
+
+            # Check if running
+            if self.current_job and self.current_job['id'] == job_id:
+                log(f"Cancelling running job: {self.current_job['name']}")
+                self.kill_current_process()
+                return True
+        return False
+
+    def register_process(self, process):
+        self.current_process = process
+
+    def kill_current_process(self):
+        if self.current_process:
+            try:
+                log("Terminating process...")
+                self.current_process.terminate()
+                # Give it a moment, then force kill if needed?
+                # Keeping it simple for now.
+            except Exception as e:
+                log(f"Failed to kill process: {e}")
+
+    def get_status(self):
+        with self.lock:
+            return {
+                'current': {
+                    'id': self.current_job['id'],
+                    'name': self.current_job['name']
+                } if self.current_job else None,
+                'queue': [
+                    {'id': j['id'], 'name': j['name']} for j in self.queue
+                ]
+            }
+
+    def get_next_job(self):
+        with self.lock:
+            if self.queue:
+                return self.queue.pop(0)
+            else:
+                self.queue_event.clear()
+                return None
+
+job_manager = JobManager()
 
 def log(message):
     """Adds a message to the log queue."""
@@ -32,29 +102,34 @@ def log(message):
 def worker():
     """Background worker that processes jobs from the queue."""
     while True:
+        job = job_manager.get_next_job()
+
+        if not job:
+            # Wait for new jobs
+            job_manager.queue_event.wait()
+            continue
+
+        with job_manager.lock:
+            job_manager.current_job = job
+            job_manager.current_process = None # Reset process tracker
+
+        job_name = job.get('name', 'Unknown Job')
+        log(f"Starting Queued Job: {job_name}")
+
+        target = job.get('target')
+        args = job.get('args', ())
+
         try:
-            job = job_queue.get()
-            if job is None:
-                break
-
-            job_name = job.get('name', 'Unknown Job')
-            log(f"Starting Queued Job: {job_name}")
-
-            target = job.get('target')
-            args = job.get('args', ())
-
-            try:
-                target(*args)
-            except Exception as e:
-                log(f"Job {job_name} Failed: {e}")
-                import traceback
-                log(traceback.format_exc())
-            finally:
-                log(f"Finished Job: {job_name}")
-                job_queue.task_done()
-
+            target(*args)
         except Exception as e:
-            log(f"Worker Error: {e}")
+            log(f"Job {job_name} Failed: {e}")
+            import traceback
+            log(traceback.format_exc())
+        finally:
+            log(f"Finished Job: {job_name}")
+            with job_manager.lock:
+                job_manager.current_job = None
+                job_manager.current_process = None
 
 # Start the worker thread
 threading.Thread(target=worker, daemon=True).start()
@@ -114,89 +189,103 @@ class RcloneManager:
             return []
 
     @staticmethod
-    def run_upload(source_files, remote, upload_path, transfers=4):
-        # source_files is a list of file paths
+    def run_upload(source_paths, remote, upload_path, transfers=4):
+        # source_paths is a list of file OR folder paths
         log(f"Starting Rclone Upload to {remote}:{upload_path} (Parallel: {transfers})")
 
-        if not source_files:
+        if not source_paths:
             return True
 
-        # Optimization: If multiple files are in the same directory, run a single rclone command
-        # This allows rclone to use parallel transfers
-
-        # Group files by parent directory
-        from collections import defaultdict
-        grouped_files = defaultdict(list)
-
-        for f in source_files:
-            parent = os.path.dirname(f)
-            grouped_files[parent].append(os.path.basename(f))
+        # Separate directories and files
+        dirs = []
+        files = []
+        for p in source_paths:
+            if os.path.isdir(p):
+                dirs.append(p)
+            else:
+                files.append(p)
 
         failed = False
 
-        for parent_dir, filenames in grouped_files.items():
-            log(f"Processing batch of {len(filenames)} files from {parent_dir}...")
+        # Process Directories (One by one, recursive copy)
+        for d in dirs:
+            folder_name = os.path.basename(d)
+            # If upload_path is empty, use folder_name. If set, append folder_name.
+            target_path = os.path.join(upload_path, folder_name) if upload_path else folder_name
 
-            # rclone copy source remote:path --include f1 --include f2 --transfers N --stats 1s -v
-            cmd = ['rclone', 'copy', parent_dir, f"{remote}:{upload_path}",
+            log(f"Uploading directory: {d} -> {remote}:{target_path}")
+
+            cmd = ['rclone', 'copy', d, f"{remote}:{target_path}",
                    '--transfers', str(transfers),
                    '--stats', '2s',
                    '-v']
 
-            # Add includes
-            # Note: rclone filters are relative to the root of the transfer
-            # If we transfer 'parent_dir', the files are at root relative to transfer
-            for name in filenames:
-                cmd.append('--include')
-                cmd.append(name)
-
-            try:
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True
-                )
-
-                # Capture output
-                for line in process.stdout:
-                    line = line.strip()
-                    if not line: continue
-
-                    # Log errors/failures
-                    if "error" in line.lower() or "failed" in line.lower():
-                        log(f"[RCLONE ERROR] {line}")
-                    # Log progress
-                    elif "Transferred:" in line or "Errors:" in line or "Checks:" in line:
-                        # Clean up progress lines
-                        if "Transferred:" in line:
-                             log(f"[UPLOAD] {line}")
-                    elif "100%" in line:
-                         log(f"[UPLOAD] {line}")
-                    else:
-                        # Verbose info
-                        if "INFO" in line:
-                            # Keep it cleaner?
-                            pass
-                        else:
-                            # log(f"[RCLONE] {line}")
-                            pass
-
-                process.wait()
-                if process.returncode != 0:
-                    log(f"Batch upload failed for {parent_dir} (Code {process.returncode})")
-                    failed = True
-                else:
-                    log(f"Batch upload completed for {parent_dir}")
-
-            except Exception as e:
-                log(f"Rclone Execution Error: {e}")
+            if not RcloneManager._execute_rclone(cmd):
                 failed = True
+
+        # Process Files (Batch by parent directory for efficiency)
+        if files:
+            from collections import defaultdict
+            grouped_files = defaultdict(list)
+
+            for f in files:
+                parent = os.path.dirname(f)
+                grouped_files[parent].append(os.path.basename(f))
+
+            for parent_dir, filenames in grouped_files.items():
+                log(f"Processing batch of {len(filenames)} files from {parent_dir}...")
+
+                cmd = ['rclone', 'copy', parent_dir, f"{remote}:{upload_path}",
+                       '--transfers', str(transfers),
+                       '--stats', '2s',
+                       '-v']
+
+                for name in filenames:
+                    cmd.append('--include')
+                    cmd.append(name)
+
+                if not RcloneManager._execute_rclone(cmd):
+                    failed = True
 
         if not failed:
             log("All uploads completed successfully.")
             return True
         return False
+
+    @staticmethod
+    def _execute_rclone(cmd):
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True
+            )
+
+            # Register for cancellation
+            if job_manager.current_job:
+                job_manager.register_process(process)
+
+            for line in process.stdout:
+                line = line.strip()
+                if not line: continue
+
+                if "error" in line.lower() or "failed" in line.lower():
+                    log(f"[RCLONE ERROR] {line}")
+                elif "Transferred:" in line:
+                     log(f"[UPLOAD] {line}")
+                elif "100%" in line:
+                     log(f"[UPLOAD] {line}")
+
+            process.wait()
+            if process.returncode != 0:
+                log(f"Rclone failed with code {process.returncode}")
+                return False
+            return True
+
+        except Exception as e:
+            log(f"Rclone Execution Error: {e}")
+            return False
 
 @app.route('/')
 def index():
@@ -339,6 +428,18 @@ def settings():
 @app.route('/api/remotes')
 def get_remotes():
     return jsonify(RcloneManager.list_remotes())
+
+@app.route('/api/queue', methods=['GET'])
+def get_queue_status():
+    return jsonify(job_manager.get_status())
+
+@app.route('/api/queue/cancel/<job_id>', methods=['POST'])
+def cancel_job_endpoint(job_id):
+    success = job_manager.cancel_job(job_id)
+    if success:
+        return jsonify({'status': 'cancelled'})
+    else:
+        return jsonify({'error': 'Job not found'}), 404
 
 @app.route('/api/upload', methods=['POST'])
 def trigger_manual_upload():
