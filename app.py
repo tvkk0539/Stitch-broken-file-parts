@@ -240,11 +240,16 @@ def trigger_repair():
 
     # Handle file selection (convert to parent directory)
     work_dir = abs_path
+    target_par2 = None
+
     if not os.path.isdir(abs_path):
         work_dir = os.path.dirname(abs_path)
+        # If user selected a par2 file specifically, pass it as target
+        if abs_path.lower().endswith('.par2'):
+            target_par2 = os.path.basename(abs_path)
 
     # Run repair in a separate thread to not block the response
-    thread = threading.Thread(target=RepairManager.run_repair_job, args=(work_dir,))
+    thread = threading.Thread(target=RepairManager.run_repair_job, args=(work_dir, target_par2))
     thread.start()
 
     return jsonify({'status': 'started', 'message': f'Repair job started for {target_path}'})
@@ -714,25 +719,36 @@ class ArchiveManager:
 
 class RepairManager:
     @staticmethod
-    def run_repair_job(directory):
+    def run_repair_job(directory, forced_par2=None):
         log(f"Starting repair job in: {directory}")
 
         try:
-            # Step 1: Find the master PAR2 file
-            par2_files = [f for f in os.listdir(directory) if f.endswith('.par2') and not 'vol' in f]
-            if not par2_files:
-                # Fallback: look for volume 1 if no master file exists
-                par2_files = [f for f in os.listdir(directory) if f.endswith('.vol01+02.par2') or f.endswith('.vol001+002.par2')]
+            master_par2 = None
 
-            if not par2_files:
-                log("ERROR: No .par2 files found in this directory.")
-                return
+            if forced_par2:
+                log(f"User selected PAR2 file: {forced_par2}")
+                master_par2 = forced_par2
+            else:
+                # Step 1: Find a suitable PAR2 file
+                files = os.listdir(directory)
+                # Case-insensitive search
+                all_par2 = [f for f in files if f.lower().endswith('.par2')]
 
-            # Pick the first logical par2 file (usually the smallest one without vol numbers, or the first vol)
-            # Sorting ensures we pick shortest name usually (Master.par2 vs Master.vol01.par2)
-            par2_files.sort(key=len)
-            master_par2 = par2_files[0]
-            log(f"Found Master PAR2: {master_par2}")
+                if not all_par2:
+                    log("ERROR: No .par2 files found in this directory.")
+                    return
+
+                # Priority 1: "Master" files (usually don't have 'vol' in name)
+                candidates = [f for f in all_par2 if 'vol' not in f.lower()]
+                if candidates:
+                    candidates.sort(key=len) # Shortest name is usually the master (Name.par2 vs Name.vol01.par2)
+                    master_par2 = candidates[0]
+                else:
+                    # Priority 2: Any PAR2 file (PAR2 can start from any volume)
+                    all_par2.sort()
+                    master_par2 = all_par2[0]
+
+            log(f"Using Master PAR2: {master_par2}")
 
             # Step 2: The Wildcard Repair Strategy
             # par2 r "Master.par2" *
