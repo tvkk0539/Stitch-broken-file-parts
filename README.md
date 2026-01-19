@@ -31,6 +31,11 @@ Easily create multi-part archives from large files or folders.
 - **Delete:** Manually delete files/folders to clean up space.
 - **Multi-Select:** Check multiple files/folders to perform batch actions (Upload, Move, Delete, etc.).
 
+### 🛡️ Stability & UX
+- **Smart Job Queue:** All heavy tasks (Repair, Pack, Upload) are queued and processed sequentially in the background. This prevents server crashes (Out of Memory) even if you trigger multiple jobs at once.
+- **Toast Notifications:** Modern, non-blocking status popups (Success/Error/Info) replace annoying browser alerts.
+- **Health Monitoring:** Includes a Docker `HEALTHCHECK` to ensure the service is always running correctly.
+
 ## 🚀 Deployment Guide (Detailed)
 
 You have two options to deploy this. Choose **Option B** if you want the easiest setup.
