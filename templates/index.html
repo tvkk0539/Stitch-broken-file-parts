@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParFix Web Utility</title>
+    <style>
+        :root {
+            --bg-color: #1a1b26;
+            --text-color: #a9b1d6;
+            --accent-color: #7aa2f7;
+            --success-color: #9ece6a;
+            --error-color: #f7768e;
+            --panel-bg: #24283b;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            height: 100vh;
+            box-sizing: border-box;
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #file-browser {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #414868;
+        }
+
+        #log-panel {
+            flex: 2;
+            border: 1px solid #414868;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--accent-color);
+            border-bottom: 1px solid #414868;
+            padding-bottom: 10px;
+        }
+
+        /* File List Styles */
+        #file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .file-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #2f3549;
+            display: flex;
+            align-items: center;
+        }
+
+        .file-item:hover {
+            background-color: #2f3549;
+        }
+
+        .file-item.selected {
+            background-color: #3b4261;
+            color: var(--accent-color);
+        }
+
+        .icon {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .dir-icon { color: var(--accent-color); }
+        .file-icon { color: #565f89; }
+        .par2-icon { color: var(--success-color); }
+
+        /* Controls */
+        #controls {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap; /* Fix: Allow wrapping on small screens */
+        }
+
+        /* Hover effect for manually grayed out settings button to show color */
+        #settings-btn:hover {
+            background-color: var(--accent-color) !important;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: #15161e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+            flex: 1;
+        }
+
+        button.secondary {
+            background-color: #9ece6a; /* Green */
+        }
+
+        button.danger {
+            background-color: #f7768e; /* Red */
+        }
+
+        button.purple-btn {
+            background-color: #bb9af7; /* Purple */
+        }
+
+        button.info-btn {
+            background-color: #7dcfff; /* Cyan */
+        }
+
+        button.warning-btn {
+            background-color: #e0af68; /* Orange */
+        }
+
+        button.icon-btn {
+            flex: 0;
+            padding: 10px 15px;
+            min-width: 50px;
+        }
+
+        /* Checkbox styling */
+        .file-item input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: dimgray !important;
+            color: #ccc;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+
+        .modal-content {
+            background-color: var(--panel-bg);
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #414868;
+            width: 400px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #414868;
+            padding-bottom: 10px;
+        }
+
+        .modal-header h3 { margin: 0; color: var(--accent-color); }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #a9b1d6; }
+        .form-group input:not([type="checkbox"]):not([type="radio"]), .form-group select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            background: #1a1b26;
+            border: 1px solid #414868;
+            color: #c0caf5;
+            border-radius: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Log Console */
+        #console {
+            background-color: #15161e;
+            color: #c0caf5;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+
+        .breadcrumb {
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            color: #737aa2;
+        }
+
+        .breadcrumb span:hover {
+            color: var(--accent-color);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        /* Toast Notification Styles */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background-color: var(--panel-bg);
+            border-left: 5px solid var(--accent-color);
+            color: #fff;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            min-width: 250px;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease-in-out;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast.error { border-left-color: var(--error-color); }
+        .toast.success { border-left-color: var(--success-color); }
+    </style>
+</head>
+<body>
+    <div id="toast-container"></div>
+
+    <!-- Left Panel: File Browser -->
+    <div id="file-browser" class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>File Browser</h2>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <label style="cursor:pointer; font-size:0.9em; user-select:none; color:#a9b1d6;" title="Select All / None">
+                    <input type="checkbox" id="select-all-check"> All
+                </label>
+                <button id="refresh-btn" class="icon-btn" style="background:none; border:1px solid #414868; color:var(--accent-color);" title="Refresh">🔄</button>
+                <button id="new-folder-btn" class="icon-btn" style="background:none; border:1px solid #414868; color:var(--accent-color);" title="New Folder">📂+</button>
+            </div>
+        </div>
+        <div id="current-path" class="breadcrumb">/</div>
+        <ul id="file-list">
+            <!-- Items injected via JS -->
+        </ul>
+        <div id="controls">
+            <button id="repair-btn" disabled>Repair</button>
+            <button id="extract-btn" style="background-color:#00d9ff;" disabled>Extract</button>
+            <button id="archive-btn" class="secondary" disabled>Pack</button>
+            <button id="upload-btn" class="purple-btn" disabled>Upload</button>
+            <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
+            <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
+            <button id="rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
+            <button id="delete-btn" class="danger" disabled>🗑️</button>
+            <button id="settings-btn" class="icon-btn" title="Settings" style="background-color:dimgray; color:white;">⚙️</button>
+        </div>
+    </div>
+
+    <!-- Right Panel: Logs -->
+    <div id="log-panel" class="panel">
+        <h2>System Logs</h2>
+        <div id="console">Waiting for jobs...</div>
+    </div>
+
+    <!-- Archive Modal -->
+    <div id="archive-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create Archive (Pack)</h3>
+            </div>
+            <div class="form-group">
+                <label>Archive Name:</label>
+                <input type="text" id="arc-name" placeholder="Movie.Name">
+            </div>
+            <div class="form-group">
+                <label>Format:</label>
+                <select id="arc-fmt">
+                    <option value="rar" selected>RAR (Recommended)</option>
+                    <option value="7z">7-Zip</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Split Size:</label>
+                <select id="arc-size">
+                    <option value="100M">100 MB</option>
+                    <option value="200M">200 MB</option>
+                    <option value="300M">300 MB</option>
+                    <option value="400M">400 MB</option>
+                    <option value="500M">500 MB</option>
+                    <option value="600M">600 MB</option>
+                    <option value="700M">700 MB</option>
+                    <option value="800M">800 MB</option>
+                    <option value="900M">900 MB</option>
+                    <option value="1024M" selected>1 GB</option>
+                    <option value="1536M">1.5 GB</option>
+                    <option value="2048M">2 GB</option>
+                    <option value="2560M">2.5 GB</option>
+                    <option value="3072M">3 GB</option>
+                    <option value="3584M">3.5 GB</option>
+                    <option value="4096M">4 GB</option>
+                    <option value="4608M">4.5 GB</option>
+                    <option value="5120M">5 GB</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Password (Optional):</label>
+                <input type="text" id="arc-pass" placeholder="Leave empty for none">
+            </div>
+            <div class="form-group">
+                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="arc-par2" checked>
+                    Create PAR2 Recovery Files (Recommended)
+                </label>
+            </div>
+            <div class="form-group">
+                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="arc-upload">
+                    Upload to Cloud after Packing
+                </label>
+            </div>
+            <div id="arc-upload-opts" style="display:none; padding-left:20px; border-left: 2px solid #414868;">
+                <div class="form-group">
+                    <label>Remote:</label>
+                    <select id="arc-remote"></select>
+                </div>
+                <div class="form-group">
+                    <label>Upload Path:</label>
+                    <input type="text" id="arc-upload-path" placeholder="Backups/Movies">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-arc" style="background:#f7768e">Cancel</button>
+                <button id="start-arc" class="secondary">Start Packing</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Upload Modal -->
+    <div id="upload-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Manual Cloud Upload</h3>
+            </div>
+            <div class="form-group">
+                <label>Target Remote:</label>
+                <select id="up-remote"></select>
+            </div>
+            <div class="form-group">
+                <label>Remote Path:</label>
+                <input type="text" id="up-path" placeholder="ParFix_Uploads/">
+            </div>
+            <div class="form-group">
+                <label>Parallel Transfers (Concurrency):</label>
+                <input type="number" id="up-transfers" value="4" min="1" max="16">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-up" style="background:#f7768e">Cancel</button>
+                <button id="start-up" class="secondary">Start Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings (Notifications)</h3>
+            </div>
+            <div class="form-group">
+                <label>Discord Webhook URL:</label>
+                <input type="text" id="set-discord" placeholder="https://discord.com/api/webhooks/...">
+            </div>
+            <div class="form-group">
+                <label>Telegram Bot Token:</label>
+                <input type="text" id="set-tg-token" placeholder="123456:ABC-DEF...">
+            </div>
+            <div class="form-group">
+                <label>Telegram Chat ID:</label>
+                <input type="text" id="set-tg-chat" placeholder="123456789">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-set" style="background:#f7768e">Cancel</button>
+                <button id="save-set" class="secondary">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move/Copy Modal -->
+    <div id="move-copy-modal" class="modal">
+        <div class="modal-content" style="width: 500px;">
+            <div class="modal-header">
+                <h3 id="mc-title">Move Items</h3>
+            </div>
+            <div class="form-group">
+                <label>Select Destination Folder:</label>
+                <div id="mc-browser" style="border: 1px solid #414868; height: 200px; overflow-y: auto; background: #15161e; padding: 5px; margin-bottom: 10px;">
+                    <!-- Folder list -->
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="color:#737aa2;">Current:</span>
+                    <strong id="mc-selected-path" style="color:#7aa2f7;">/</strong>
+                    <button id="mc-up-btn" class="icon-btn" style="padding: 2px 8px; min-width: 30px;">⬆️</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-mc" style="background:#f7768e">Cancel</button>
+                <button id="confirm-mc" class="secondary">Confirm Here</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Extract Modal -->
+    <div id="extract-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Extract Archive</h3>
+            </div>
+            <div class="form-group">
+                <label>Method:</label>
+                <select id="ext-method">
+                    <option value="unrar" selected>UnRAR (Default)</option>
+                    <option value="7z">7-Zip</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Password (Optional):</label>
+                <input type="text" id="ext-pass" placeholder="Password if protected">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-ext" style="background:#f7768e">Cancel</button>
+                <button id="confirm-ext" class="secondary">Extract Here</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div id="rename-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Rename Item</h3>
+            </div>
+            <div class="form-group">
+                <label>New Name:</label>
+                <input type="text" id="rename-input" placeholder="NewName.ext">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-rename" style="background:#f7768e">Cancel</button>
+                <button id="confirm-rename" class="secondary">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Folder Modal -->
+    <div id="mkdir-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Folder</h3>
+            </div>
+            <div class="form-group">
+                <label>Folder Name:</label>
+                <input type="text" id="mkdir-name" placeholder="New Folder">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-mkdir" style="background:#f7768e">Cancel</button>
+                <button id="confirm-mkdir" class="secondary">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPath = '';
+        let selectedPaths = []; // Track selections
+
+        const fileList = document.getElementById('file-list');
+        const breadcrumb = document.getElementById('current-path');
+        const repairBtn = document.getElementById('repair-btn');
+        const extractBtn = document.getElementById('extract-btn');
+        const archiveBtn = document.getElementById('archive-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+        const moveBtn = document.getElementById('move-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const renameBtn = document.getElementById('rename-btn');
+        const deleteBtn = document.getElementById('delete-btn');
+        const settingsBtn = document.getElementById('settings-btn');
+        const newFolderBtn = document.getElementById('new-folder-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const selectAllCheck = document.getElementById('select-all-check');
+        const consoleDiv = document.getElementById('console');
+
+        // Archive Modal Elements
+        const modal = document.getElementById('archive-modal');
+        const startArcBtn = document.getElementById('start-arc');
+        const cancelArcBtn = document.getElementById('cancel-arc');
+        const arcNameInput = document.getElementById('arc-name');
+        const arcSizeInput = document.getElementById('arc-size');
+        const arcPassInput = document.getElementById('arc-pass');
+        const arcFmtInput = document.getElementById('arc-fmt');
+        const arcPar2Input = document.getElementById('arc-par2');
+        const arcUploadCheck = document.getElementById('arc-upload');
+        const arcUploadOpts = document.getElementById('arc-upload-opts');
+        const arcRemoteSelect = document.getElementById('arc-remote');
+        const arcUploadPath = document.getElementById('arc-upload-path');
+
+        // Upload Modal Elements
+        const upModal = document.getElementById('upload-modal');
+        const upRemoteSelect = document.getElementById('up-remote');
+        const upPathInput = document.getElementById('up-path');
+        const upTransfersInput = document.getElementById('up-transfers');
+        const startUpBtn = document.getElementById('start-up');
+        const cancelUpBtn = document.getElementById('cancel-up');
+
+        // Settings Modal Elements
+        const setModal = document.getElementById('settings-modal');
+        const setDiscordInput = document.getElementById('set-discord');
+        const setTgTokenInput = document.getElementById('set-tg-token');
+        const setTgChatInput = document.getElementById('set-tg-chat');
+        const saveSetBtn = document.getElementById('save-set');
+        const cancelSetBtn = document.getElementById('cancel-set');
+
+        // Move/Copy Modal Elements
+        const mcModal = document.getElementById('move-copy-modal');
+        const mcTitle = document.getElementById('mc-title');
+        const mcBrowser = document.getElementById('mc-browser');
+        const mcSelectedPath = document.getElementById('mc-selected-path');
+        const mcUpBtn = document.getElementById('mc-up-btn');
+        const confirmMcBtn = document.getElementById('confirm-mc');
+        const cancelMcBtn = document.getElementById('cancel-mc');
+        let mcAction = 'move'; // 'move' or 'copy'
+        let mcCurrentBrowserPath = '';
+
+        // Rename Modal Elements
+        const renameModal = document.getElementById('rename-modal');
+        const renameInput = document.getElementById('rename-input');
+        const confirmRenameBtn = document.getElementById('confirm-rename');
+        const cancelRenameBtn = document.getElementById('cancel-rename');
+
+        // Mkdir Modal Elements
+        const mkdirModal = document.getElementById('mkdir-modal');
+        const mkdirNameInput = document.getElementById('mkdir-name');
+        const confirmMkdirBtn = document.getElementById('confirm-mkdir');
+        const cancelMkdirBtn = document.getElementById('cancel-mkdir');
+
+        // Extract Modal Elements
+        const extModal = document.getElementById('extract-modal');
+        const extMethod = document.getElementById('ext-method');
+        const extPass = document.getElementById('ext-pass');
+        const confirmExtBtn = document.getElementById('confirm-ext');
+        const cancelExtBtn = document.getElementById('cancel-ext');
+
+        // Initial Load
+        loadPath('');
+
+        // Listen for logs
+        const evtSource = new EventSource("/api/logs");
+        evtSource.onmessage = function(event) {
+            const newLog = document.createElement('div');
+            newLog.textContent = event.data;
+            consoleDiv.appendChild(newLog);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        };
+
+        // Toast Notification Function
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+
+            container.appendChild(toast);
+
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        async function loadPath(path) {
+            try {
+                const response = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    return;
+                }
+
+                currentPath = data.current_path;
+                selectedPaths = []; // Reset selection on nav
+                selectAllCheck.checked = false; // Reset master check
+                updateButtonState();
+
+                renderBreadcrumb(currentPath);
+                renderFiles(data.items, data.parent_path);
+
+            } catch (err) {
+                console.error('Failed to load path', err);
+            }
+        }
+
+        async function loadRemotes() {
+            try {
+                const res = await fetch('/api/remotes');
+                const remotes = await res.json();
+
+                // Populate both dropdowns
+                [arcRemoteSelect, upRemoteSelect].forEach(select => {
+                    select.innerHTML = '';
+                    remotes.forEach(r => {
+                        const opt = document.createElement('option');
+                        opt.value = r;
+                        opt.textContent = r;
+                        select.appendChild(opt);
+                    });
+                });
+            } catch (err) {
+                console.error("Failed to load remotes", err);
+            }
+        }
+
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                setDiscordInput.value = data.discord_webhook || '';
+                setTgTokenInput.value = data.telegram_token || '';
+                setTgChatInput.value = data.telegram_chat_id || '';
+            } catch (err) {
+                console.error("Failed to load settings", err);
+            }
+        }
+
+        function renderBreadcrumb(path) {
+            breadcrumb.innerHTML = '';
+            const parts = path.split('/').filter(Boolean);
+
+            let accumulated = '';
+
+            // Root
+            const rootSpan = document.createElement('span');
+            rootSpan.textContent = 'ROOT / ';
+            rootSpan.onclick = () => loadPath('');
+            breadcrumb.appendChild(rootSpan);
+
+            parts.forEach((part, index) => {
+                accumulated += (accumulated ? '/' : '') + part;
+                const span = document.createElement('span');
+                span.textContent = part + (index < parts.length - 1 ? ' / ' : '');
+                const target = accumulated; // closure capture
+                span.onclick = () => loadPath(target);
+                breadcrumb.appendChild(span);
+            });
+        }
+
+        function renderFiles(items, parentPath) {
+            fileList.innerHTML = '';
+
+            // Parent link
+            if (parentPath !== null) {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.innerHTML = '<span class="icon dir-icon">📁</span> ..';
+                li.onclick = () => loadPath(parentPath);
+                fileList.appendChild(li);
+            }
+
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+
+                // Checkbox
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.dataset.path = item.path; // Store path for Select All
+                checkbox.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleSelection(item.path, checkbox.checked);
+                };
+
+                let icon = '📄';
+                let iconClass = 'file-icon';
+
+                const span = document.createElement('span');
+                span.className = `icon ${iconClass}`;
+
+                if (item.is_dir) {
+                    icon = '📁';
+                    span.className = `icon dir-icon`;
+                    // Clicking the row (not checkbox) navigates
+                    li.onclick = (e) => {
+                        if (e.target !== checkbox) loadPath(item.path);
+                    };
+                } else {
+                    if (item.name.endsWith('.par2')) {
+                        icon = '🔧';
+                        span.className = `icon par2-icon`;
+                    } else if (item.name.endsWith('.rar')) {
+                        icon = '📦';
+                    }
+                }
+                span.textContent = icon;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = item.name;
+
+                li.appendChild(checkbox);
+                li.appendChild(span);
+                li.appendChild(nameSpan);
+                fileList.appendChild(li);
+            });
+        }
+
+        function toggleSelection(path, checked) {
+            if (checked) {
+                selectedPaths.push(path);
+            } else {
+                selectedPaths = selectedPaths.filter(p => p !== path);
+                selectAllCheck.checked = false; // Uncheck master if any item is unchecked
+            }
+            updateButtonState();
+        }
+
+        // --- Refresh Logic ---
+        refreshBtn.onclick = () => loadPath(currentPath);
+
+        // --- Select All Logic ---
+        selectAllCheck.onclick = () => {
+            const isChecked = selectAllCheck.checked;
+            const checkboxes = fileList.querySelectorAll('input[type="checkbox"]');
+
+            selectedPaths = []; // Reset and rebuild
+
+            checkboxes.forEach(cb => {
+                cb.checked = isChecked;
+                if (isChecked) {
+                    // We store the path in a data attribute or derive it?
+                    // The 'renderFiles' loop uses closure for onclick,
+                    // but we need the path here.
+                    // Let's add data-path to the checkbox in renderFiles or just rely on DOM order?
+                    // Safer: renderFiles attaches the path to the element.
+                    if (cb.dataset.path) {
+                        selectedPaths.push(cb.dataset.path);
+                    }
+                }
+            });
+            updateButtonState();
+        };
+
+        function updateButtonState() {
+            const count = selectedPaths.length;
+
+            // Batch actions
+            const hasSelection = count > 0;
+            deleteBtn.disabled = !hasSelection;
+            uploadBtn.disabled = !hasSelection;
+            moveBtn.disabled = !hasSelection;
+            copyBtn.disabled = !hasSelection;
+
+            // Single Item actions
+            repairBtn.disabled = count !== 1;
+            archiveBtn.disabled = count !== 1;
+            renameBtn.disabled = count !== 1;
+            extractBtn.disabled = count !== 1;
+        }
+
+        repairBtn.onclick = async () => {
+            const target = selectedPaths[0]; // Logic works on selection now
+            if (!target) return;
+
+            if (!confirm(`Are you sure you want to run repair in:\n${target}?`)) return;
+
+            repairBtn.disabled = true;
+            repairBtn.textContent = "Starting...";
+
+            try {
+                const res = await fetch('/api/repair', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ path: target })
+                });
+                const data = await res.json();
+                if (data.status === 'queued' || data.status === 'started') {
+                     showToast("Repair job queued", "success");
+                     repairBtn.textContent = "Queued";
+                     setTimeout(() => repairBtn.textContent = "Repair", 2000);
+                } else {
+                    showToast('Error: ' + data.error, 'error');
+                    repairBtn.disabled = false;
+                    repairBtn.textContent = "Repair";
+                }
+            } catch (err) {
+                showToast('Request failed', 'error');
+                repairBtn.disabled = false;
+                repairBtn.textContent = "Repair";
+            }
+        };
+
+        // --- Archive Modal Logic ---
+        archiveBtn.onclick = () => {
+            loadRemotes();
+            const target = selectedPaths[0]; // Assume single selection for packing
+            if (!target) return;
+
+            const parts = target.split('/');
+            const defaultName = parts[parts.length-1] || 'Archive';
+            arcNameInput.value = defaultName;
+
+            // Smart Default Path
+            arcUploadPath.value = `ParFix_Uploads/Archives/${defaultName}/`;
+
+            modal.style.display = "block";
+        };
+
+        cancelArcBtn.onclick = () => modal.style.display = "none";
+
+        arcUploadCheck.onchange = () => {
+            arcUploadOpts.style.display = arcUploadCheck.checked ? 'block' : 'none';
+        };
+
+        startArcBtn.onclick = async () => {
+            const target = selectedPaths[0]; // Assume single selection
+            const name = arcNameInput.value;
+            const size = arcSizeInput.value;
+            const password = arcPassInput.value;
+            const fmt = arcFmtInput.value;
+            const createPar2 = arcPar2Input.checked;
+            const upload = arcUploadCheck.checked;
+            const remote = arcRemoteSelect.value;
+            const upPath = arcUploadPath.value;
+
+            if (!name) { alert("Name is required"); return; }
+            if (upload && !remote) { alert("Select a remote for upload"); return; }
+
+            modal.style.display = "none";
+            archiveBtn.disabled = true;
+            archiveBtn.textContent = "Packing...";
+
+            try {
+                const res = await fetch('/api/archive', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        path: target,
+                        name: name,
+                        split_size: size,
+                        password: password,
+                        format: fmt,
+                        create_par2: createPar2,
+                        upload: upload,
+                        remote: remote,
+                        upload_path: upPath
+                    })
+                });
+                const data = await res.json();
+
+                if (data.status === 'queued' || data.status === 'started') {
+                     showToast("Archive job queued", "success");
+                } else {
+                    showToast('Error: ' + data.error, 'error');
+                    archiveBtn.disabled = false;
+                    archiveBtn.textContent = "Create Archive";
+                }
+            } catch (err) {
+                showToast('Request failed', 'error');
+                archiveBtn.disabled = false;
+                archiveBtn.textContent = "Create Archive";
+            }
+        };
+
+        // --- Manual Upload Logic ---
+        uploadBtn.onclick = () => {
+            loadRemotes();
+
+            // Fix Default Path Logic
+            // If file(s) selected, default to base folder: ParFix_Uploads/
+            // If FOLDER selected, use ParFix_Uploads/FolderName/ ??
+            // User requested: "make remote path default to this ParFix_Uploads/" and complained about file names being added.
+
+            // Checking if we selected files or folders
+            // We only have paths. We can guess by extension or just use a generic default.
+
+            // Simplest approach per request: Default to ParFix_Uploads/
+            // If the user wants a subfolder, they can add it.
+            // But if they select a FOLDER, they might expect that folder to be the container.
+            // Rclone copy src dest: If src is folder, contents go to dest.
+            // So if I select "MovieFolder" and dest is "ParFix_Uploads/", contents of MovieFolder go to ParFix_Uploads/.
+            // That mixes files.
+            // Rclone copy "MovieFolder" "remote:ParFix_Uploads/MovieFolder" -> Correct.
+
+            // Refined Logic:
+            // If single selection and it looks like a file (has extension), use ParFix_Uploads/
+            // If single selection and no extension (likely folder), use ParFix_Uploads/FolderName/
+            // If multiple selection, use ParFix_Uploads/ (User can organize)
+
+            let defaultPath = "ParFix_Uploads/";
+
+            if (selectedPaths.length === 1) {
+                const p = selectedPaths[0];
+                const parts = p.split('/');
+                const name = parts[parts.length-1];
+
+                // Heuristic: If it has an extension, treat as file.
+                if (!name.includes('.')) {
+                    // Likely a folder
+                    defaultPath = `ParFix_Uploads/${name}/`;
+                }
+            }
+
+            upPathInput.value = defaultPath;
+            upModal.style.display = "block";
+        };
+
+        cancelUpBtn.onclick = () => upModal.style.display = "none";
+
+        startUpBtn.onclick = async () => {
+            const remote = upRemoteSelect.value;
+            const path = upPathInput.value;
+            const transfers = upTransfersInput.value;
+
+            if (!remote) { showToast("Select remote", "error"); return; }
+
+            upModal.style.display = "none";
+            try {
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        paths: selectedPaths,
+                        remote: remote,
+                        upload_path: path,
+                        transfers: transfers
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'queued') showToast("Upload queued", "success");
+            } catch (e) { showToast("Upload request failed", "error"); }
+        };
+
+        // --- Delete Logic ---
+        deleteBtn.onclick = async () => {
+            if (selectedPaths.length === 0) return;
+
+            if (!confirm(`Are you sure you want to PERMANENTLY DELETE ${selectedPaths.length} items?`)) return;
+
+            deleteBtn.disabled = true;
+            try {
+                const res = await fetch('/api/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ paths: selectedPaths })
+                });
+                const data = await res.json();
+
+                showToast(`Deleted ${data.deleted} items.`, 'success');
+                loadPath(currentPath); // Refresh view
+
+            } catch(e) {
+                showToast("Delete failed", 'error');
+            }
+        };
+
+        // --- Settings Logic ---
+        settingsBtn.onclick = () => {
+            loadSettings();
+            setModal.style.display = "block";
+        };
+
+        cancelSetBtn.onclick = () => setModal.style.display = "none";
+
+        saveSetBtn.onclick = async () => {
+            const payload = {
+                discord_webhook: setDiscordInput.value,
+                telegram_token: setTgTokenInput.value,
+                telegram_chat_id: setTgChatInput.value
+            };
+
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            setModal.style.display = "none";
+        };
+
+        // --- Move/Copy Logic (Enhanced with Browser) ---
+        async function loadMcBrowser(path) {
+             mcCurrentBrowserPath = path;
+             mcSelectedPath.textContent = path || '/';
+             mcBrowser.innerHTML = '<div style="color:#565f89; padding:5px;">Loading...</div>';
+
+             try {
+                const response = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                mcBrowser.innerHTML = '';
+
+                // Show directories only usually, but list sends all. Filter for is_dir
+                const dirs = data.items.filter(i => i.is_dir);
+
+                if (dirs.length === 0) {
+                    mcBrowser.innerHTML = '<div style="color:#565f89; padding:5px;">No subfolders</div>';
+                    return;
+                }
+
+                const ul = document.createElement('ul');
+                ul.style.listStyle = 'none';
+                ul.style.padding = '0';
+                ul.style.margin = '0';
+
+                dirs.forEach(d => {
+                    const li = document.createElement('li');
+                    li.style.padding = '5px 10px';
+                    li.style.cursor = 'pointer';
+                    li.style.borderBottom = '1px solid #2f3549';
+                    li.style.display = 'flex';
+                    li.style.alignItems = 'center';
+                    li.innerHTML = '<span style="margin-right:10px;">📁</span> ' + d.name;
+
+                    li.onclick = () => loadMcBrowser(d.path);
+                    li.onmouseover = () => li.style.background = '#2f3549';
+                    li.onmouseout = () => li.style.background = 'transparent';
+
+                    ul.appendChild(li);
+                });
+                mcBrowser.appendChild(ul);
+
+             } catch(e) {
+                 mcBrowser.textContent = "Error loading path";
+             }
+        }
+
+        function openMcModal(action) {
+            mcAction = action;
+            mcTitle.textContent = action === 'move' ? 'Move Items' : 'Copy Items';
+            // Start browser at root or current?
+            // Usually easier to start at root to find target, or current if moving short distance.
+            // Let's start at Root to allow easy navigation elsewhere.
+            loadMcBrowser('');
+            mcModal.style.display = 'block';
+        }
+
+        mcUpBtn.onclick = () => {
+             // Calculate parent path
+             if (!mcCurrentBrowserPath) return; // Already at root
+             const parts = mcCurrentBrowserPath.split('/').filter(Boolean);
+             parts.pop();
+             const parent = parts.join('/');
+             loadMcBrowser(parent);
+        };
+
+        moveBtn.onclick = () => openMcModal('move');
+        copyBtn.onclick = () => openMcModal('copy');
+
+        cancelMcBtn.onclick = () => mcModal.style.display = 'none';
+
+        confirmMcBtn.onclick = async () => {
+            const dest = mcCurrentBrowserPath; // Use the path selected in browser
+            const endpoint = mcAction === 'move' ? '/api/move' : '/api/copy';
+
+            mcModal.style.display = 'none';
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        paths: selectedPaths,
+                        destination: dest
+                    })
+                });
+                const data = await res.json();
+
+                if (data.status === 'completed') {
+                    showToast(`${mcAction === 'move' ? 'Moved' : 'Copied'} ${data.moved || data.copied} items.`, 'success');
+                    loadPath(currentPath);
+                } else {
+                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showToast('Request failed', 'error');
+            }
+        };
+
+        // --- Rename Logic ---
+        renameBtn.onclick = () => {
+            if (selectedPaths.length !== 1) return;
+            const target = selectedPaths[0];
+            const parts = target.split('/');
+            const currentName = parts[parts.length-1];
+
+            renameInput.value = currentName;
+            renameModal.style.display = 'block';
+        };
+
+        cancelRenameBtn.onclick = () => renameModal.style.display = 'none';
+
+        confirmRenameBtn.onclick = async () => {
+             const newName = renameInput.value;
+             if (!newName) return;
+
+             renameModal.style.display = 'none';
+             const target = selectedPaths[0];
+
+             try {
+                 const res = await fetch('/api/rename', {
+                     method: 'POST',
+                     headers: {'Content-Type': 'application/json'},
+                     body: JSON.stringify({
+                         path: target,
+                         new_name: newName
+                     })
+                 });
+                 const data = await res.json();
+                 if (data.status === 'renamed') {
+                     loadPath(currentPath);
+                 } else {
+                     showToast("Rename Failed: " + data.error, 'error');
+                 }
+             } catch(e) {
+                 showToast("Request failed", 'error');
+             }
+        };
+
+        // --- New Folder Logic ---
+        newFolderBtn.onclick = () => {
+            mkdirNameInput.value = '';
+            mkdirModal.style.display = 'block';
+        };
+
+        cancelMkdirBtn.onclick = () => mkdirModal.style.display = 'none';
+
+        confirmMkdirBtn.onclick = async () => {
+            const name = mkdirNameInput.value;
+            if (!name) return;
+
+            mkdirModal.style.display = 'none';
+            try {
+                const res = await fetch('/api/mkdir', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        path: currentPath,
+                        name: name
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'created') {
+                    loadPath(currentPath);
+                } else {
+                    showToast('Error: ' + data.error, 'error');
+                }
+            } catch (e) {
+                showToast('Request failed', 'error');
+            }
+        };
+
+        // --- Extract Logic ---
+        extractBtn.onclick = () => {
+            if (selectedPaths.length !== 1) return;
+            extModal.style.display = "block";
+        };
+
+        cancelExtBtn.onclick = () => extModal.style.display = "none";
+
+        confirmExtBtn.onclick = async () => {
+             const method = extMethod.value;
+             const password = extPass.value;
+
+             extModal.style.display = "none";
+             const target = selectedPaths[0];
+
+             extractBtn.disabled = true;
+             extractBtn.textContent = "Extracting...";
+
+             try {
+                 const res = await fetch('/api/extract', {
+                     method: 'POST',
+                     headers: {'Content-Type': 'application/json'},
+                     body: JSON.stringify({
+                         path: target,
+                         method: method,
+                         password: password
+                     })
+                 });
+                 const data = await res.json();
+
+                 if (data.status === 'queued' || data.status === 'started') {
+                     showToast("Extract job queued", "success");
+                 } else {
+                     showToast("Extraction Request Failed: " + data.error, 'error');
+                     extractBtn.disabled = false;
+                     extractBtn.textContent = "Extract";
+                 }
+
+                 // Reset button after short delay
+                 setTimeout(() => {
+                     extractBtn.disabled = selectedPaths.length !== 1;
+                     extractBtn.textContent = "Extract";
+                 }, 3000);
+
+             } catch(e) {
+                 showToast("Request failed", 'error');
+                 extractBtn.disabled = false;
+                 extractBtn.textContent = "Extract";
+             }
+        };
+
+        // Close Modals on click outside
+        window.onclick = (event) => {
+            if (event.target == modal) modal.style.display = "none";
+            if (event.target == upModal) upModal.style.display = "none";
+            if (event.target == setModal) setModal.style.display = "none";
+            if (event.target == mcModal) mcModal.style.display = "none";
+            if (event.target == mkdirModal) mkdirModal.style.display = "none";
+            if (event.target == extModal) extModal.style.display = "none";
+        };
+
+    </script>
+</body>
+</html>

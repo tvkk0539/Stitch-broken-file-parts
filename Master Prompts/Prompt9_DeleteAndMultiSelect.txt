@@ -1,0 +1,27 @@
+# Master Prompt: Manual Delete & Multi-Select
+
+**Project Context:**
+The user wants more control over file management. Specifically:
+1.  **Deletion:** Ability to manually delete files/folders from the UI (to clean up after upload).
+2.  **Multi-Select:** Ability to select multiple files/folders at once for Batch Upload or Batch Delete.
+
+**Core Requirements:**
+1.  **Frontend Update (`index.html`):**
+    *   **Selection Logic:** Change single-click selection to allow multi-select (e.g., Ctrl+Click or Checkboxes). Let's use **Checkboxes** next to each item for mobile/touch friendliness and clarity.
+    *   **Delete Button:** Add a red "Trash" icon button to the control bar.
+    *   **Batch Actions:**
+        *   **Upload:** If multiple items selected -> Loop through them or bundle? Rclone supports list of files? Easier to loop `run_upload` for each.
+        *   **Delete:** Loop through and delete each.
+
+2.  **Backend Update (`app.py`):**
+    *   **Delete Endpoint:** Add `/api/delete` (POST).
+        *   Input: List of paths.
+        *   Logic: `rm -rf` (safe implementation using `shutil.rmtree` or `os.remove`).
+        *   Security: MUST enforce `DOWNLOAD_ROOT` scope check for *every* path.
+    *   **Upload Endpoint:** Update `/api/upload` to accept a **List** of paths instead of a single path.
+
+**Deliverables:**
+*   Checkbox-based multi-selection in File Browser.
+*   "Delete" button with confirmation.
+*   Batch Upload capability.
+*   Updated README.

@@ -1,0 +1,41 @@
+# Master Prompt: Archive Creation Feature (The "Packer" Module)
+
+**Project Context:**
+We are extending "ParFix", a Flask-based web utility that currently repairs and extracts scrambled archives. The user wants to add the **inverse capability**: creating multi-part, password-protected archives from large files or folders.
+
+**The Goal:**
+Add a "Create Archive" (Pack) feature to the existing Web UI.
+
+**Core Requirements:**
+1.  **Input:** The user selects a single large file OR a directory.
+2.  **Parameters (User Configurable):**
+    *   **Split Size:** Dropdown or input (e.g., 500MB, 1GB, 2GB).
+    *   **Password:** Optional text field.
+    *   **Compression:** Force "Store" (Level 0) for maximum speed (as requested: "original file size but within what I desire the parts size").
+    *   **Format:** RAR (standard for scene/usenet releases) or 7Z. *Note: RAR creation on Linux usually requires `rar` (non-free), whereas `7z` is open source. We should check if we can install `rar` or fallback to `7z`.*
+3.  **Process:**
+    *   Run in background (non-blocking).
+    *   Stream logs to the existing log panel.
+    *   Output files naming convention: `Name.part001.rar`, `Name.part002.rar`.
+
+**Technical Implementation Plan:**
+1.  **Dependencies:**
+    *   Update `Dockerfile` and `setup.sh` to install `rar` (from non-free) or `p7zip-full`.
+    *   *Decision:* The user specifically mentioned `.rar` style parts. We will attempt to install the official `rar` binary.
+2.  **Backend (`app.py`):**
+    *   Add `/api/pack` endpoint (POST).
+    *   Create `ArchiveManager` class.
+    *   Implement command builder:
+        *   RAR: `rar a -m0 -v1024M -p"PASSWORD" "ArchiveName" "SourceFile"`
+        *   `-m0`: Store (no compression).
+        *   `-v`: Volume size.
+        *   `-p`: Password.
+3.  **Frontend (`index.html`):**
+    *   Add "Pack / Archive" button.
+    *   Create a Modal/Popup form for the settings (Size, Password).
+
+**Deliverables:**
+*   Updated `app.py` with packing logic.
+*   Updated `index.html` with the UI for packing.
+*   Updated `Dockerfile` to include `rar`.
+*   Updated `README.md` explaining the new "Dual-Mode" (Repair & Pack) capability.

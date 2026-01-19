@@ -1,0 +1,21 @@
+# Copy and paste this block into your main docker-compose.yml under 'services:'
+  parfix:
+    image: ghcr.io/tvkk0539/parfix:latest
+    container_name: parfix
+    ports:
+      - "5001:5000"
+    environment:
+      - DOWNLOAD_ROOT=/data/downloads
+      - CONFIG_FILE=/config/config.json
+    volumes:
+      # CHANGE THIS PATH to match your actual downloads folder
+      - /path/to/your/real/downloads:/data/downloads
+      # OPTIONAL: Persist settings
+      - ./parfix-config:/config
+      # OPTIONAL: For Cloud Uploads (Map your rclone.conf)
+      # - /home/user/.config/rclone/rclone.conf:/root/.config/rclone/rclone.conf
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G

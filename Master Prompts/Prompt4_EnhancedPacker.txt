@@ -1,0 +1,37 @@
+# Master Prompt: Enhanced Packer with PAR2 and 7-Zip
+
+**Project Context:**
+We are upgrading the "Packer" module of ParFix. The user wants to ensure maximum data longevity and flexibility.
+
+**The Goal:**
+1.  **Add PAR2 Generation:** When creating an archive, automatically generate PAR2 recovery volumes to protect against future corruption.
+2.  **Add 7-Zip Support:** Add `.7z` as an alternative format option alongside RAR.
+
+**Core Requirements:**
+1.  **Format Selection:** Dropdown in UI to choose between `RAR` and `7Z`.
+2.  **PAR2 Integration:**
+    *   New Checkbox in UI: "Generate PAR2 Recovery Files".
+    *   Default: Checked (Recommended).
+    *   Redundancy Level: Fixed at 5% or 10% (standard) or configurable. Let's start with a standard **10%** for safety.
+3.  **Process Logic:**
+    *   **Step 1:** Create the Split Archive (RAR or 7Z).
+    *   **Step 2:** If PAR2 is requested, run `par2create` on the generated archive parts.
+    *   *Command:* `par2 c -r10 -n1 "ArchiveName" "ArchiveName.part*"`
+
+**Technical Implementation Plan:**
+1.  **Dependencies:**
+    *   Update `Dockerfile`/`setup.sh` to install `p7zip-full` (for 7z creation).
+2.  **Backend (`app.py`):**
+    *   Update `trigger_archive` to accept `format` ('rar' or '7z') and `create_par2` (bool).
+    *   Update `ArchiveManager`:
+        *   Implement `create_7z` logic (`7z a -v{SIZE} -mx0 ...`).
+        *   Implement `create_par2` logic (`par2 c ...`).
+        *   Chain them: Archive First -> Then PAR2.
+3.  **Frontend (`index.html`):**
+    *   Add "Format" dropdown (RAR / 7Z).
+    *   Add "Create PAR2 Recovery" checkbox.
+
+**Deliverables:**
+*   Full support for creating 7Z split archives.
+*   Full support for generating PAR2 protection for ANY archive created.
+*   Updated UI to reflect these advanced options.

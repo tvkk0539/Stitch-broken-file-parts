@@ -1,0 +1,35 @@
+# Master Prompt: Cloud Upload & Notifications
+
+**Project Context:**
+The user wants to transform ParFix into a complete Backup & Management Station. We are adding Rclone integration and Notifications.
+
+**Goal 1: Rclone Integration (Cloud Upload)**
+*   **Philosophy:** Manual upload as default, Auto-upload as optional. Maximum flexibility.
+*   **Requirements:**
+    *   **Dependency:** Install `rclone` in `Dockerfile` & `setup.sh`.
+    *   **Configuration:** The app needs to see the user's `rclone.conf`.
+    *   **UI - Packer Modal:** Add "Upload after packing" checkbox (Default: OFF).
+    *   **UI - File Browser:** Add a new "Upload" button next to files/folders. This allows *manual* upload of any file, anytime.
+    *   **Logic:** Execute `rclone copy/move` commands. Support "Remote Selection" (dropdown of available remotes from config).
+
+**Goal 2: Notifications**
+*   **Requirements:**
+    *   **Settings Panel:** A new settings modal to save Webhook URLs (stored in a simple JSON file or SQLite).
+    *   **Triggers:** Send notification on "Job Complete" (Repair or Pack or Upload).
+    *   **Platforms:** Discord (Webhook) and Telegram (Bot Token + Chat ID).
+
+**Technical Implementation:**
+1.  **Dependencies:** Add `rclone` and `curl` (for notifications).
+2.  **Backend:**
+    *   `RcloneManager` class: `list_remotes()`, `run_upload()`.
+    *   `NotificationManager` class: `send_discord()`, `send_telegram()`.
+    *   Update `app.py` to handle `/api/remotes`, `/api/upload`, `/api/settings`.
+3.  **Frontend:**
+    *   Add "Upload" button to file list items? Or a general Action menu.
+    *   Add "Settings" (Gear icon) for Notification config.
+    *   Update Packer modal with Rclone options.
+
+**Deliverables:**
+*   Functional Rclone integration (Manual & Auto).
+*   Functional Notifications.
+*   Updated README with "Cloud & Alerts" section.
