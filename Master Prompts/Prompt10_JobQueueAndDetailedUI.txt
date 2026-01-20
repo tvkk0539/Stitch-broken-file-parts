@@ -1,0 +1,31 @@
+The goal of this phase is to implement a robust Job Queue System with user-facing controls and improve the Cloud Upload workflow.
+
+### 1. Job Queue Management UI
+- **Current State:** Jobs (Repair, Pack, Upload) are queued in the backend, but the user only sees a "System Logs" panel. They cannot see what is queued or stop a running job.
+- **Requirement:**
+    - Replace the "System Logs" panel with a **Tabbed Interface**:
+        - **Tab 1: System Logs** (Existing functionality).
+        - **Tab 2: Job Queue** (New).
+    - **Job Queue Tab Features:**
+        - Display the **Current Running Job** (Name, Status, "Running").
+        - Display a list of **Pending Jobs** (Name, Status, "Queued").
+        - **Cancellation:** Provide a **"Cancel" button** for:
+            - The *Running* job (should immediately terminate the underlying process like `rclone`, `rar`, or `par2`).
+            - Any *Pending* job (should remove it from the queue).
+        - **Detailed Progress:** Clicking on a job card should expand it to show real-time details (e.g., *"Uploading file 3 of 10: movie.mkv"*, *"Creating PAR2..."*).
+
+### 2. Enhanced Folder Upload Logic
+- **Current Issue:** Selecting a folder for upload treats it like a file or doesn't preserve structure correctly on the remote.
+- **Requirement:**
+    - **Recursive Uploads:** When a folder is selected, it must be uploaded recursively.
+    - **Path Logic:**
+        - Default Remote Path in UI: `ParFix_Uploads/` (Do not autofill folder names here).
+        - **Behavior:**
+            - If File `A.mkv` is selected -> Uploads to `ParFix_Uploads/A.mkv`.
+            - If Folder `MyMovie` is selected -> Uploads to `ParFix_Uploads/MyMovie/` (preserving contents).
+    - **Batch Uploads:** Support selecting multiple files and folders at once. The system must iterate through them, applying the correct logic (File vs Folder) for each, and checking for cancellation between items.
+
+### 3. Technical Constraints
+- The backend `JobManager` needs to track `subprocess.Popen` objects to allow `terminate()` calls.
+- The `/api/jobs` endpoint must serialize job data correctly (avoiding `TypeError` on function objects).
+- The frontend should poll `/api/jobs` (e.g., every 2s) to update the queue UI.

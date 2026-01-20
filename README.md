@@ -32,7 +32,11 @@ Easily create multi-part archives from large files or folders.
 - **Multi-Select:** Check multiple files/folders to perform batch actions (Upload, Move, Delete, etc.).
 
 ### 🛡️ Stability & UX
-- **Smart Job Queue:** All heavy tasks (Repair, Pack, Upload) are queued and processed sequentially in the background. This prevents server crashes (Out of Memory) even if you trigger multiple jobs at once.
+- **Smart Job Queue:** All heavy tasks (Repair, Pack, Upload) are queued and processed sequentially in the background. This prevents server crashes (Out of Memory).
+- **Job Management UI:**
+    - **Visual Queue:** See exactly what is running and what is waiting in the "Job Queue" tab.
+    - **Cancellation:** Stop any running job or remove pending jobs with a single click.
+    - **Detailed Progress:** Click on any running job to see granular details (e.g., *Current File being uploaded*, *Current Archive Action*).
 - **Toast Notifications:** Modern, non-blocking status popups (Success/Error/Info) replace annoying browser alerts.
 - **Health Monitoring:** Includes a Docker `HEALTHCHECK` to ensure the service is always running correctly.
 
@@ -127,8 +131,10 @@ If you are using Nginx Proxy Manager (included in many Arr stacks):
 1. Select the file(s) or folder(s) you want to upload.
 2. Click **"Upload"**.
 3. Select your Rclone Remote (requires `rclone.conf` mounted).
+   - *Note: The default path `ParFix_Uploads/` handles folders intelligently. Files go into root, folders get their own subdirectories automatically.*
 4. (Optional) Adjust concurrency settings for faster parallel uploads.
-5. Click **"Start Upload"**. Logs will show detailed progress.
+5. Click **"Start Upload"**.
+6. Switch to the **Job Queue** tab to monitor progress or cancel the upload.
 
 ## 📦 Bare Metal Installation (Debian/Ubuntu)
 
