@@ -237,6 +237,9 @@
 
         .job-card.running { border-left: 3px solid var(--accent-color); }
         .job-card.queued { border-left: 3px solid #737aa2; }
+        .job-card.completed { border-left: 3px solid var(--success-color); }
+        .job-card.failed { border-left: 3px solid var(--error-color); }
+        .job-card.cancelled { border-left: 3px solid #e0af68; }
 
         .job-header {
             display: flex;
@@ -769,7 +772,7 @@
                 section.className = 'job-section';
                 section.innerHTML = '<h3>Currently Running</h3>';
 
-                const card = createJobCard(data.current, true);
+                const card = createJobCard(data.current, 'running');
                 section.appendChild(card);
                 jobQueueContainer.appendChild(section);
             }
@@ -781,20 +784,36 @@
                 section.innerHTML = `<h3>Pending Jobs (${data.pending.length})</h3>`;
 
                 data.pending.forEach(job => {
-                    const card = createJobCard(job, false);
+                    const card = createJobCard(job, 'queued');
                     section.appendChild(card);
                 });
                 jobQueueContainer.appendChild(section);
             }
 
-            if (!data.current && (!data.pending || data.pending.length === 0)) {
+            // History
+            if (data.history && data.history.length > 0) {
+                const section = document.createElement('div');
+                section.className = 'job-section';
+                section.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #414868; padding-bottom: 5px;">
+                    <h3 style="border:none; padding:0; margin:0;">Job History</h3>
+                    <button class="icon-btn" onclick="clearHistory()" style="padding: 2px 8px; font-size:0.8em; min-width:auto;">Clear</button>
+                </div>`;
+
+                data.history.forEach(job => {
+                    const card = createJobCard(job, job.status || 'completed');
+                    section.appendChild(card);
+                });
+                jobQueueContainer.appendChild(section);
+            }
+
+            if (!data.current && (!data.pending || data.pending.length === 0) && (!data.history || data.history.length === 0)) {
                 jobQueueContainer.innerHTML = '<div style="color: #565f89; text-align: center; margin-top: 50px;">No jobs running or queued.</div>';
             }
         }
 
-        function createJobCard(job, isRunning) {
+        function createJobCard(job, status) {
             const card = document.createElement('div');
-            card.className = `job-card ${isRunning ? 'running' : 'queued'}`;
+            card.className = `job-card ${status}`;
 
             // Header Section
             const header = document.createElement('div');
@@ -809,21 +828,30 @@
 
             const meta = document.createElement('div');
             meta.className = 'job-meta';
-            meta.textContent = isRunning ? 'Status: Running (Click for details)' : 'Status: Queued';
+
+            let statusText = status.charAt(0).toUpperCase() + status.slice(1);
+            if (status === 'running') statusText += ' (Click for details)';
+            else if (status !== 'queued') statusText += ' (Click for reason)';
+
+            meta.textContent = `Status: ${statusText}`;
 
             info.appendChild(name);
             info.appendChild(meta);
 
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'btn-cancel';
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.onclick = (e) => {
-                e.stopPropagation();
-                cancelJob(job.id);
-            };
-
             header.appendChild(info);
-            header.appendChild(cancelBtn);
+
+            // Add Cancel button only for running or queued jobs
+            if (status === 'running' || status === 'queued') {
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'btn-cancel';
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    cancelJob(job.id);
+                };
+                header.appendChild(cancelBtn);
+            }
+
             card.appendChild(header);
 
             // Details Section
@@ -839,7 +867,12 @@
 
                     const row = document.createElement('div');
                     row.className = 'detail-row';
-                    row.innerHTML = `<span class="detail-key">${displayKey}:</span> <span class="detail-val">${value}</span>`;
+                    // Highlight error if present
+                    if (key === 'error') {
+                        row.innerHTML = `<span class="detail-key" style="color:var(--error-color)">Error:</span> <span class="detail-val" style="color:#f7768e">${value}</span>`;
+                    } else {
+                        row.innerHTML = `<span class="detail-key">${displayKey}:</span> <span class="detail-val">${value}</span>`;
+                    }
                     detailsDiv.appendChild(row);
                 }
             } else {
@@ -859,6 +892,12 @@
             };
 
             return card;
+        }
+
+        async function clearHistory() {
+            if(!confirm("Clear job history?")) return;
+            await fetch('/api/jobs/history/clear', { method: 'POST' });
+            fetchJobs();
         }
 
         async function cancelJob(jobId) {

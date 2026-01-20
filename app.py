@@ -70,6 +70,7 @@ class JobManager:
         self.lock = threading.Lock()
         self.pending_jobs = [] # List of dicts
         self.current_job = None # Dict
+        self.history = [] # Finished jobs
         self.current_process = None # subprocess.Popen object
         self._cancelled = False
 
@@ -130,11 +131,14 @@ class JobManager:
             if self.current_job and self.current_job['id'] == job_id:
                 log(f"Cancelling RUNNING job: {self.current_job['name']}")
                 self._cancelled = True
+
+                # Update details to reflect cancellation intent
+                if 'details' not in self.current_job: self.current_job['details'] = {}
+                self.current_job['details']['error'] = "User requested cancellation"
+
                 if self.current_process:
                     try:
                         self.current_process.terminate()
-                        # Give it a moment, then kill if needed?
-                        # Usually terminate is enough for these tools.
                     except Exception as e:
                         log(f"Error terminating process: {e}")
                 return True
@@ -143,6 +147,11 @@ class JobManager:
             for i, job in enumerate(self.pending_jobs):
                 if job['id'] == job_id:
                     removed = self.pending_jobs.pop(i)
+                    removed['status'] = 'cancelled'
+                    removed['completed_at'] = time.time()
+                    removed['details'] = {'error': 'Cancelled by user before starting'}
+                    self.history.insert(0, removed) # Add to history
+                    if len(self.history) > 50: self.history.pop()
                     log(f"Cancelled PENDING job: {removed['name']}")
                     return True
 
@@ -155,16 +164,26 @@ class JobManager:
                 if not job: return None
                 j = job.copy()
                 if 'target' in j: del j['target']
-                # args might contain non-serializable objects too, but usually just strings/ints here.
-                # safely convert args to string rep if needed or just leave if we know they are safe.
-                # For safety, let's just keep metadata.
                 if 'args' in j: del j['args']
                 return j
 
             return {
                 'current': sanitize(self.current_job),
-                'pending': [sanitize(j) for j in self.pending_jobs]
+                'pending': [sanitize(j) for j in self.pending_jobs],
+                'history': [sanitize(j) for j in self.history]
             }
+
+    def add_to_history(self, job):
+        with self.lock:
+            # Finalize job state
+            job['completed_at'] = time.time()
+            self.history.insert(0, job)
+            if len(self.history) > 50:
+                self.history.pop()
+
+    def clear_history(self):
+        with self.lock:
+            self.history = []
 
 job_manager = JobManager()
 
@@ -186,12 +205,31 @@ def worker():
 
         try:
             target(*args)
+            # Check if job was marked as failed/cancelled internally by the target
+            # Ideally target updates job details.
+            # We assume success unless exception, OR if job details has error
+
+            # Determine status based on cancellation or error presence
+            if job_manager.is_cancelled():
+                job['status'] = 'cancelled'
+                if 'details' not in job: job['details'] = {}
+                if 'error' not in job['details']: job['details']['error'] = 'Cancelled by user'
+            elif job.get('details', {}).get('error'):
+                 job['status'] = 'failed'
+            else:
+                 job['status'] = 'completed'
+
         except Exception as e:
             log(f"Job {job_name} Failed: {e}")
+            job['status'] = 'failed'
+            if 'details' not in job: job['details'] = {}
+            job['details']['error'] = str(e)
+
             import traceback
             log(traceback.format_exc())
         finally:
-            log(f"Finished Job: {job_name}")
+            log(f"Finished Job: {job_name} ({job.get('status', 'unknown')})")
+            job_manager.add_to_history(job)
             job_manager.set_current_job(None)
             job_manager.clear_current_process()
 
@@ -284,11 +322,13 @@ class RcloneManager:
                         log(f"Upload cancelled for {basename}")
                         break
                     log(f"Upload failed for {basename} (Code {process.returncode})")
+                    job_manager.update_job_details({'error': f"Upload failed for {basename} (Code {process.returncode})"})
                 else:
                     log(f"Upload completed for {basename}")
 
             except Exception as e:
                 log(f"Rclone Error processing {src_path}: {e}")
+                job_manager.update_job_details({'error': str(e)})
 
         return True
 
@@ -351,6 +391,7 @@ class ArchiveManager:
                     log("Archiving Cancelled")
                 else:
                     log(f"Archiving failed (Code {process.returncode})")
+                    job_manager.update_job_details({'error': f"Archiving failed (Code {process.returncode})"})
                     NotificationManager.send_notification(f"❌ ParFix: Archiving Failed for {archive_name}")
                 return
 
@@ -415,6 +456,7 @@ class ArchiveManager:
 
         except Exception as e:
             log(f"Error during archiving: {str(e)}")
+            job_manager.update_job_details({'error': str(e)})
 
 class RepairManager:
     @staticmethod
@@ -479,6 +521,7 @@ class RepairManager:
                      log("Repair Cancelled")
                  else:
                      log(f"PAR2 failed (Code {process.returncode})")
+                     job_manager.update_job_details({'error': f"PAR2 Repair failed (Code {process.returncode})"})
                      NotificationManager.send_notification(f"❌ ParFix: Repair Failed")
                  return
 
@@ -502,6 +545,7 @@ class RepairManager:
 
         except Exception as e:
             log(f"Error: {str(e)}")
+            job_manager.update_job_details({'error': str(e)})
 
     @staticmethod
     def cleanup_and_rename(directory, master_par2_name):
@@ -629,9 +673,11 @@ class ExtractManager:
                     log("Extraction Cancelled")
                 else:
                     log(f"Extraction failed (Code {process.returncode})")
+                    job_manager.update_job_details({'error': f"Extraction failed (Code {process.returncode})"})
 
         except Exception as e:
             log(f"Extraction Error: {e}")
+            job_manager.update_job_details({'error': str(e)})
 
 # --- API Routes ---
 
@@ -686,6 +732,11 @@ def stream_logs():
 @app.route('/api/jobs', methods=['GET'])
 def get_jobs():
     return jsonify(job_manager.get_status())
+
+@app.route('/api/jobs/history/clear', methods=['POST'])
+def clear_history():
+    job_manager.clear_history()
+    return jsonify({'status': 'cleared'})
 
 @app.route('/api/jobs/cancel/<job_id>', methods=['POST'])
 def cancel_job(job_id):
