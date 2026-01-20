@@ -228,16 +228,45 @@
             padding: 12px;
             margin-bottom: 10px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column; /* Changed for expansion */
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
+
+        .job-card:hover { background-color: #262b40; }
 
         .job-card.running { border-left: 3px solid var(--accent-color); }
         .job-card.queued { border-left: 3px solid #737aa2; }
 
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
         .job-info { flex-grow: 1; }
         .job-name { font-weight: bold; color: #c0caf5; display: block; margin-bottom: 4px; }
         .job-meta { font-size: 0.85em; color: #737aa2; }
+
+        .job-details {
+            display: none;
+            width: 100%;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #2f3549;
+            font-size: 0.85em;
+            color: #a9b1d6;
+        }
+
+        .job-details.expanded { display: block; }
+
+        .detail-row {
+            display: flex;
+            margin-bottom: 4px;
+        }
+        .detail-key { width: 100px; color: #737aa2; font-weight: bold; }
+        .detail-val { flex: 1; color: #c0caf5; word-break: break-all; }
 
         .btn-cancel {
             background-color: var(--error-color);
@@ -767,6 +796,10 @@
             const card = document.createElement('div');
             card.className = `job-card ${isRunning ? 'running' : 'queued'}`;
 
+            // Header Section
+            const header = document.createElement('div');
+            header.className = 'job-header';
+
             const info = document.createElement('div');
             info.className = 'job-info';
 
@@ -776,7 +809,7 @@
 
             const meta = document.createElement('div');
             meta.className = 'job-meta';
-            meta.textContent = isRunning ? 'Status: Running' : 'Status: Queued';
+            meta.textContent = isRunning ? 'Status: Running (Click for details)' : 'Status: Queued';
 
             info.appendChild(name);
             info.appendChild(meta);
@@ -784,10 +817,46 @@
             const cancelBtn = document.createElement('button');
             cancelBtn.className = 'btn-cancel';
             cancelBtn.textContent = 'Cancel';
-            cancelBtn.onclick = () => cancelJob(job.id);
+            cancelBtn.onclick = (e) => {
+                e.stopPropagation();
+                cancelJob(job.id);
+            };
 
-            card.appendChild(info);
-            card.appendChild(cancelBtn);
+            header.appendChild(info);
+            header.appendChild(cancelBtn);
+            card.appendChild(header);
+
+            // Details Section
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'job-details';
+            detailsDiv.id = `details-${job.id}`;
+
+            // Populate details if available
+            if (job.details) {
+                for (const [key, value] of Object.entries(job.details)) {
+                    // Format key for display (e.g., current_item -> Current Item)
+                    const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+                    const row = document.createElement('div');
+                    row.className = 'detail-row';
+                    row.innerHTML = `<span class="detail-key">${displayKey}:</span> <span class="detail-val">${value}</span>`;
+                    detailsDiv.appendChild(row);
+                }
+            } else {
+                detailsDiv.textContent = "No additional details.";
+            }
+
+            card.appendChild(detailsDiv);
+
+            // Toggle Expand
+            card.onclick = () => {
+                const isExpanded = detailsDiv.classList.contains('expanded');
+                if (isExpanded) {
+                    detailsDiv.classList.remove('expanded');
+                } else {
+                    detailsDiv.classList.add('expanded');
+                }
+            };
 
             return card;
         }

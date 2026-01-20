@@ -101,6 +101,15 @@ class JobManager:
             if job:
                 self.current_job['status'] = 'running'
                 self.current_job['started_at'] = time.time()
+                self.current_job['details'] = {'action': 'Starting...'}
+
+    def update_job_details(self, details):
+        with self.lock:
+            if self.current_job:
+                # Merge details
+                if 'details' not in self.current_job:
+                    self.current_job['details'] = {}
+                self.current_job['details'].update(details)
 
     def set_current_process(self, process):
         """Registers the active subprocess so it can be killed if cancelled."""
@@ -215,17 +224,21 @@ class RcloneManager:
             base_upload_path += '/'
 
         # Process each selected item
-        for src_path in source_paths:
+        for i, src_path in enumerate(source_paths):
             if job_manager.is_cancelled():
                 log("Upload job cancelled.")
                 break
+
+            basename = os.path.basename(src_path)
+            job_manager.update_job_details({
+                'action': f"Uploading item {i+1} of {len(source_paths)}",
+                'current_item': basename
+            })
 
             try:
                 if not os.path.exists(src_path):
                     log(f"Skipping missing file: {src_path}")
                     continue
-
-                basename = os.path.basename(src_path)
 
                 # Determine command based on type
                 if os.path.isdir(src_path):
@@ -292,6 +305,11 @@ class ArchiveManager:
 
         log(f"Packing '{base_name}' into '{archive_name}' ({fmt})")
 
+        job_manager.update_job_details({
+            'action': f"Creating Archive ({fmt.upper()})",
+            'archive_name': archive_name
+        })
+
         cmd = []
         if fmt == 'rar':
             cmd = ['rar', 'a', '-m0', f'-v{split_size}', '-ep1']
@@ -346,6 +364,8 @@ class ArchiveManager:
                 log("Starting PAR2 Generation...")
                 par2_base = archive_name + ".par2"
 
+                job_manager.update_job_details({'action': 'Generating PAR2 Recovery Files'})
+
                 # Determine what files to protect
                 import glob
                 target_pattern = archive_name.replace('.rar', '.part*.rar') if fmt == 'rar' else archive_name + ".*"
@@ -387,6 +407,7 @@ class ArchiveManager:
 
             # --- PHASE 3: CLOUD UPLOAD ---
             if upload and remote:
+                job_manager.update_job_details({'action': f'Uploading {len(generated_files)} files to Cloud'})
                 RcloneManager.run_upload(generated_files, remote, upload_path)
                 NotificationManager.send_notification(f"✅ ParFix: Packed & Uploaded {archive_name}")
             else:
@@ -399,6 +420,11 @@ class RepairManager:
     @staticmethod
     def run_repair_job(directory, forced_par2=None):
         log(f"Starting repair in: {directory}")
+
+        job_manager.update_job_details({
+            'action': 'Initializing Repair...',
+            'directory': directory
+        })
 
         try:
             if job_manager.is_cancelled(): return
@@ -422,6 +448,8 @@ class RepairManager:
                     master_par2 = all_par2[0]
 
             log(f"Using Master PAR2: {master_par2}")
+
+            job_manager.update_job_details({'action': 'Running PAR2 Repair/Verify'})
 
             # Step 2: Wildcard Repair
             import glob
@@ -459,11 +487,13 @@ class RepairManager:
             if job_manager.is_cancelled(): return
 
             # Step 3: Extract
+            job_manager.update_job_details({'action': 'Extracting Archive...'})
             if RepairManager.extract_archive(directory):
                 NotificationManager.send_notification(f"✅ ParFix: Repair & Extract Complete")
             else:
                 if job_manager.is_cancelled(): return
                 # Rename and retry
+                job_manager.update_job_details({'action': 'Renaming and Retrying Extraction...'})
                 RepairManager.cleanup_and_rename(directory, master_par2)
                 if RepairManager.extract_archive(directory):
                     NotificationManager.send_notification(f"✅ ParFix: Repair & Extract Complete (Retry)")
@@ -557,6 +587,11 @@ class ExtractManager:
             return
 
         log(f"Extracting {archive_file} ({method})")
+
+        job_manager.update_job_details({
+            'action': f"Extracting ({method.upper()})",
+            'archive': archive_file
+        })
 
         cmd = []
         if method == 'unrar':
