@@ -141,10 +141,20 @@ class JobManager:
 
     def get_status(self):
         with self.lock:
-            # Return copies to avoid race conditions during serialization
+            # Return sanitised copies to avoid race conditions and JSON errors
+            def sanitize(job):
+                if not job: return None
+                j = job.copy()
+                if 'target' in j: del j['target']
+                # args might contain non-serializable objects too, but usually just strings/ints here.
+                # safely convert args to string rep if needed or just leave if we know they are safe.
+                # For safety, let's just keep metadata.
+                if 'args' in j: del j['args']
+                return j
+
             return {
-                'current': self.current_job.copy() if self.current_job else None,
-                'pending': [j.copy() for j in self.pending_jobs]
+                'current': sanitize(self.current_job),
+                'pending': [sanitize(j) for j in self.pending_jobs]
             }
 
 job_manager = JobManager()
