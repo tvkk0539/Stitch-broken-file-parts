@@ -1,0 +1,38 @@
+The goal of this phase is to transform the "Cloud Browser" into a professional, fully-featured Cloud File Manager and improve the destination selection workflow.
+
+### 1. Rclone Remote Browser (No-FUSE)
+- **Requirement:** Implement a file browser for Rclone remotes (e.g., GDrive, OneDrive) without using `fuse3` (mounting).
+- **Implementation:**
+    - Use `rclone lsjson` commands in the backend to fetch file lists with metadata (Name, Size, IsDir).
+    - Create a **Tabbed Interface** in the frontend: `[ Local Storage ]` vs `[ Cloud Remotes ]`.
+    - **Cloud Mode:** Allows navigation into remotes and subfolders.
+
+### 2. Cloud-to-Cloud Operations
+- **Requirement:** Enable file operations within the cloud environment without downloading files to the local VPS.
+- **Implementation:**
+    - **Move/Copy:** Use `rclone moveto` and `rclone copyto` to transfer files between folders or even different remotes (Server-Side Copy where supported).
+    - **Rename:** Use `rclone moveto` to rename files/folders.
+    - **Delete:** Use `rclone delete` (files) or `rclone purge` (folders).
+    - **Mkdir:** Use `rclone mkdir` to create new cloud folders.
+    - **Job Queue:** Wrap heavy operations (Move/Copy/Delete) in the Job Queue so they run in the background with progress tracking.
+
+### 3. Download to VPS
+- **Requirement:** Allow users to download files from the Cloud to the VPS.
+- **Implementation:**
+    - Add a **"Download to VPS"** button in Cloud Mode.
+    - Uses `rclone copyto` to transfer files/folders to the local `DOWNLOAD_ROOT`.
+    - Integrated with the **Destination Selector** (see below).
+
+### 4. Enhanced Destination Selector
+- **Requirement:** Improve the UX for choosing where files go during Move/Copy/Download.
+- **Implementation:**
+    - Update the "Move/Copy" modal to act as a generic "Destination Selector".
+    - **New Folder Button:** Allow creating a new folder directly inside the selector modal.
+    - **Download Workflow:** When downloading from Cloud, open this selector so users can choose a specific local folder instead of dumping everything in the root.
+    - **Cloud-to-Cloud Selector:** When moving cloud files, the selector switches to "Cloud Mode", allowing navigation back to the root remote list to pick a different remote as the destination.
+
+### 5. Config Management
+- **Requirement:** Allow uploading `rclone.conf` via the web UI.
+- **Implementation:**
+    - Add a file upload section in the Settings Modal.
+    - Backend saves the file to `~/.config/rclone/rclone.conf` (or the mapped volume location) and reloads the remote list.
