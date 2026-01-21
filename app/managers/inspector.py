@@ -25,12 +25,47 @@ class InspectorManager:
             return {'type': 'unknown', 'info': 'No deep inspection available for this file type.'}
 
     @staticmethod
-    def _get_best_value(track, keys, default='Unknown'):
-        for key in keys:
-            val = track.get(key)
-            if val:
-                return val
-        return default
+    def _format_size(size_str):
+        try:
+            size = float(size_str)
+            for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                if size < 1024:
+                    return f"{size:.2f} {unit}"
+                size /= 1024
+            return f"{size:.2f} PB"
+        except (ValueError, TypeError):
+            return size_str
+
+    @staticmethod
+    def _format_duration(dur_str):
+        try:
+            # Duration is usually in milliseconds
+            ms = float(dur_str)
+            seconds = int((ms / 1000) % 60)
+            minutes = int((ms / (1000 * 60)) % 60)
+            hours = int((ms / (1000 * 60 * 60)))
+
+            parts = []
+            if hours > 0: parts.append(f"{hours}h")
+            if minutes > 0: parts.append(f"{minutes}m")
+            if seconds > 0 or not parts: parts.append(f"{seconds}s")
+
+            return " ".join(parts)
+        except (ValueError, TypeError):
+            return dur_str
+
+    @staticmethod
+    def _format_bitrate(bps_str):
+        try:
+            # Bitrate is in bits/sec
+            bps = float(bps_str)
+            if bps >= 1_000_000:
+                return f"{bps/1_000_000:.1f} Mb/s"
+            elif bps >= 1_000:
+                return f"{bps/1_000:.0f} Kb/s"
+            return f"{bps:.0f} bps"
+        except (ValueError, TypeError):
+            return bps_str
 
     @staticmethod
     def _inspect_media(path):
@@ -52,31 +87,40 @@ class InspectorManager:
                         # Format
                         info['details'].append(('Format', track.get('Format', 'Unknown')))
 
-                        # Duration Fallback
-                        dur = InspectorManager._get_best_value(
-                            track,
-                            ['Duration_String4', 'Duration_String3', 'Duration_String', 'Duration_String1', 'Duration'],
-                            'Unknown'
-                        )
+                        # Duration (Prefer String -> Fallback to Raw + Format)
+                        dur = track.get('Duration_String4') or track.get('Duration_String3') or track.get('Duration_String') or track.get('Duration_String1')
+                        if not dur:
+                            raw_dur = track.get('Duration')
+                            dur = InspectorManager._format_duration(raw_dur) if raw_dur else 'Unknown'
                         info['details'].append(('Duration', dur))
 
-                        # Size Fallback
-                        size = InspectorManager._get_best_value(
-                            track,
-                            ['FileSize_String4', 'FileSize_String3', 'FileSize_String', 'FileSize_String1', 'FileSize'],
-                            'Unknown'
-                        )
+                        # Size (Prefer String -> Fallback to Raw + Format)
+                        size = track.get('FileSize_String4') or track.get('FileSize_String3') or track.get('FileSize_String') or track.get('FileSize_String1')
+                        if not size:
+                            raw_size = track.get('FileSize')
+                            size = InspectorManager._format_size(raw_size) if raw_size else 'Unknown'
                         info['details'].append(('Size', size))
 
                     elif track['@type'] == 'Video':
                         res = f"{track.get('Width', '?')}x{track.get('Height', '?')}"
-                        info['details'].append(('Video', f"{track.get('Format', 'Unknown')} ({res})"))
+                        fmt_line = f"{track.get('Format', 'Unknown')} ({res})"
 
-                        bitrate = InspectorManager._get_best_value(
-                            track,
-                            ['BitRate_String', 'BitRate'],
-                            'Unknown'
-                        )
+                        # Bit Depth (8-bit, 10-bit)
+                        bit_depth = track.get('BitDepth_String') or track.get('BitDepth')
+                        if bit_depth:
+                            # If it's just a number, append 'bit'
+                            if str(bit_depth).isdigit():
+                                bit_depth = f"{bit_depth}-bit"
+                            fmt_line += f" {bit_depth}"
+
+                        info['details'].append(('Video', fmt_line))
+
+                        # Bitrate
+                        bitrate = track.get('BitRate_String')
+                        if not bitrate:
+                            raw_br = track.get('BitRate')
+                            bitrate = InspectorManager._format_bitrate(raw_br) if raw_br else 'Unknown'
+
                         info['details'].append(('Bitrate', bitrate))
 
                     elif track['@type'] == 'Audio':
