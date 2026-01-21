@@ -1,0 +1,61 @@
+# Future Expansion Strategy: The "Swiss Army Knife" Architecture
+
+This document outlines the professional roadmap for evolving ParFix from a single utility into a modular "Master Utility Container".
+
+## 1. Architectural Philosophy
+We have refactored the codebase into a Modular Architecture (`app/core`, `app/managers/`). This is the foundation for the "Swiss Army Knife" strategy.
+
+*   **Goal:** To add 4-5 high-value *utility* modules without bloating the core or causing instability.
+*   **The Rule:** Only add *file manipulation utilities* (Renamers, Optimizers, Inspectors). Do NOT add heavy *services* (Media Servers, Databases) which belong in separate containers.
+
+## 2. The "Dual-Image" Strategy (Pro Release)
+To satisfy both lightweight users and power users, we will adopt a multi-stage Docker build strategy.
+
+### Image A: `parfix:lite` (Current)
+*   **Focus:** Speed, Safety, Minimal RAM.
+*   **Contents:**
+    *   ParFix Web UI
+    *   Job Queue System
+    *   Rclone (Cloud Manager)
+    *   Unrar / 7-Zip / Par2
+    *   Mediainfo (Basic Inspection)
+*   **Use Case:** Low-end VPS, Seedboxes, "Just fix my files".
+
+### Image B: `parfix:full` (Future)
+*   **Focus:** Maximum capability, "One container for everything".
+*   **Base:** Built `FROM parfix:lite`.
+*   **Added Tools:**
+    *   **FFmpeg:** For video conversion/remuxing modules.
+    *   **MKVToolNix:** For advanced subtitle/audio track stripping.
+    *   **SubtitleEdit:** For automated subtitle sync/fixing.
+    *   **ImageMagick:** For automated cover art optimization.
+*   **Use Case:** Home Servers, High-power workstations.
+
+## 3. Future Modules Roadmap
+Using the new `app/managers/` structure, we can plug in these features cleanly:
+
+1.  **Subtitle Manager (`managers/subtitles.py`)**
+    *   Auto-download subtitles for selected movies.
+    *   Extract subtitles from MKV containers.
+
+2.  **Remuxer / Optimizer (`managers/ffmpeg.py`)**
+    *   Convert `.avi` to `.mp4` (Direct Stream Copy).
+    *   Strip unwanted audio tracks (e.g., remove Commentary tracks to save space).
+
+3.  **Checksum Verifier (`managers/checksum.py`)**
+    *   Generate `SFV` or `MD5` hashes for archiving.
+    *   Verify file integrity before upload.
+
+4.  **Dedupe / Cleaner (`managers/cleaner.py`)**
+    *   Find and delete "sample" files.
+    *   Remove empty folders.
+    *   Find duplicate files by hash.
+
+## 4. Implementation Guide for New Apps
+To add a new app (e.g., "SuperTool"):
+1.  Create `app/managers/supertool.py`.
+2.  Add a route in `app/routes.py` (`/api/supertool`).
+3.  Add a button in `templates/index.html`.
+4.  If it needs a binary, add it to `Dockerfile.full`.
+
+This strategy ensures ParFix remains professional, scalable, and unbreakable.

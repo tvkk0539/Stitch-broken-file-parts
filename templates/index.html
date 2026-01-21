@@ -2059,80 +2059,25 @@
 
             // --- Case 2: Cloud-to-Cloud Move/Copy ---
             } else if (browserMode === 'cloud') {
-                // Determine remote and path from destination
-                // Destination format in 'cloud' context is: "RemoteName" or "RemoteName/Folder"
-                // But the API takes `remote` and `dest_path`.
-                // Actually, our `run_cloud_move` takes `remote` (source remote) and `dest_path`.
-                // Wait, if we move ACROSS remotes, `run_cloud_move` logic assumes:
-                // Source: remote:src_path
-                // Dest: remote:dest_path
-                // The current backend implementation (`run_cloud_move`) assumes SAME remote!
-
-                // Let's check app.py implementation:
-                // full_src = f"{remote}:{src_path}"
-                // full_dest = f"{remote}:{dest_path}/{basename}"
-
-                // This means currently backend ONLY supports same-remote moves.
-                // However, the frontend selector allows picking ANY remote.
-                // If user picked a different remote, `dest` string will be "OtherRemote/Folder".
-                // If we pass `dest` as `dest_path` to backend, it will try to move to:
-                // `SourceRemote:OtherRemote/Folder/Basename`. This is WRONG.
-
-                // Correction: Backend needs to support full destination remote.
-                // BUT, modifying backend now is risky.
-                // PROFESSIONAL FIX: Update backend logic to support cross-remote, OR restrict frontend.
-                // Given the requirement for "Professional use full potential", I SHOULD support cross-remote.
-                // But wait, `rclone moveto` supports `rclone moveto remote1:path remote2:path`.
-                // My backend code:
-                // `full_dest = f"{remote}:{dest_path}/{basename}"`
-                // It hardcodes `remote` (source remote) into destination.
-
-                // To support cross-remote, the backend `run_cloud_move` should accept `dest_remote` separately,
-                // OR `dest_path` should be the FULL remote path (e.g. "Remote2:Folder").
-
-                // Let's stick to what we have for now: Same-Remote moves are safer to implement without
-                // rewriting the backend function signature which might break other things.
-                // BUT, if I pass a path that LOOKS like a remote path, rclone might handle it?
-                // No, `SourceRemote:DestRemote:Path` is invalid.
-
-                // Compromise: For this iteration, I will assume the user stays on the same remote
-                // OR I will parse the destination in frontend and warn if it's different?
-                // Actually, the destination selector browses ALL remotes.
-                // If I select "OneDrive" while in "GDrive", `dest` is "OneDrive".
-                // Passing "OneDrive" to backend results in `GDrive:OneDrive/File`.
-                // This is a valid path on GDrive (folder named OneDrive).
-                // It works, but it's not a cross-remote move. It's a move into a subfolder named after the other remote.
-
-                // To fix this properly requires backend changes.
-                // However, the user asked to fix the "Missing glue code".
-                // I will wire it up to the existing backend endpoints.
-                // To mitigate confusion, I should ideally filter the browser to current remote only,
-                // BUT I implemented full browsing.
-
-                // Let's implement the glue code calling the endpoints we created.
-
                 const endpoint = mcAction === 'move' ? '/api/rclone/move' : '/api/rclone/copy';
 
-                // We need to pass: remote, paths, destination.
-                // `remote` is the SOURCE remote (`currentRemote`).
-                // `destination` is the path inside the source remote.
-                // Since our selector returns `Remote/Folder`, we should strip the Remote prefix
-                // IF it matches current remote.
+                // Parse Destination Remote and Path from browser path
+                // Format in browser is ALWAYS "RemoteName" or "RemoteName/Path/To/Folder"
+                let targetRemote = "";
+                let targetPath = "";
 
-                // Parse destination:
-                let targetDest = dest;
-
-                // If dest starts with currentRemote + '/', strip it.
-                if (targetDest.startsWith(currentRemote + '/')) {
-                    targetDest = targetDest.substring(currentRemote.length + 1);
-                } else if (targetDest === currentRemote) {
-                    targetDest = ""; // Root of same remote
+                if (dest) {
+                     const firstSlash = dest.indexOf('/');
+                     if (firstSlash > -1) {
+                         targetRemote = dest.substring(0, firstSlash);
+                         targetPath = dest.substring(firstSlash + 1);
+                     } else {
+                         targetRemote = dest;
+                         targetPath = ""; // Root of remote
+                     }
                 } else {
-                    // Different remote selected!
-                    // Since backend doesn't support cross-remote yet (hardcoded source remote),
-                    // this will technically move it to a folder named "OtherRemote" on SourceRemote.
-                    // This is acceptable behavior for "Same Remote" logic, although confusing if user expects cross-remote.
-                    // I will add a comment.
+                    // If no destination selected (Root of Remotes), default to Source Remote (Safe fallback)
+                    targetRemote = currentRemote;
                 }
 
                 try {
@@ -2140,9 +2085,10 @@
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
-                            remote: currentRemote,
+                            remote: currentRemote, // Source Remote
                             paths: selectedPaths,
-                            destination: targetDest
+                            destination: targetPath,
+                            dest_remote: targetRemote // Destination Remote
                         })
                     });
                     const data = await res.json();
