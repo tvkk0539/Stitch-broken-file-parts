@@ -533,7 +533,6 @@
                             <button id="cloud-move-btn" class="warning-btn" disabled>➡️ Move</button>
                             <button id="cloud-copy-btn" class="info-btn" disabled>📋 Copy</button>
                             <button id="cloud-rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
-                            <button id="cloud-mkdir-btn" style="background-color:var(--accent-color);">📂 New Folder</button>
                             <button id="cloud-delete-btn" class="danger" disabled>🗑️ Delete</button>
                             <button id="download-btn" class="purple-btn" style="flex: 2;" disabled>☁️ Download to VPS</button>
                         </div>
@@ -721,7 +720,6 @@
         const cloudCopyBtn = document.getElementById('cloud-copy-btn');
         const cloudRenameBtn = document.getElementById('cloud-rename-btn');
         const cloudDeleteBtn = document.getElementById('cloud-delete-btn');
-        const cloudMkdirBtn = document.getElementById('cloud-mkdir-btn');
         const downloadBtn = document.getElementById('download-btn');
 
         // Settings Elements
@@ -905,14 +903,12 @@
                 tabCloud.classList.remove('active');
                 localControls.style.display = 'contents';
                 cloudControls.style.display = 'none';
-                newFolderBtn.style.display = 'inline-block';
                 loadPath('');
             } else {
                 tabCloud.classList.add('active');
                 tabLocal.classList.remove('active');
                 localControls.style.display = 'none';
                 cloudControls.style.display = 'block';
-                newFolderBtn.style.display = 'none';
                 loadRemotesList();
             }
             updateButtonState();
@@ -1080,6 +1076,7 @@
             const single = selectedPaths.length === 1;
 
             if(browserMode === 'local') {
+                newFolderBtn.disabled = false;
                 repairBtn.disabled = !single;
                 extractBtn.disabled = !single;
                 archiveBtn.disabled = !single;
@@ -1090,12 +1087,12 @@
                 copyBtn.disabled = !has;
                 deleteBtn.disabled = !has;
             } else {
+                newFolderBtn.disabled = !currentRemote;
                 downloadBtn.disabled = !has;
                 cloudMoveBtn.disabled = !has;
                 cloudCopyBtn.disabled = !has;
                 cloudDeleteBtn.disabled = !has;
                 cloudRenameBtn.disabled = !single;
-                cloudMkdirBtn.disabled = !currentRemote;
             }
         }
 
@@ -1380,9 +1377,6 @@
         // --- Cloud Wiring ---
         cloudMoveBtn.onclick = () => openMcModal('move');
         cloudCopyBtn.onclick = () => openMcModal('copy');
-
-        // Mkdir uses shared modal
-        cloudMkdirBtn.onclick = () => { mkdirNameInput.value=''; mkdirModal.style.display='block'; };
 
         // Rename uses shared modal
         cloudRenameBtn.onclick = () => { renameInput.value=selectedPaths[0].split('/').pop(); renameModal.style.display='block'; };
