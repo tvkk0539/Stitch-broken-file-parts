@@ -276,6 +276,12 @@
             cursor: not-allowed;
         }
 
+        /* Remove background for disabled icon-btn to avoid 'block' look */
+        button.icon-btn:disabled {
+            background-color: transparent !important;
+            opacity: 0.3;
+        }
+
         button:hover:not(:disabled) { opacity: 0.9; }
 
         button.secondary { background-color: var(--success-color); }
@@ -949,6 +955,7 @@
                     li.onclick = () => loadCloudPath('', r);
                     fileList.appendChild(li);
                 });
+                updateButtonState();
             } catch(e) { showToast('Error loading remotes', 'error'); }
         }
 
@@ -977,6 +984,8 @@
                     li.onclick = () => loadCloudPath(data.parent_path);
                     fileList.appendChild(li);
                 }
+
+                updateButtonState();
 
                 data.items.forEach(item => {
                     const li = document.createElement('li');
@@ -1207,7 +1216,7 @@
         }
         function formatBytes(bytes) {
             if(bytes===0) return '0 B';
-            if(!bytes || isNaN(bytes)) return '-';
+            if(!bytes || isNaN(bytes) || bytes < 0) return '-';
             const sizes=['B','KB','MB','GB','TB'];
             const i=Math.floor(Math.log(bytes)/Math.log(1024));
             return parseFloat((bytes/Math.pow(1024,i)).toFixed(2))+' '+sizes[i];
