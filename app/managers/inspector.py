@@ -19,8 +19,10 @@ class InspectorManager:
 
         if filename.endswith('.rar') or filename.endswith('.7z') or filename.endswith('.001'):
             return InspectorManager._inspect_archive(path)
-        elif filename.endswith(('.mkv', '.mp4', '.avi', '.mov', '.ts')):
+        elif filename.endswith(('.mkv', '.mp4', '.avi', '.mov', '.ts', '.m2ts')):
             return InspectorManager._inspect_media(path)
+        elif filename.endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.tiff', '.tif', '.heic')):
+            return InspectorManager._inspect_image(path)
         else:
             return {'type': 'unknown', 'info': 'No deep inspection available for this file type.'}
 
@@ -163,6 +165,66 @@ class InspectorManager:
                         if not ch:
                             ch = track.get('Channel(s)', '')
                         info['details'].append(('Audio', f"{fmt} {ch}".strip()))
+
+            return info
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def _inspect_image(path):
+        try:
+            # Run mediainfo with JSON output
+            cmd = ['mediainfo', '--Output=JSON', path]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                return {'error': 'MediaInfo failed'}
+
+            data = json.loads(result.stdout)
+
+            # Parse simplified info
+            info = {'type': 'image', 'details': []}
+
+            if 'media' in data and 'track' in data['media']:
+                for track in data['media']['track']:
+                    if track['@type'] == 'Image':
+                        # Format
+                        fmt = track.get('Format', 'Unknown')
+                        if track.get('Format_Version'):
+                            fmt += f" {track.get('Format_Version')}"
+                        info['details'].append(('Format', fmt))
+
+                        # Resolution
+                        w = track.get('Width', '?')
+                        h = track.get('Height', '?')
+                        info['details'].append(('Resolution', f"{w}x{h}"))
+
+                        # Color Space / Chroma
+                        cs = track.get('ColorSpace')
+                        chroma = track.get('ChromaSubsampling')
+                        if cs:
+                            line = cs
+                            if chroma: line += f" {chroma}"
+                            info['details'].append(('Color', line))
+
+                        # Bit Depth
+                        bd = track.get('BitDepth')
+                        if bd:
+                            if str(bd).isdigit(): bd = f"{bd}-bit"
+                            info['details'].append(('Bit Depth', bd))
+
+                        # Compression
+                        comp = track.get('Compression_Mode')
+                        if comp:
+                            info['details'].append(('Compression', comp))
+
+                        # Size
+                        size = track.get('FileSize_String4') or track.get('FileSize_String')
+                        if not size:
+                            raw = track.get('FileSize')
+                            size = InspectorManager._format_size(raw) if raw else 'Unknown'
+                        info['details'].append(('Size', size))
+
+                        break # Only process first image track
 
             return info
         except Exception as e:
