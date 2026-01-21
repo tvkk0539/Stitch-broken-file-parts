@@ -87,17 +87,51 @@ class InspectorManager:
                         # Format
                         info['details'].append(('Format', track.get('Format', 'Unknown')))
 
+                        raw_size = track.get('FileSize')
+                        raw_dur = track.get('Duration')
+
+                        # Heuristic: Fix Duration if likely in seconds
+                        # Some versions/files return seconds (e.g. 1889.5) instead of MS (1889500)
+                        if raw_dur and raw_size:
+                            try:
+                                d = float(raw_dur)
+                                s = float(raw_size)
+                                # Try to get bitrate from General track to validate
+                                br = float(track.get('OverallBitRate') or track.get('BitRate') or 0)
+
+                                is_seconds = False
+
+                                # Method 1: Cross-check with Bitrate
+                                if br > 0:
+                                    expected_sec = (s * 8) / br
+                                    # If d is close to expected_sec (ratio ~1), it's seconds
+                                    if 0.1 < (d / expected_sec) < 10.0:
+                                        is_seconds = True
+                                    # If d is close to expected_sec * 1000 (ratio ~1000), it's MS
+
+                                # Method 2: Fallback Sanity Check (Max Bitrate)
+                                if not is_seconds and br == 0 and d > 0:
+                                    # If treated as MS, implied bitrate
+                                    dur_s = d / 1000.0
+                                    implied_bps = (s * 8) / dur_s
+                                    # If > 1 Gbps and Size > 10MB, assume seconds (AVC/HEVC rarely > 1Gbps)
+                                    if implied_bps > 1_000_000_000 and s > 10_000_000:
+                                        is_seconds = True
+
+                                if is_seconds:
+                                    raw_dur = str(d * 1000)
+                            except:
+                                pass
+
                         # Duration (Prefer String -> Fallback to Raw + Format)
                         dur = track.get('Duration_String4') or track.get('Duration_String3') or track.get('Duration_String') or track.get('Duration_String1')
                         if not dur:
-                            raw_dur = track.get('Duration')
                             dur = InspectorManager._format_duration(raw_dur) if raw_dur else 'Unknown'
                         info['details'].append(('Duration', dur))
 
                         # Size (Prefer String -> Fallback to Raw + Format)
                         size = track.get('FileSize_String4') or track.get('FileSize_String3') or track.get('FileSize_String') or track.get('FileSize_String1')
                         if not size:
-                            raw_size = track.get('FileSize')
                             size = InspectorManager._format_size(raw_size) if raw_size else 'Unknown'
                         info['details'].append(('Size', size))
 
