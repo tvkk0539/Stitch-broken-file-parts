@@ -259,17 +259,50 @@ class InspectorManager:
             size = 'Unknown'
             dur = 'Unknown'
             if general:
+                raw_size = general.get('FileSize')
+                raw_dur = general.get('Duration')
+
+                # Heuristic: Fix Duration if likely in seconds (Copy from _inspect_media)
+                if raw_dur and raw_size:
+                    try:
+                        d = float(raw_dur)
+                        s = float(raw_size)
+                        # Try to get bitrate from General track to validate
+                        br = float(general.get('OverallBitRate') or general.get('BitRate') or 0)
+
+                        is_seconds = False
+
+                        # Method 1: Cross-check with Bitrate
+                        if br > 0:
+                            expected_sec = (s * 8) / br
+                            # If d is close to expected_sec (ratio ~1), it's seconds
+                            # If d was MS, it would be 1000x larger
+                            if 0.1 < (d / expected_sec) < 10.0:
+                                is_seconds = True
+
+                        # Method 2: Fallback Sanity Check (Max Bitrate)
+                        if not is_seconds and br == 0 and d > 0:
+                            # If treated as MS, implied bitrate
+                            dur_s = d / 1000.0
+                            implied_bps = (s * 8) / dur_s
+                            # If > 1 Gbps and Size > 10MB, assume seconds
+                            if implied_bps > 1_000_000_000 and s > 10_000_000:
+                                is_seconds = True
+
+                        if is_seconds:
+                            raw_dur = str(d * 1000)
+                    except:
+                        pass
+
                 # Size
                 size = general.get('FileSize_String4') or general.get('FileSize_String')
-                if not size:
-                    raw = general.get('FileSize')
-                    if raw: size = InspectorManager._format_size(raw)
+                if not size and raw_size:
+                    size = InspectorManager._format_size(raw_size)
 
                 # Duration
                 dur = general.get('Duration_String4') or general.get('Duration_String3') or general.get('Duration_String')
-                if not dur:
-                    raw_dur = general.get('Duration')
-                    if raw_dur: dur = InspectorManager._format_duration(raw_dur)
+                if not dur and raw_dur:
+                    dur = InspectorManager._format_duration(raw_dur)
 
             # Get Audio info
             audio = find_track('Audio')
