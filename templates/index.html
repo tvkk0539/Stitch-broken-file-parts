@@ -384,8 +384,14 @@
 
     <!-- Left Panel: File Browser -->
     <div id="file-browser" class="panel">
+        <!-- Browser Mode Switcher -->
+        <div style="display:flex; border-bottom: 1px solid #414868; margin-bottom: 10px;">
+            <button id="tab-local" class="tab-btn active" style="flex:1; border:none; border-bottom: 2px solid var(--accent-color);" onclick="switchBrowserMode('local')">Local Storage</button>
+            <button id="tab-cloud" class="tab-btn" style="flex:1; border:none; border-bottom: 2px solid transparent;" onclick="switchBrowserMode('cloud')">Cloud Remotes</button>
+        </div>
+
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2>File Browser</h2>
+            <h2 id="browser-title" style="border:none; padding:0; margin:0; font-size:1.2em;">Local Files</h2>
             <div style="display:flex; gap:8px; align-items:center;">
                 <label style="cursor:pointer; font-size:0.9em; user-select:none; color:#a9b1d6;" title="Select All / None">
                     <input type="checkbox" id="select-all-check"> All
@@ -398,15 +404,26 @@
         <ul id="file-list">
             <!-- Items injected via JS -->
         </ul>
+
+        <!-- Controls Container -->
         <div id="controls">
-            <button id="repair-btn" disabled>Repair</button>
-            <button id="extract-btn" style="background-color:#00d9ff;" disabled>Extract</button>
-            <button id="archive-btn" class="secondary" disabled>Pack</button>
-            <button id="upload-btn" class="purple-btn" disabled>Upload</button>
-            <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
-            <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
-            <button id="rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
-            <button id="delete-btn" class="danger" disabled>🗑️</button>
+            <!-- Local Controls -->
+            <div id="local-controls" style="display:contents;">
+                <button id="repair-btn" disabled>Repair</button>
+                <button id="extract-btn" style="background-color:#00d9ff;" disabled>Extract</button>
+                <button id="archive-btn" class="secondary" disabled>Pack</button>
+                <button id="upload-btn" class="purple-btn" disabled>Upload</button>
+                <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
+                <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
+                <button id="rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
+                <button id="delete-btn" class="danger" disabled>🗑️</button>
+            </div>
+
+            <!-- Cloud Controls -->
+            <div id="cloud-controls" style="display:none; width:100%;">
+                <button id="download-btn" class="purple-btn" style="width:100%; display:block;" disabled>☁️ Download to VPS</button>
+            </div>
+
             <button id="settings-btn" class="icon-btn" title="Settings" style="background-color:dimgray; color:white;">⚙️</button>
         </div>
     </div>
@@ -641,9 +658,21 @@
         let currentPath = '';
         let selectedPaths = []; // Track selections
         let expandedJobIds = new Set(); // Track expanded job cards
+        let browserMode = 'local'; // 'local' or 'cloud'
+        let currentRemote = ''; // Store selected remote name
 
         const fileList = document.getElementById('file-list');
         const breadcrumb = document.getElementById('current-path');
+
+        // Mode UI
+        const tabLocal = document.getElementById('tab-local');
+        const tabCloud = document.getElementById('tab-cloud');
+        const browserTitle = document.getElementById('browser-title');
+        const localControls = document.getElementById('local-controls');
+        const cloudControls = document.getElementById('cloud-controls');
+        const downloadBtn = document.getElementById('download-btn');
+
+        // Buttons
         const repairBtn = document.getElementById('repair-btn');
         const extractBtn = document.getElementById('extract-btn');
         const archiveBtn = document.getElementById('archive-btn');
@@ -656,6 +685,7 @@
         const newFolderBtn = document.getElementById('new-folder-btn');
         const refreshBtn = document.getElementById('refresh-btn');
         const selectAllCheck = document.getElementById('select-all-check');
+
         const consoleDiv = document.getElementById('console');
         const jobQueueContainer = document.getElementById('job-queue-container');
 
@@ -722,6 +752,40 @@
         // Initial Load
         loadPath('');
         startJobPoller();
+
+        // --- Browser Mode Switcher ---
+        function switchBrowserMode(mode) {
+            browserMode = mode;
+            selectedPaths = [];
+            selectAllCheck.checked = false;
+
+            if (mode === 'local') {
+                tabLocal.classList.add('active');
+                tabLocal.style.borderBottom = '2px solid var(--accent-color)';
+                tabCloud.classList.remove('active');
+                tabCloud.style.borderBottom = '2px solid transparent';
+
+                browserTitle.textContent = "Local Files";
+                localControls.style.display = 'contents';
+                cloudControls.style.display = 'none';
+                newFolderBtn.style.display = 'inline-block';
+
+                loadPath(''); // Reset to local root
+            } else {
+                tabCloud.classList.add('active');
+                tabCloud.style.borderBottom = '2px solid var(--accent-color)';
+                tabLocal.classList.remove('active');
+                tabLocal.style.borderBottom = '2px solid transparent';
+
+                browserTitle.textContent = "Cloud Remotes";
+                localControls.style.display = 'none';
+                cloudControls.style.display = 'block';
+                newFolderBtn.style.display = 'none'; // Cannot create folder in remote root easily yet
+
+                loadRemotesList(); // Load root remotes
+            }
+            updateButtonState();
+        }
 
         // Listen for logs
         const evtSource = new EventSource("/api/logs");
@@ -980,25 +1044,168 @@
         }
 
         async function loadPath(path) {
+            // Decider: Local or Cloud?
+            if (browserMode === 'local') {
+                await loadLocalPath(path);
+            } else {
+                await loadCloudPath(path);
+            }
+        }
+
+        async function loadLocalPath(path) {
             try {
+                fileList.innerHTML = '<div style="color:#737aa2; text-align:center; padding:20px;">Loading...</div>';
                 const response = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
                 const data = await response.json();
 
                 if (data.error) {
                     showToast(data.error, 'error');
+                    fileList.innerHTML = '';
                     return;
                 }
 
                 currentPath = data.current_path;
-                selectedPaths = []; // Reset selection on nav
-                selectAllCheck.checked = false; // Reset master check
+                selectedPaths = [];
+                selectAllCheck.checked = false;
                 updateButtonState();
 
-                renderBreadcrumb(currentPath);
+                renderBreadcrumb(currentPath, 'local');
                 renderFiles(data.items, data.parent_path);
 
             } catch (err) {
-                console.error('Failed to load path', err);
+                console.error('Failed to load local path', err);
+                fileList.innerHTML = '<div style="color:var(--error-color); text-align:center;">Failed to load.</div>';
+            }
+        }
+
+        async function loadRemotesList() {
+            try {
+                fileList.innerHTML = '<div style="color:#737aa2; text-align:center; padding:20px;">Loading Remotes...</div>';
+                const res = await fetch('/api/remotes');
+                const remotes = await res.json();
+
+                currentPath = ''; // Root level of remotes
+                currentRemote = '';
+                selectedPaths = [];
+                selectAllCheck.checked = false;
+                updateButtonState();
+
+                breadcrumb.innerHTML = '<span style="color:var(--accent-color); font-weight:bold;">Cloud Remotes</span>';
+
+                fileList.innerHTML = '';
+                remotes.forEach(r => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.onclick = () => loadCloudPath('', r); // Click to enter remote root
+
+                    li.innerHTML = `
+                        <span class="icon" style="color:#bb9af7">☁️</span>
+                        <span>${r}</span>
+                    `;
+                    fileList.appendChild(li);
+                });
+
+            } catch (e) {
+                showToast("Failed to list remotes", "error");
+            }
+        }
+
+        async function loadCloudPath(path, remoteOverride=null) {
+            if (remoteOverride) currentRemote = remoteOverride;
+            if (!currentRemote) { loadRemotesList(); return; }
+
+            try {
+                fileList.innerHTML = '<div style="color:#737aa2; text-align:center; padding:20px;">Loading Cloud Files...</div>';
+                const res = await fetch(`/api/rclone/list?remote=${encodeURIComponent(currentRemote)}&path=${encodeURIComponent(path)}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    fileList.innerHTML = '';
+                    return;
+                }
+
+                currentPath = data.current_path;
+                selectedPaths = [];
+                selectAllCheck.checked = false;
+                updateButtonState();
+
+                renderBreadcrumb(currentPath, 'cloud');
+
+                // For cloud, parent handling is tricky if at root.
+                // data.parent_path handles subfolders. If at root of remote, we want link back to Remotes List.
+
+                fileList.innerHTML = '';
+
+                if (currentPath === '') {
+                    // We are at root of remote. Back button goes to Remotes List.
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.innerHTML = '<span class="icon dir-icon">📁</span> .. (Remotes List)';
+                    li.onclick = () => loadRemotesList();
+                    fileList.appendChild(li);
+                } else if (data.parent_path !== null) {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.innerHTML = '<span class="icon dir-icon">📁</span> ..';
+                    li.onclick = () => loadCloudPath(data.parent_path);
+                    fileList.appendChild(li);
+                }
+
+                data.items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+
+                    // Checkbox
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.dataset.path = item.path; // Store relative path
+                    checkbox.onclick = (e) => {
+                        e.stopPropagation();
+                        toggleSelection(item.path, checkbox.checked);
+                    };
+
+                    let icon = item.is_dir ? '📁' : '📄';
+                    let iconClass = item.is_dir ? 'dir-icon' : 'file-icon';
+
+                    if (item.name.toLowerCase().endsWith('.mkv') || item.name.toLowerCase().endsWith('.mp4')) icon = '🎬';
+
+                    const span = document.createElement('span');
+                    span.className = `icon ${iconClass}`;
+                    span.textContent = icon;
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = item.name;
+
+                    // Size badge
+                    if (!item.is_dir && item.size) {
+                        const sizeSpan = document.createElement('span');
+                        sizeSpan.style.marginLeft = 'auto';
+                        sizeSpan.style.color = '#565f89';
+                        sizeSpan.style.fontSize = '0.8em';
+                        sizeSpan.textContent = formatBytes(item.size);
+                        li.appendChild(checkbox);
+                        li.appendChild(span);
+                        li.appendChild(nameSpan);
+                        li.appendChild(sizeSpan);
+                    } else {
+                        li.appendChild(checkbox);
+                        li.appendChild(span);
+                        li.appendChild(nameSpan);
+                    }
+
+                    if (item.is_dir) {
+                        li.onclick = (e) => {
+                            if (e.target !== checkbox) loadCloudPath(item.path);
+                        };
+                    }
+
+                    fileList.appendChild(li);
+                });
+
+            } catch (e) {
+                console.error(e);
+                showToast("Failed to load cloud path", "error");
             }
         }
 
@@ -1034,26 +1241,51 @@
             }
         }
 
-        function renderBreadcrumb(path) {
+        function renderBreadcrumb(path, mode) {
             breadcrumb.innerHTML = '';
+
+            if (mode === 'local') {
+                const rootSpan = document.createElement('span');
+                rootSpan.textContent = 'ROOT / ';
+                rootSpan.onclick = () => loadPath('');
+                breadcrumb.appendChild(rootSpan);
+            } else {
+                // Cloud mode
+                const rootSpan = document.createElement('span');
+                rootSpan.textContent = 'REMOTES';
+                rootSpan.onclick = () => loadRemotesList();
+                breadcrumb.appendChild(rootSpan);
+
+                const sep1 = document.createElement('span');
+                sep1.textContent = ' / ';
+                breadcrumb.appendChild(sep1);
+
+                const remoteSpan = document.createElement('span');
+                remoteSpan.textContent = currentRemote + ' / ';
+                remoteSpan.onclick = () => loadCloudPath('');
+                breadcrumb.appendChild(remoteSpan);
+            }
+
             const parts = path.split('/').filter(Boolean);
-
             let accumulated = '';
-
-            // Root
-            const rootSpan = document.createElement('span');
-            rootSpan.textContent = 'ROOT / ';
-            rootSpan.onclick = () => loadPath('');
-            breadcrumb.appendChild(rootSpan);
 
             parts.forEach((part, index) => {
                 accumulated += (accumulated ? '/' : '') + part;
                 const span = document.createElement('span');
                 span.textContent = part + (index < parts.length - 1 ? ' / ' : '');
                 const target = accumulated; // closure capture
-                span.onclick = () => loadPath(target);
+                span.onclick = () => loadPath(target); // loadPath dispatches based on mode
                 breadcrumb.appendChild(span);
             });
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
         function renderFiles(items, parentPath) {
@@ -1125,7 +1357,43 @@
         }
 
         // --- Refresh Logic ---
-        refreshBtn.onclick = () => loadPath(currentPath);
+        refreshBtn.onclick = () => {
+            if (browserMode === 'local') loadLocalPath(currentPath);
+            else {
+                if (currentRemote) loadCloudPath(currentPath);
+                else loadRemotesList();
+            }
+        };
+
+        // --- Download Logic ---
+        downloadBtn.onclick = async () => {
+            if (!selectedPaths.length) return;
+
+            if(!confirm(`Download ${selectedPaths.length} items from ${currentRemote} to VPS Download Folder?`)) return;
+
+            downloadBtn.disabled = true;
+            try {
+                const res = await fetch('/api/rclone/download', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        remote: currentRemote,
+                        paths: selectedPaths,
+                        transfers: 4 // default
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'queued') {
+                    showToast("Download Queued", "success");
+                } else {
+                    showToast("Error: " + data.error, "error");
+                }
+            } catch (e) {
+                showToast("Request failed", "error");
+            }
+            // Reset button state is handled by user action or page refresh mostly, but let's re-enable after timeout
+            setTimeout(() => updateButtonState(), 2000);
+        };
 
         // --- Select All Logic ---
         selectAllCheck.onclick = () => {
@@ -1147,19 +1415,22 @@
 
         function updateButtonState() {
             const count = selectedPaths.length;
-
-            // Batch actions
             const hasSelection = count > 0;
-            deleteBtn.disabled = !hasSelection;
-            uploadBtn.disabled = !hasSelection;
-            moveBtn.disabled = !hasSelection;
-            copyBtn.disabled = !hasSelection;
 
-            // Single Item actions
-            repairBtn.disabled = count !== 1;
-            archiveBtn.disabled = count !== 1;
-            renameBtn.disabled = count !== 1;
-            extractBtn.disabled = count !== 1;
+            if (browserMode === 'local') {
+                deleteBtn.disabled = !hasSelection;
+                uploadBtn.disabled = !hasSelection;
+                moveBtn.disabled = !hasSelection;
+                copyBtn.disabled = !hasSelection;
+                repairBtn.disabled = count !== 1;
+                archiveBtn.disabled = count !== 1;
+                renameBtn.disabled = count !== 1;
+                extractBtn.disabled = count !== 1;
+            } else {
+                // Cloud Mode
+                downloadBtn.disabled = !hasSelection;
+                downloadBtn.textContent = hasSelection ? `☁️ Download ${count} Item${count > 1 ? 's' : ''} to VPS` : '☁️ Download to VPS';
+            }
         }
 
         repairBtn.onclick = async () => {

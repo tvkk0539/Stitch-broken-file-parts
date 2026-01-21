@@ -333,6 +333,134 @@ class RcloneManager:
 
         return True
 
+    @staticmethod
+    def list_path(remote, path=''):
+        """Lists files in a remote path using rclone lsjson."""
+        try:
+            full_target = f"{remote}:{path}"
+            log(f"Listing remote path: {full_target}")
+
+            cmd = ['rclone', 'lsjson', full_target]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode != 0:
+                log(f"Rclone list failed: {result.stderr}")
+                return {'error': 'Failed to list remote path'}
+
+            items = json.loads(result.stdout)
+            # Process items to match our API structure
+            processed_items = []
+            for item in items:
+                processed_items.append({
+                    'name': item['Name'],
+                    'is_dir': item['IsDir'],
+                    'path': os.path.join(path, item['Name']), # Relative path for navigation
+                    'size': item.get('Size', 0),
+                    'mod_time': item.get('ModTime', '')
+                })
+
+            # Sort: Directories first, then files
+            processed_items.sort(key=lambda x: (not x['is_dir'], x['name'].lower()))
+
+            return {
+                'current_path': path,
+                'parent_path': os.path.dirname(path) if path else '',
+                'items': processed_items
+            }
+        except Exception as e:
+            log(f"Rclone list exception: {e}")
+            return {'error': str(e)}
+
+    @staticmethod
+    def run_download(remote, source_paths, dest_root, transfers=4):
+        log(f"Starting Rclone Download from {remote} (Parallel: {transfers})")
+
+        if not source_paths: return True
+
+        for i, src_path in enumerate(source_paths):
+            if job_manager.is_cancelled():
+                log("Download job cancelled.")
+                break
+
+            basename = os.path.basename(src_path)
+            # Logic: If item is folder, we copy TO dest_root/basename
+            # If item is file, we copy TO dest_root
+
+            # Since we don't know if src is dir or file easily without lsjson check,
+            # we can infer or simpler: copy remote:path local_path.
+            # rclone copy remote:file /local/  -> /local/file
+            # rclone copy remote:folder /local/folder -> /local/folder/...
+
+            # Wait, rclone copy remote:Folder /local/Folder works recursively.
+
+            # We need to construct the local destination carefully.
+            # For a file "A.mkv" at "remote:Mov/A.mkv", src_path is "Mov/A.mkv".
+            # We want it in "dest_root/A.mkv" (flat) or preserving struct?
+            # User expectation: usually flat download to "Downloads" unless structured.
+            # Let's preserve basename.
+
+            full_src = f"{remote}:{src_path}"
+
+            # We'll assume typical behavior: download into a folder named after the item if it's a folder,
+            # or just the file if it's a file.
+            # Actually rclone copy src dest is safer.
+
+            # Strategy: Always copy to DOWNLOAD_ROOT.
+            # If src is "folder", rclone copy remote:folder /data/downloads/folder
+            # If src is "file", rclone copy remote:file /data/downloads/
+
+            # We can use 'rclone lsjson' quickly to check type? Or just rely on user intent.
+            # Let's assume the frontend passes correct intent or we handle it.
+            # Actually, `rclone copy source dest` behaves well.
+
+            # Construct Local Path
+            # We want to mirror the basename in the root.
+            target_local = os.path.join(dest_root, basename)
+
+            log(f"Downloading {basename} -> {target_local}")
+            job_manager.update_job_details({
+                'action': f"Downloading item {i+1} of {len(source_paths)}",
+                'current_item': basename
+            })
+
+            # Use 'copyto' to handle single file downloads correctly (avoiding wrapper directories)
+            # while still handling recursive folder downloads.
+            cmd = ['rclone', 'copyto', full_src, target_local,
+                   '--transfers', str(transfers), '--stats', '2s', '-v']
+
+            process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True
+                )
+
+            job_manager.set_current_process(process)
+
+            for line in process.stdout:
+                line = line.strip()
+                if not line: continue
+                if "error" in line.lower() or "failed" in line.lower():
+                    log(f"[RCLONE ERROR] {line}")
+                elif "Transferred:" in line or "Errors:" in line or "Checks:" in line:
+                        if "Transferred:" in line: log(f"[DOWNLOAD] {line}")
+                elif "100%" in line:
+                        log(f"[DOWNLOAD] {line}")
+
+            process.wait()
+
+            if process.returncode != 0:
+                if job_manager.is_cancelled():
+                    log(f"Download cancelled for {basename}")
+                    break
+                log(f"Download failed for {basename} (Code {process.returncode})")
+                job_manager.update_job_details({'error': f"Download failed (Code {process.returncode})"})
+            else:
+                log(f"Download completed for {basename}")
+                NotificationManager.send_notification(f"✅ ParFix: Downloaded {basename} from Cloud")
+
+        return True
+
 class ArchiveManager:
     @staticmethod
     def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path=''):
@@ -948,6 +1076,33 @@ def settings():
 @app.route('/api/remotes')
 def get_remotes():
     return jsonify(RcloneManager.list_remotes())
+
+@app.route('/api/rclone/list', methods=['GET'])
+def list_rclone_path():
+    remote = request.args.get('remote')
+    path = request.args.get('path', '')
+    if not remote: return jsonify({'error': 'Remote required'}), 400
+
+    return jsonify(RcloneManager.list_path(remote, path))
+
+@app.route('/api/rclone/download', methods=['POST'])
+def trigger_rclone_download():
+    data = request.json
+    remote = data.get('remote')
+    paths = data.get('paths', [])
+    transfers = int(data.get('transfers', 4))
+
+    if not remote or not paths: return jsonify({'error': 'Missing args'}), 400
+
+    display_names = [os.path.basename(p) for p in paths]
+
+    job_id = job_manager.add_job(
+        f"Download {len(paths)} items from {remote}",
+        RcloneManager.run_download,
+        args=(remote, paths, DOWNLOAD_ROOT, transfers),
+        initial_details={'targets': display_names}
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
 
 if __name__ == '__main__':
     if not os.path.exists(DOWNLOAD_ROOT):
