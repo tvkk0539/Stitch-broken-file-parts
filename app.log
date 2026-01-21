@@ -1,0 +1,46 @@
+ * Serving Flask app 'app'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.2:5000
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [21/Jan/2026 09:57:08] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:08] "[33mGET /api/list?path= HTTP/1.1[0m" 404 -
+127.0.0.1 - - [21/Jan/2026 09:57:08] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:09] "GET /api/remotes HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:10] "GET /api/settings HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:10] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:12] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:14] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:16] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:18] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:20] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:22] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:24] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:26] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:28] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:28] "GET /api/logs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:30] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:32] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:34] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:36] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:57:38] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:58:10] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:58:10] "[33mGET /api/list?path= HTTP/1.1[0m" 404 -
+127.0.0.1 - - [21/Jan/2026 09:58:10] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:58:12] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:58:12] "GET /api/settings HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 09:58:30] "GET /api/logs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:02:22] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:02:22] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:02:22] "[33mGET /api/list?path= HTTP/1.1[0m" 404 -
+127.0.0.1 - - [21/Jan/2026 10:02:24] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:02:24] "GET /api/settings HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:02:42] "GET /api/logs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:03:25] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:03:25] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:03:25] "[33mGET /api/list?path= HTTP/1.1[0m" 404 -
+127.0.0.1 - - [21/Jan/2026 10:03:27] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:03:28] "GET /api/settings HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 10:03:45] "GET /api/logs HTTP/1.1" 200 -

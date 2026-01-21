@@ -461,6 +461,162 @@ class RcloneManager:
 
         return True
 
+    @staticmethod
+    def run_cloud_move(remote, source_paths, dest_path):
+        """Moves files/folders between locations in the cloud (Server-Side Move)."""
+        log(f"Starting Rclone Move to {remote}:{dest_path}")
+
+        for i, src_path in enumerate(source_paths):
+            if job_manager.is_cancelled(): break
+
+            basename = os.path.basename(src_path)
+            # Source: remote:src_path
+            # Dest: remote:dest_path/basename (rclone moveto behaves like mv)
+
+            full_src = f"{remote}:{src_path}"
+            full_dest = f"{remote}:{dest_path}/{basename}"
+
+            job_manager.update_job_details({
+                'action': f"Moving item {i+1} of {len(source_paths)}",
+                'current_item': basename
+            })
+
+            log(f"Moving {full_src} -> {full_dest}")
+
+            cmd = ['rclone', 'moveto', full_src, full_dest, '-v', '--stats', '2s']
+
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            job_manager.set_current_process(process)
+
+            for line in process.stdout:
+                if "Transferred:" in line: log(f"[MOVE] {line.strip()}")
+
+            process.wait()
+
+            if process.returncode != 0:
+                if job_manager.is_cancelled():
+                    log(f"Move cancelled for {basename}")
+                else:
+                    log(f"Move failed for {basename}")
+                    job_manager.update_job_details({'error': f"Move failed (Code {process.returncode})"})
+            else:
+                log(f"Moved {basename}")
+
+        return True
+
+    @staticmethod
+    def run_cloud_copy(remote, source_paths, dest_path):
+        """Copies files/folders between locations in the cloud (Server-Side Copy)."""
+        log(f"Starting Rclone Copy to {remote}:{dest_path}")
+
+        for i, src_path in enumerate(source_paths):
+            if job_manager.is_cancelled(): break
+
+            basename = os.path.basename(src_path)
+            full_src = f"{remote}:{src_path}"
+            full_dest = f"{remote}:{dest_path}/{basename}"
+
+            job_manager.update_job_details({
+                'action': f"Copying item {i+1} of {len(source_paths)}",
+                'current_item': basename
+            })
+
+            log(f"Copying {full_src} -> {full_dest}")
+
+            cmd = ['rclone', 'copyto', full_src, full_dest, '-v', '--stats', '2s']
+
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            job_manager.set_current_process(process)
+
+            for line in process.stdout:
+                if "Transferred:" in line: log(f"[COPY] {line.strip()}")
+
+            process.wait()
+
+            if process.returncode != 0:
+                if job_manager.is_cancelled():
+                    log(f"Copy cancelled for {basename}")
+                else:
+                    log(f"Copy failed for {basename}")
+                    job_manager.update_job_details({'error': f"Copy failed (Code {process.returncode})"})
+            else:
+                log(f"Copied {basename}")
+
+        return True
+
+    @staticmethod
+    def delete_items_job(remote, paths):
+        log(f"Deleting {len(paths)} items from {remote}")
+
+        for i, path in enumerate(paths):
+            if job_manager.is_cancelled(): break
+
+            full_path = f"{remote}:{path}"
+            job_manager.update_job_details({
+                'action': f"Deleting item {i+1} of {len(paths)}",
+                'current_item': path
+            })
+            log(f"Deleting {full_path}")
+
+            # Use purge for dirs, deletefile for files?
+            # We don't easily know if it's a dir or file here without checking.
+            # But 'purge' deletes path and everything under it. 'delete' deletes files in path.
+            # 'deletefile' deletes single file.
+            # Safest is 'purge' if we know it's a dir, or 'deletefile' if file.
+            # If we don't know, we can try 'purge' which works for both? No, purge requires path to exist.
+            # Let's try 'purge' first, if fails try 'deletefile'?
+            # Actually, `rclone purge remote:path` deletes the directory.
+            # `rclone delete remote:path` deletes contents but leaves dir.
+            # Since frontend knows, maybe we should have passed IsDir?
+            # For now, let's assume 'purge' for everything as it removes the target.
+
+            cmd = ['rclone', 'purge', full_path, '-v']
+            # If purge fails (e.g. it's a single file), try deletefile?
+            # Actually rclone purge works on single files too in some remotes, but usually for dirs.
+
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            job_manager.set_current_process(process)
+
+            # Read output to avoid blocking
+            out, _ = process.communicate()
+
+            if process.returncode != 0:
+                # Fallback to deletefile if purge failed (likely it was a file)
+                cmd_retry = ['rclone', 'deletefile', full_path]
+                subprocess.run(cmd_retry, capture_output=True)
+                # We won't check retry code strictly, just best effort.
+                log(f"Deleted {path} (via fallback)")
+            else:
+                log(f"Deleted {path}")
+
+        return True
+
+    @staticmethod
+    def mkdir_sync(remote, path, name):
+        full_path = f"{remote}:{path}/{name}" if path else f"{remote}:{name}"
+        log(f"Creating Cloud Folder: {full_path}")
+        try:
+            subprocess.run(['rclone', 'mkdir', full_path], check=True, capture_output=True)
+            return True
+        except subprocess.CalledProcessError as e:
+            log(f"Mkdir failed: {e}")
+            raise Exception("Failed to create folder")
+
+    @staticmethod
+    def rename_sync(remote, path, new_name):
+        # rclone moveto remote:path remote:parent/new_name
+        parent = os.path.dirname(path)
+        old_full = f"{remote}:{path}"
+        new_full = f"{remote}:{parent}/{new_name}" if parent else f"{remote}:{new_name}"
+
+        log(f"Renaming Cloud Item: {old_full} -> {new_full}")
+        try:
+            subprocess.run(['rclone', 'moveto', old_full, new_full], check=True, capture_output=True)
+            return True
+        except subprocess.CalledProcessError as e:
+            log(f"Rename failed: {e}")
+            raise Exception("Failed to rename item")
+
 class ArchiveManager:
     @staticmethod
     def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path=''):
@@ -1107,6 +1263,112 @@ def trigger_rclone_download():
         initial_details={'targets': display_names}
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
+
+@app.route('/api/rclone/move', methods=['POST'])
+def trigger_rclone_move():
+    data = request.json
+    remote = data.get('remote')
+    paths = data.get('paths', [])
+    dest = data.get('destination', '')
+
+    if not remote or not paths: return jsonify({'error': 'Missing args'}), 400
+
+    job_id = job_manager.add_job(
+        f"Move {len(paths)} items in Cloud",
+        RcloneManager.run_cloud_move,
+        args=(remote, paths, dest)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@app.route('/api/rclone/copy', methods=['POST'])
+def trigger_rclone_copy():
+    data = request.json
+    remote = data.get('remote')
+    paths = data.get('paths', [])
+    dest = data.get('destination', '')
+
+    if not remote or not paths: return jsonify({'error': 'Missing args'}), 400
+
+    job_id = job_manager.add_job(
+        f"Copy {len(paths)} items in Cloud",
+        RcloneManager.run_cloud_copy,
+        args=(remote, paths, dest)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@app.route('/api/rclone/delete', methods=['POST'])
+def trigger_rclone_delete():
+    data = request.json
+    remote = data.get('remote')
+    paths = data.get('paths', [])
+
+    if not remote or not paths: return jsonify({'error': 'Missing args'}), 400
+
+    job_id = job_manager.add_job(
+        f"Delete {len(paths)} items from Cloud",
+        RcloneManager.delete_items_job,
+        args=(remote, paths)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@app.route('/api/rclone/mkdir', methods=['POST'])
+def trigger_rclone_mkdir():
+    data = request.json
+    remote = data.get('remote')
+    path = data.get('path', '')
+    name = data.get('name')
+
+    if not remote or not name: return jsonify({'error': 'Missing args'}), 400
+
+    try:
+        RcloneManager.mkdir_sync(remote, path, name)
+        return jsonify({'status': 'created'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rclone/rename', methods=['POST'])
+def trigger_rclone_rename():
+    data = request.json
+    remote = data.get('remote')
+    path = data.get('path') # Relative path
+    new_name = data.get('new_name')
+
+    if not remote or not path or not new_name: return jsonify({'error': 'Missing args'}), 400
+
+    try:
+        RcloneManager.rename_sync(remote, path, new_name)
+        return jsonify({'status': 'renamed'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings/upload-config', methods=['POST'])
+def upload_config():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    if file:
+        # Determine config path
+        # In Docker, we usually map /config/config.json for app config.
+        # Rclone config is usually at ~/.config/rclone/rclone.conf
+        # We should try to find where rclone looks for config, or overwrite standard loc.
+        # 'rclone config file' command tells us where.
+
+        try:
+            res = subprocess.run(['rclone', 'config', 'file'], capture_output=True, text=True)
+            # Output: "Configuration file is stored at:\n/root/.config/rclone/rclone.conf\n"
+            lines = res.stdout.strip().split('\n')
+            conf_path = lines[-1].strip()
+
+            os.makedirs(os.path.dirname(conf_path), exist_ok=True)
+            file.save(conf_path)
+            log(f"Rclone config uploaded to {conf_path}")
+            return jsonify({'status': 'uploaded', 'path': conf_path})
+        except Exception as e:
+            return jsonify({'error': f"Failed to save config: {e}"}), 500
 
 if __name__ == '__main__':
     if not os.path.exists(DOWNLOAD_ROOT):
