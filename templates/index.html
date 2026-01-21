@@ -19,11 +19,19 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: 0;
             display: flex;
+            flex-direction: column;
             height: 100vh;
             box-sizing: border-box;
+        }
+
+        #main-layout {
+            display: flex;
+            flex: 1;
+            padding: 20px;
             gap: 20px;
+            overflow: hidden;
         }
 
         .panel {
@@ -382,8 +390,34 @@
 <body>
     <div id="toast-container"></div>
 
-    <!-- Left Panel: File Browser -->
-    <div id="file-browser" class="panel">
+    <!-- System Status Bar -->
+    <div id="status-bar" style="background: #15161e; border-bottom: 1px solid #414868; padding: 8px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; flex-shrink: 0;">
+        <div style="font-weight: bold; color: var(--accent-color);">ParFix Utility <span style="font-size:0.8em; color:#565f89; font-weight:normal;">Pro</span></div>
+        <div style="display: flex; gap: 20px; align-items: center;">
+            <div class="stat-item" style="display:flex; align-items:center; gap:8px;">
+                <span>💾 Disk:</span>
+                <div style="width: 100px; height: 8px; background: #2f3549; border-radius: 4px; overflow: hidden;">
+                    <div id="stat-disk-bar" style="width: 0%; height: 100%; background: var(--accent-color); transition: width 0.5s;"></div>
+                </div>
+                <span id="stat-disk-text" style="min-width: 60px;">0%</span>
+            </div>
+            <div class="stat-item" style="display:flex; align-items:center; gap:8px;">
+                <span>🧠 RAM:</span>
+                <div style="width: 100px; height: 8px; background: #2f3549; border-radius: 4px; overflow: hidden;">
+                    <div id="stat-ram-bar" style="width: 0%; height: 100%; background: #bb9af7; transition: width 0.5s;"></div>
+                </div>
+                <span id="stat-ram-text" style="min-width: 40px;">0%</span>
+            </div>
+            <div class="stat-item" style="display:flex; align-items:center; gap:8px;">
+                <span>⚙️ CPU:</span>
+                <span id="stat-cpu-text" style="color: #c0caf5;">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-layout">
+        <!-- Left Panel: File Browser -->
+        <div id="file-browser" class="panel">
         <!-- Browser Mode Switcher -->
         <div style="display:flex; border-bottom: 1px solid #414868; margin-bottom: 10px;">
             <button id="tab-local" class="tab-btn active" style="flex:1; border:none; border-bottom: 2px solid var(--accent-color);" onclick="switchBrowserMode('local')">Local Storage</button>
@@ -416,6 +450,7 @@
                 <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
                 <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
                 <button id="rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
+                <button id="inspect-btn" class="purple-btn" disabled>ℹ️ Info</button>
                 <button id="delete-btn" class="danger" disabled>🗑️</button>
             </div>
 
@@ -453,6 +488,22 @@
                 <div style="color: #565f89; text-align: center; margin-top: 50px;">
                     Loading Job Queue...
                 </div>
+            </div>
+        </div>
+    </div>
+    </div> <!-- End Main Layout -->
+
+    <!-- Inspector Modal -->
+    <div id="inspect-modal" class="modal">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header">
+                <h3>File Properties</h3>
+            </div>
+            <div id="inspect-content" style="max-height: 400px; overflow-y: auto; color: #a9b1d6; font-size: 0.9em;">
+                <!-- Content injected here -->
+            </div>
+            <div class="modal-actions">
+                <button id="close-inspect" class="secondary">Close</button>
             </div>
         </div>
     </div>
@@ -708,6 +759,7 @@
         const moveBtn = document.getElementById('move-btn');
         const copyBtn = document.getElementById('copy-btn');
         const renameBtn = document.getElementById('rename-btn');
+        const inspectBtn = document.getElementById('inspect-btn');
         const deleteBtn = document.getElementById('delete-btn');
         const settingsBtn = document.getElementById('settings-btn');
         const newFolderBtn = document.getElementById('new-folder-btn');
@@ -768,6 +820,11 @@
         const confirmRenameBtn = document.getElementById('confirm-rename');
         const cancelRenameBtn = document.getElementById('cancel-rename');
 
+        // Inspect Modal Elements
+        const inspectModal = document.getElementById('inspect-modal');
+        const inspectContent = document.getElementById('inspect-content');
+        const closeInspectBtn = document.getElementById('close-inspect');
+
         // Mkdir Modal Elements
         const mkdirModal = document.getElementById('mkdir-modal');
         const mkdirNameInput = document.getElementById('mkdir-name');
@@ -784,6 +841,42 @@
         // Initial Load
         loadPath('');
         startJobPoller();
+        startStatsPoller();
+
+        // --- Stats Poller ---
+        function startStatsPoller() {
+            fetchStats();
+            setInterval(fetchStats, 5000); // 5 seconds
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/system/stats');
+                const data = await res.json();
+
+                // Update Disk
+                const diskBar = document.getElementById('stat-disk-bar');
+                const diskText = document.getElementById('stat-disk-text');
+                diskBar.style.width = data.disk.percent + '%';
+                diskText.textContent = `${data.disk.free_gb}GB Free`;
+
+                // Warn if disk > 90%
+                if (data.disk.percent > 90) diskBar.style.backgroundColor = '#f7768e';
+                else diskBar.style.backgroundColor = '#9ece6a';
+
+                // Update RAM
+                const ramBar = document.getElementById('stat-ram-bar');
+                const ramText = document.getElementById('stat-ram-text');
+                ramBar.style.width = data.ram + '%';
+                ramText.textContent = data.ram + '%';
+
+                // Update CPU
+                document.getElementById('stat-cpu-text').textContent = data.cpu + '%';
+
+            } catch(e) {
+                console.error("Stats fail");
+            }
+        }
 
         // --- Browser Mode Switcher ---
         function switchBrowserMode(mode) {
@@ -1435,6 +1528,7 @@
                 archiveBtn.disabled = count !== 1;
                 renameBtn.disabled = count !== 1;
                 extractBtn.disabled = count !== 1;
+                inspectBtn.disabled = count !== 1;
             } else {
                 // Cloud Mode
                 downloadBtn.disabled = !hasSelection;
@@ -2259,9 +2353,91 @@
              }
         };
 
+        // --- Inspector Logic ---
+        inspectBtn.onclick = async () => {
+            if (selectedPaths.length !== 1) return;
+
+            const target = selectedPaths[0];
+            inspectBtn.disabled = true;
+            inspectBtn.textContent = "Loading...";
+
+            try {
+                const res = await fetch('/api/inspect', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ path: target })
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    showToast("Inspect Error: " + data.error, "error");
+                } else {
+                    renderInspectModal(data);
+                    inspectModal.style.display = "block";
+                }
+            } catch(e) {
+                showToast("Request failed", "error");
+            }
+
+            inspectBtn.disabled = false;
+            inspectBtn.textContent = "ℹ️ Info";
+        };
+
+        closeInspectBtn.onclick = () => inspectModal.style.display = "none";
+
+        function renderInspectModal(data) {
+            inspectContent.innerHTML = '';
+
+            if (data.type === 'unknown') {
+                inspectContent.innerHTML = '<p>No details available for this file type.</p>';
+                return;
+            }
+
+            // Details Table
+            if (data.details) {
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                table.style.borderCollapse = 'collapse';
+                table.style.marginBottom = '20px';
+
+                data.details.forEach(([key, val]) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td style="color:#737aa2; padding:5px; border-bottom:1px solid #2f3549; width:120px;">${key}</td>
+                                    <td style="color:#c0caf5; padding:5px; border-bottom:1px solid #2f3549;">${val}</td>`;
+                    table.appendChild(tr);
+                });
+                inspectContent.appendChild(table);
+            }
+
+            // Archive Contents
+            if (data.contents) {
+                const h4 = document.createElement('h4');
+                h4.textContent = "Archive Contents:";
+                h4.style.color = "#7aa2f7";
+                h4.style.marginTop = "0";
+                inspectContent.appendChild(h4);
+
+                const ul = document.createElement('ul');
+                ul.style.listStyle = 'none';
+                ul.style.padding = '0';
+
+                data.contents.forEach(item => {
+                    const li = document.createElement('li');
+                    li.style.padding = '4px 0';
+                    li.style.borderBottom = '1px solid #2f3549';
+                    li.style.display = 'flex';
+                    li.justifyContent = 'space-between';
+                    li.innerHTML = `<span>${item.name}</span> <span style="color:#565f89; margin-left:auto;">${item.size}</span>`;
+                    ul.appendChild(li);
+                });
+                inspectContent.appendChild(ul);
+            }
+        }
+
         // Close Modals on click outside
         window.onclick = (event) => {
             if (event.target == modal) modal.style.display = "none";
+            if (event.target == inspectModal) inspectModal.style.display = "none";
             if (event.target == upModal) upModal.style.display = "none";
             if (event.target == setModal) setModal.style.display = "none";
             if (event.target == mcModal) mcModal.style.display = "none";
