@@ -1387,6 +1387,7 @@
         // --- Cloud Wiring ---
         cloudMoveBtn.onclick = () => openMcModal('move');
         cloudCopyBtn.onclick = () => openMcModal('copy');
+        downloadBtn.onclick = () => openMcModal('download');
 
         // Rename uses shared modal
         cloudRenameBtn.onclick = () => { renameInput.value=selectedPaths[0].split('/').pop(); renameModal.style.display='block'; };
