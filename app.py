@@ -74,7 +74,7 @@ class JobManager:
         self.current_process = None # subprocess.Popen object
         self._cancelled = False
 
-    def add_job(self, name, target, args=()):
+    def add_job(self, name, target, args=(), initial_details=None):
         job_id = str(uuid.uuid4())
         job = {
             'id': job_id,
@@ -82,7 +82,8 @@ class JobManager:
             'target': target,
             'args': args,
             'status': 'queued',
-            'added_at': time.time()
+            'added_at': time.time(),
+            'details': initial_details or {}
         }
         with self.lock:
             self.pending_jobs.append(job)
@@ -805,10 +806,14 @@ def trigger_manual_upload():
 
     transfers = int(data.get('transfers', 4))
 
+    # Get names for display
+    display_names = [os.path.basename(p) for p in abs_paths]
+
     job_id = job_manager.add_job(
         f"Upload {len(abs_paths)} items to {remote}",
         RcloneManager.run_upload,
-        args=(abs_paths, remote, upload_path, transfers)
+        args=(abs_paths, remote, upload_path, transfers),
+        initial_details={'targets': display_names}
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 

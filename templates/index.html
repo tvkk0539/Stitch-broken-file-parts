@@ -640,6 +640,7 @@
     <script>
         let currentPath = '';
         let selectedPaths = []; // Track selections
+        let expandedJobIds = new Set(); // Track expanded job cards
 
         const fileList = document.getElementById('file-list');
         const breadcrumb = document.getElementById('current-path');
@@ -859,9 +860,22 @@
             detailsDiv.className = 'job-details';
             detailsDiv.id = `details-${job.id}`;
 
+            // Restore expanded state
+            if (expandedJobIds.has(job.id)) {
+                detailsDiv.classList.add('expanded');
+            }
+
             // Populate details if available
             if (job.details) {
-                for (const [key, value] of Object.entries(job.details)) {
+                // Special handling for 'targets' list
+                const detailsCopy = {...job.details};
+                let targetList = null;
+                if (detailsCopy.targets) {
+                    targetList = detailsCopy.targets;
+                    delete detailsCopy.targets;
+                }
+
+                for (const [key, value] of Object.entries(detailsCopy)) {
                     // Format key for display (e.g., current_item -> Current Item)
                     const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
@@ -875,6 +889,34 @@
                     }
                     detailsDiv.appendChild(row);
                 }
+
+                // Render Targets List if present
+                if (targetList && Array.isArray(targetList)) {
+                     const row = document.createElement('div');
+                     row.style.marginTop = "8px";
+                     row.innerHTML = `<strong style="color:#737aa2; display:block; margin-bottom:4px;">Target Files (${targetList.length}):</strong>`;
+
+                     const ul = document.createElement('ul');
+                     ul.style.margin = "0";
+                     ul.style.paddingLeft = "20px";
+                     ul.style.color = "#a9b1d6";
+                     ul.style.maxHeight = "150px";
+                     ul.style.overflowY = "auto";
+
+                     targetList.forEach(t => {
+                         const li = document.createElement('li');
+                         li.textContent = t;
+                         ul.appendChild(li);
+                     });
+                     row.appendChild(ul);
+                     detailsDiv.appendChild(row);
+                }
+
+                // If both detailsCopy and targetList are empty/null, show default message
+                if (Object.keys(detailsCopy).length === 0 && (!targetList || targetList.length === 0)) {
+                    detailsDiv.textContent = "No additional details.";
+                }
+
             } else {
                 detailsDiv.textContent = "No additional details.";
             }
@@ -886,8 +928,10 @@
                 const isExpanded = detailsDiv.classList.contains('expanded');
                 if (isExpanded) {
                     detailsDiv.classList.remove('expanded');
+                    expandedJobIds.delete(job.id);
                 } else {
                     detailsDiv.classList.add('expanded');
+                    expandedJobIds.add(job.id);
                 }
             };
 
