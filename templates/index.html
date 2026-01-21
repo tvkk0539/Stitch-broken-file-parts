@@ -1105,7 +1105,7 @@
                 extractBtn.disabled = !single;
                 archiveBtn.disabled = !single;
                 renameBtn.disabled = !single;
-                inspectBtn.disabled = !single;
+                inspectBtn.disabled = !has; // Enabled for multiple/batch
                 uploadBtn.disabled = !has;
                 moveBtn.disabled = !has;
                 copyBtn.disabled = !has;
@@ -1367,7 +1367,11 @@
             showToast('Extract Queued', 'success');
         };
         inspectBtn.onclick = async () => {
-            const res = await fetch('/api/inspect', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:selectedPaths[0]})});
+            const res = await fetch('/api/inspect', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({paths: selectedPaths})
+            });
             const d = await res.json();
             renderInspectModal(d);
             inspectModal.style.display='block';
@@ -1377,7 +1381,7 @@
             const el = document.getElementById('inspect-content');
             el.innerHTML = '';
 
-            if (data.type === 'unknown') { el.innerHTML = '<p>No details available.</p>'; return; }
+            if (data.type === 'unknown' && !data.details) { el.innerHTML = '<p>No details available.</p>'; return; }
 
             if (data.details) {
                 const table = document.createElement('table');

@@ -193,6 +193,18 @@ def trigger_extract():
 @bp.route('/api/inspect', methods=['POST'])
 def inspect_item():
     data = request.json
+
+    # Handle batch inspection
+    paths = data.get('paths')
+    if paths:
+        abs_paths = [os.path.join(DOWNLOAD_ROOT, p) for p in paths]
+        abs_paths = [p for p in abs_paths if os.path.exists(p)]
+        if not abs_paths: return jsonify({'error': 'No valid paths'}), 404
+
+        info = InspectorManager.inspect_batch(abs_paths)
+        return jsonify(info)
+
+    # Legacy single path handling
     path = data.get('path')
     if not path: return jsonify({'error': 'No path'}), 400
 

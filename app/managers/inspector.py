@@ -6,14 +6,69 @@ import re
 
 class InspectorManager:
     @staticmethod
+    def inspect_batch(paths):
+        """
+        Inspects a batch of paths.
+        - Single file: Delegates to inspect_item.
+        - Multiple items or Folder: Returns summary (count, size).
+        """
+        if not paths:
+            return {'error': 'No paths provided'}
+
+        # Single item handling (if file)
+        if len(paths) == 1 and os.path.isfile(paths[0]):
+            return InspectorManager.inspect_item(paths[0])
+
+        # Batch/Folder Summary
+        total_size = 0
+        file_count = 0
+        folder_count = 0
+
+        try:
+            for path in paths:
+                if not os.path.exists(path): continue
+
+                if os.path.isfile(path):
+                    file_count += 1
+                    total_size += os.path.getsize(path)
+                else:
+                    # It's a directory
+                    folder_count += 1 # Count the root folder itself?
+                    # Usually "Selected: 1 folder" implies we count content.
+                    # Let's count the folder itself as 1 in "Selected Items" but user wants content stats.
+                    # Logic: We are summarizing what is *inside* or the *total impact*.
+
+                    for root, dirs, files in os.walk(path):
+                        folder_count += len(dirs)
+                        file_count += len(files)
+                        for f in files:
+                            fp = os.path.join(root, f)
+                            if not os.path.islink(fp):
+                                total_size += os.path.getsize(fp)
+
+            return {
+                'type': 'summary',
+                'details': [
+                    ('Selected Items', len(paths)),
+                    ('Total Files', file_count),
+                    ('Total Folders', folder_count),
+                    ('Total Size', InspectorManager._format_size(total_size))
+                ]
+            }
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
     def inspect_item(path):
         """
-        Inspects a file and returns details.
-        - If Archive: Returns contents.
-        - If Media: Returns metadata.
+        Inspects a single file and returns details.
         """
         if not os.path.exists(path):
             return {'error': 'File not found'}
+
+        # If it's a directory (legacy fallback or direct call), treat as batch of 1
+        if os.path.isdir(path):
+            return InspectorManager.inspect_batch([path])
 
         filename = os.path.basename(path).lower()
 
@@ -26,7 +81,12 @@ class InspectorManager:
         elif filename.endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.tiff', '.tif', '.heic')):
             return InspectorManager._inspect_image(path)
         else:
-            return {'type': 'unknown', 'info': 'No deep inspection available for this file type.'}
+            size = os.path.getsize(path)
+            return {
+                'type': 'unknown',
+                'details': [('Size', InspectorManager._format_size(size))],
+                'info': 'No deep inspection available for this file type.'
+            }
 
     @staticmethod
     def _format_size(size_str):
