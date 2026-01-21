@@ -383,38 +383,7 @@ class RcloneManager:
                 break
 
             basename = os.path.basename(src_path)
-            # Logic: If item is folder, we copy TO dest_root/basename
-            # If item is file, we copy TO dest_root
-
-            # Since we don't know if src is dir or file easily without lsjson check,
-            # we can infer or simpler: copy remote:path local_path.
-            # rclone copy remote:file /local/  -> /local/file
-            # rclone copy remote:folder /local/folder -> /local/folder/...
-
-            # Wait, rclone copy remote:Folder /local/Folder works recursively.
-
-            # We need to construct the local destination carefully.
-            # For a file "A.mkv" at "remote:Mov/A.mkv", src_path is "Mov/A.mkv".
-            # We want it in "dest_root/A.mkv" (flat) or preserving struct?
-            # User expectation: usually flat download to "Downloads" unless structured.
-            # Let's preserve basename.
-
             full_src = f"{remote}:{src_path}"
-
-            # We'll assume typical behavior: download into a folder named after the item if it's a folder,
-            # or just the file if it's a file.
-            # Actually rclone copy src dest is safer.
-
-            # Strategy: Always copy to DOWNLOAD_ROOT.
-            # If src is "folder", rclone copy remote:folder /data/downloads/folder
-            # If src is "file", rclone copy remote:file /data/downloads/
-
-            # We can use 'rclone lsjson' quickly to check type? Or just rely on user intent.
-            # Let's assume the frontend passes correct intent or we handle it.
-            # Actually, `rclone copy source dest` behaves well.
-
-            # Construct Local Path
-            # We want to mirror the basename in the root.
             target_local = os.path.join(dest_root, basename)
 
             log(f"Downloading {basename} -> {target_local}")
@@ -458,6 +427,58 @@ class RcloneManager:
             else:
                 log(f"Download completed for {basename}")
                 NotificationManager.send_notification(f"✅ ParFix: Downloaded {basename} from Cloud")
+
+        return True
+
+    @staticmethod
+    def run_cloud_ops(operation, remote, paths, dest_remote=None, dest_path=None, new_name=None):
+        """Handles heavy cloud operations: Move, Copy, Delete."""
+        log(f"Starting Cloud Op: {operation} on {remote}")
+
+        for p in paths:
+            if job_manager.is_cancelled(): break
+
+            src = f"{remote}:{p}"
+            cmd = []
+
+            job_manager.update_job_details({'current_item': os.path.basename(p)})
+
+            if operation == 'delete':
+                # Use purge for dirs, delete for files. Since we don't know easily, try deletefile, fallback purge?
+                # Safer: 'delete' deletes files in path. 'purge' deletes dir.
+                # Simplest: 'delete' for files, but for folders we need purge.
+                # We can use `rclone delete --rmdirs` maybe?
+                # 'purge' works on both if it's a specific path usually? No, purge expects dir or file.
+                # Let's try 'delete' first?
+                # Actually, `rclone delete` only deletes files. `rclone purge` deletes path.
+                cmd = ['rclone', 'purge', src]
+
+            elif operation == 'move':
+                if not dest_remote: return
+                # dest_path is the FOLDER to move INTO.
+                # Logic: rclone moveto src dest/basename
+                basename = os.path.basename(p)
+                final_dest = f"{dest_remote}:{dest_path}/{basename}"
+                cmd = ['rclone', 'moveto', src, final_dest, '-v', '--stats', '2s']
+
+            elif operation == 'copy':
+                if not dest_remote: return
+                basename = os.path.basename(p)
+                final_dest = f"{dest_remote}:{dest_path}/{basename}"
+                cmd = ['rclone', 'copyto', src, final_dest, '-v', '--stats', '2s']
+
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            job_manager.set_current_process(process)
+
+            for line in process.stdout:
+                if "error" in line.lower(): log(f"[RCLONE ERR] {line.strip()}")
+
+            process.wait()
+            if process.returncode != 0:
+                job_manager.update_job_details({'error': f"Failed to {operation} {p}"})
+                log(f"Cloud {operation} failed for {p}")
+            else:
+                log(f"Cloud {operation} success for {p}")
 
         return True
 
@@ -942,6 +963,94 @@ def trigger_manual_upload():
         RcloneManager.run_upload,
         args=(abs_paths, remote, upload_path, transfers),
         initial_details={'targets': display_names}
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@app.route('/api/settings/rclone-config', methods=['POST'])
+def upload_rclone_config():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    # Target location: Read from ENV or default /app/config.json dir
+    # Actually, standard is ~/.config/rclone/rclone.conf OR where mapped.
+    # The setup uses /root/.config/rclone/rclone.conf usually.
+    # We can try to detect where rclone looks or just overwrite the mapped one?
+    # User usually maps -v ./config:/config and uses CONFIG_FILE.
+    # But rclone config is separate.
+    # Best guess: /root/.config/rclone/rclone.conf is standard inside container.
+
+    target_dir = os.path.expanduser('~/.config/rclone')
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+
+    target_path = os.path.join(target_dir, 'rclone.conf')
+
+    try:
+        file.save(target_path)
+        log("Rclone config uploaded/updated.")
+        return jsonify({'status': 'uploaded'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# --- Cloud Operations API ---
+
+@app.route('/api/rclone/mkdir', methods=['POST'])
+def rclone_mkdir():
+    data = request.json
+    remote = data.get('remote')
+    path = data.get('path') # Parent folder
+    name = data.get('name')
+
+    if not remote or not name: return jsonify({'error': 'Args missing'}), 400
+
+    full_path = f"{remote}:{path}/{name}" if path else f"{remote}:{name}"
+
+    try:
+        subprocess.run(['rclone', 'mkdir', full_path], check=True)
+        return jsonify({'status': 'created'})
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rclone/rename', methods=['POST'])
+def rclone_rename():
+    data = request.json
+    remote = data.get('remote')
+    path = data.get('path') # Full path to item
+    new_name = data.get('new_name')
+
+    if not remote or not path or not new_name: return jsonify({'error': 'Args missing'}), 400
+
+    # rclone moveto src dst
+    parent = os.path.dirname(path)
+    src = f"{remote}:{path}"
+    dst = f"{remote}:{parent}/{new_name}" if parent else f"{remote}:{new_name}"
+
+    try:
+        subprocess.run(['rclone', 'moveto', src, dst], check=True)
+        return jsonify({'status': 'renamed'})
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rclone/action', methods=['POST'])
+def rclone_action():
+    # Handles Move/Copy/Delete via Job Queue
+    data = request.json
+    action = data.get('action') # move, copy, delete
+    remote = data.get('remote')
+    paths = data.get('paths', [])
+    dest_remote = data.get('dest_remote') # For move/copy
+    dest_path = data.get('dest_path', '') # For move/copy
+
+    if not action or not remote or not paths: return jsonify({'error': 'Args missing'}), 400
+
+    job_id = job_manager.add_job(
+        f"Cloud {action.title()} ({len(paths)} items)",
+        RcloneManager.run_cloud_ops,
+        args=(action, remote, paths, dest_remote, dest_path),
+        initial_details={'targets': [os.path.basename(p) for p in paths]}
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
