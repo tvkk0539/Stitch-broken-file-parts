@@ -4,12 +4,12 @@ from app.managers.rclone import RcloneManager
 from app.managers.archive import ArchiveManager
 from app.managers.repair import RepairManager
 from app.managers.extract import ExtractManager
- from app.managers.inspector import InspectorManager
+from app.managers.inspector import InspectorManager
 from app.core.config import save_config, load_config
 import os
 import shutil
 import subprocess
- import psutil
+import psutil
 
 bp = Blueprint('main', __name__)
 
@@ -346,13 +346,14 @@ def trigger_rclone_move():
     remote = data.get('remote')
     paths = data.get('paths', [])
     dest = data.get('destination', '')
+    dest_remote = data.get('dest_remote') # Optional: for cross-remote move
 
     if not remote or not paths: return jsonify({'error': 'Missing args'}), 400
 
     job_id = job_manager.add_job(
         f"Move {len(paths)} items in Cloud",
         RcloneManager.run_cloud_move,
-        args=(remote, paths, dest)
+        args=(remote, paths, dest, dest_remote)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
@@ -362,13 +363,14 @@ def trigger_rclone_copy():
     remote = data.get('remote')
     paths = data.get('paths', [])
     dest = data.get('destination', '')
+    dest_remote = data.get('dest_remote') # Optional: for cross-remote copy
 
     if not remote or not paths: return jsonify({'error': 'Missing args'}), 400
 
     job_id = job_manager.add_job(
         f"Copy {len(paths)} items in Cloud",
         RcloneManager.run_cloud_copy,
-        args=(remote, paths, dest)
+        args=(remote, paths, dest, dest_remote)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 

@@ -180,3 +180,6 @@ def worker(job_manager):
             job_manager.add_to_history(job)
             job_manager.set_current_job(None)
             job_manager.clear_current_process()
+
+# Create the global instance here
+job_manager = JobManager()

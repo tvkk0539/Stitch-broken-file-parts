@@ -190,19 +190,20 @@ class RcloneManager:
         return True
 
     @staticmethod
-    def run_cloud_move(remote, source_paths, dest_path):
+    def run_cloud_move(remote, source_paths, dest_path, dest_remote=None):
         """Moves files/folders between locations in the cloud (Server-Side Move)."""
-        log(f"Starting Rclone Move to {remote}:{dest_path}")
+        target_remote = dest_remote if dest_remote else remote
+        log(f"Starting Rclone Move to {target_remote}:{dest_path}")
 
         for i, src_path in enumerate(source_paths):
             if job_manager.is_cancelled(): break
 
             basename = os.path.basename(src_path)
             # Source: remote:src_path
-            # Dest: remote:dest_path/basename (rclone moveto behaves like mv)
+            # Dest: target_remote:dest_path/basename
 
             full_src = f"{remote}:{src_path}"
-            full_dest = f"{remote}:{dest_path}/{basename}"
+            full_dest = f"{target_remote}:{dest_path}/{basename}"
 
             job_manager.update_job_details({
                 'action': f"Moving item {i+1} of {len(source_paths)}",
@@ -233,16 +234,17 @@ class RcloneManager:
         return True
 
     @staticmethod
-    def run_cloud_copy(remote, source_paths, dest_path):
+    def run_cloud_copy(remote, source_paths, dest_path, dest_remote=None):
         """Copies files/folders between locations in the cloud (Server-Side Copy)."""
-        log(f"Starting Rclone Copy to {remote}:{dest_path}")
+        target_remote = dest_remote if dest_remote else remote
+        log(f"Starting Rclone Copy to {target_remote}:{dest_path}")
 
         for i, src_path in enumerate(source_paths):
             if job_manager.is_cancelled(): break
 
             basename = os.path.basename(src_path)
             full_src = f"{remote}:{src_path}"
-            full_dest = f"{remote}:{dest_path}/{basename}"
+            full_dest = f"{target_remote}:{dest_path}/{basename}"
 
             job_manager.update_job_details({
                 'action': f"Copying item {i+1} of {len(source_paths)}",
