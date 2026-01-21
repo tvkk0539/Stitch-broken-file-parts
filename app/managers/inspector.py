@@ -25,6 +25,14 @@ class InspectorManager:
             return {'type': 'unknown', 'info': 'No deep inspection available for this file type.'}
 
     @staticmethod
+    def _get_best_value(track, keys, default='Unknown'):
+        for key in keys:
+            val = track.get(key)
+            if val:
+                return val
+        return default
+
+    @staticmethod
     def _inspect_media(path):
         try:
             # Run mediainfo with JSON output
@@ -41,15 +49,42 @@ class InspectorManager:
             if 'media' in data and 'track' in data['media']:
                 for track in data['media']['track']:
                     if track['@type'] == 'General':
-                        info['details'].append(('Format', track.get('Format')))
-                        info['details'].append(('Duration', track.get('Duration_String4')))
-                        info['details'].append(('Size', track.get('FileSize_String4')))
+                        # Format
+                        info['details'].append(('Format', track.get('Format', 'Unknown')))
+
+                        # Duration Fallback
+                        dur = InspectorManager._get_best_value(
+                            track,
+                            ['Duration_String4', 'Duration_String3', 'Duration_String', 'Duration_String1', 'Duration'],
+                            'Unknown'
+                        )
+                        info['details'].append(('Duration', dur))
+
+                        # Size Fallback
+                        size = InspectorManager._get_best_value(
+                            track,
+                            ['FileSize_String4', 'FileSize_String3', 'FileSize_String', 'FileSize_String1', 'FileSize'],
+                            'Unknown'
+                        )
+                        info['details'].append(('Size', size))
+
                     elif track['@type'] == 'Video':
                         res = f"{track.get('Width', '?')}x{track.get('Height', '?')}"
-                        info['details'].append(('Video', f"{track.get('Format')} ({res})"))
-                        info['details'].append(('Bitrate', track.get('BitRate_String')))
+                        info['details'].append(('Video', f"{track.get('Format', 'Unknown')} ({res})"))
+
+                        bitrate = InspectorManager._get_best_value(
+                            track,
+                            ['BitRate_String', 'BitRate'],
+                            'Unknown'
+                        )
+                        info['details'].append(('Bitrate', bitrate))
+
                     elif track['@type'] == 'Audio':
-                        info['details'].append(('Audio', f"{track.get('Format')} {track.get('Channel(s)_String', '')}"))
+                        fmt = track.get('Format', 'Unknown')
+                        ch = track.get('Channel(s)_String', '')
+                        if not ch:
+                            ch = track.get('Channel(s)', '')
+                        info['details'].append(('Audio', f"{fmt} {ch}".strip()))
 
             return info
         except Exception as e:
