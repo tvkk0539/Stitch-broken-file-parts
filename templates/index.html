@@ -572,14 +572,17 @@
         </div>
     </div>
 
-    <!-- Move/Copy Modal -->
+    <!-- Move/Copy/Download Modal -->
     <div id="move-copy-modal" class="modal">
         <div class="modal-content" style="width: 500px;">
             <div class="modal-header">
-                <h3 id="mc-title">Move Items</h3>
+                <h3 id="mc-title">Select Destination</h3>
             </div>
             <div class="form-group">
-                <label>Select Destination Folder:</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label style="margin:0;">Destination Folder:</label>
+                    <button id="mc-new-folder-btn" class="icon-btn" style="padding: 2px 8px; font-size: 0.8em;" title="Create New Folder Here">📂+ New</button>
+                </div>
                 <div id="mc-browser" style="border: 1px solid #414868; height: 200px; overflow-y: auto; background: #15161e; padding: 5px; margin-bottom: 10px;">
                     <!-- Folder list -->
                 </div>
@@ -719,15 +722,16 @@
         const saveSetBtn = document.getElementById('save-set');
         const cancelSetBtn = document.getElementById('cancel-set');
 
-        // Move/Copy Modal Elements
+        // Move/Copy/Download Modal Elements
         const mcModal = document.getElementById('move-copy-modal');
         const mcTitle = document.getElementById('mc-title');
         const mcBrowser = document.getElementById('mc-browser');
         const mcSelectedPath = document.getElementById('mc-selected-path');
         const mcUpBtn = document.getElementById('mc-up-btn');
+        const mcNewFolderBtn = document.getElementById('mc-new-folder-btn');
         const confirmMcBtn = document.getElementById('confirm-mc');
         const cancelMcBtn = document.getElementById('cancel-mc');
-        let mcAction = 'move'; // 'move' or 'copy'
+        let mcAction = 'move'; // 'move', 'copy', or 'download'
         let mcCurrentBrowserPath = '';
 
         // Rename Modal Elements
@@ -1669,10 +1673,11 @@
 
         function openMcModal(action) {
             mcAction = action;
-            mcTitle.textContent = action === 'move' ? 'Move Items' : 'Copy Items';
-            // Start browser at root or current?
-            // Usually easier to start at root to find target, or current if moving short distance.
-            // Let's start at Root to allow easy navigation elsewhere.
+            if (action === 'move') mcTitle.textContent = 'Move Items';
+            else if (action === 'copy') mcTitle.textContent = 'Copy Items';
+            else if (action === 'download') mcTitle.textContent = 'Download to...';
+
+            // Start browser at root
             loadMcBrowser('');
             mcModal.style.display = 'block';
         }
@@ -1686,6 +1691,31 @@
              loadMcBrowser(parent);
         };
 
+        mcNewFolderBtn.onclick = async () => {
+            const name = prompt("Enter new folder name:");
+            if (!name) return;
+
+            try {
+                const res = await fetch('/api/mkdir', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        path: mcCurrentBrowserPath,
+                        name: name
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'created') {
+                    showToast("Folder created", "success");
+                    loadMcBrowser(mcCurrentBrowserPath); // Refresh
+                } else {
+                    showToast("Error: " + data.error, "error");
+                }
+            } catch (e) {
+                showToast("Request failed", "error");
+            }
+        };
+
         moveBtn.onclick = () => openMcModal('move');
         copyBtn.onclick = () => openMcModal('copy');
 
@@ -1693,29 +1723,56 @@
 
         confirmMcBtn.onclick = async () => {
             const dest = mcCurrentBrowserPath; // Use the path selected in browser
-            const endpoint = mcAction === 'move' ? '/api/move' : '/api/copy';
-
             mcModal.style.display = 'none';
 
-            try {
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        paths: selectedPaths,
-                        destination: dest
-                    })
-                });
-                const data = await res.json();
-
-                if (data.status === 'completed') {
-                    showToast(`${mcAction === 'move' ? 'Moved' : 'Copied'} ${data.moved || data.copied} items.`, 'success');
-                    loadPath(currentPath);
-                } else {
-                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+            if (mcAction === 'download') {
+                // Download Logic
+                downloadBtn.disabled = true;
+                try {
+                    const res = await fetch('/api/rclone/download', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            remote: currentRemote,
+                            paths: selectedPaths,
+                            transfers: 4,
+                            destination: dest
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'queued') {
+                        showToast("Download Queued", "success");
+                    } else {
+                        showToast("Error: " + data.error, "error");
+                    }
+                } catch (e) {
+                    showToast("Request failed", "error");
                 }
-            } catch (e) {
-                showToast('Request failed', 'error');
+                setTimeout(() => updateButtonState(), 2000);
+
+            } else {
+                // Move or Copy Logic
+                const endpoint = mcAction === 'move' ? '/api/move' : '/api/copy';
+                try {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            paths: selectedPaths,
+                            destination: dest
+                        })
+                    });
+                    const data = await res.json();
+
+                    if (data.status === 'completed') {
+                        showToast(`${mcAction === 'move' ? 'Moved' : 'Copied'} ${data.moved || data.copied} items.`, 'success');
+                        loadPath(currentPath);
+                    } else {
+                        showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                    }
+                } catch (e) {
+                    showToast('Request failed', 'error');
+                }
             }
         };
 

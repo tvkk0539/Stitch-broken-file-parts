@@ -1091,15 +1091,19 @@ def trigger_rclone_download():
     remote = data.get('remote')
     paths = data.get('paths', [])
     transfers = int(data.get('transfers', 4))
+    destination = data.get('destination', '') # Relative to DOWNLOAD_ROOT
 
     if not remote or not paths: return jsonify({'error': 'Missing args'}), 400
+
+    # Construct absolute download path
+    dest_abs = os.path.join(DOWNLOAD_ROOT, destination) if destination else DOWNLOAD_ROOT
 
     display_names = [os.path.basename(p) for p in paths]
 
     job_id = job_manager.add_job(
         f"Download {len(paths)} items from {remote}",
         RcloneManager.run_download,
-        args=(remote, paths, DOWNLOAD_ROOT, transfers),
+        args=(remote, paths, dest_abs, transfers),
         initial_details={'targets': display_names}
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
