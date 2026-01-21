@@ -16,6 +16,7 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     rclone \
     curl \
     procps \
+    mediainfo \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

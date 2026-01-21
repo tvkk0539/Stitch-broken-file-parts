@@ -3,15 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParFix Web Utility</title>
+    <title>ParFix Web Utility Pro</title>
     <style>
         :root {
             --bg-color: #1a1b26;
+            --sidebar-bg: #16161e;
+            --panel-bg: #24283b;
             --text-color: #a9b1d6;
+            --text-muted: #565f89;
             --accent-color: #7aa2f7;
             --success-color: #9ece6a;
             --error-color: #f7768e;
-            --panel-bg: #24283b;
+            --warning-color: #e0af68;
+            --border-color: #414868;
         }
 
         body {
@@ -19,90 +23,239 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 20px;
-            display: flex;
+            padding: 0;
             height: 100vh;
-            box-sizing: border-box;
-            gap: 20px;
+            overflow: hidden;
+            display: flex;
         }
 
-        .panel {
-            background-color: var(--panel-bg);
-            border-radius: 8px;
-            padding: 15px;
+        /* --- Sidebar --- */
+        #sidebar {
+            width: 80px; /* Collapsed width */
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            transition: width 0.3s;
+            z-index: 10;
+        }
+
+        #sidebar:hover {
+            width: 200px;
+        }
+
+        .nav-item {
+            width: 100%;
+            padding: 15px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center; /* Center icon initially */
+            color: var(--text-muted);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            color: var(--accent-color);
+            background-color: rgba(122, 162, 247, 0.1);
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: var(--accent-color);
+        }
+
+        .nav-icon {
+            font-size: 1.5em;
+            min-width: 80px; /* Fixed width for icon center */
+            text-align: center;
+        }
+
+        .nav-label {
+            display: none;
+            white-space: nowrap;
+            font-size: 1em;
+            font-weight: bold;
+            padding-right: 20px;
+        }
+
+        #sidebar:hover .nav-label {
+            display: block;
+        }
+
+        #sidebar:hover .nav-item {
+            justify-content: flex-start;
+        }
+
+        /* --- Main Layout --- */
+        #main-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0; /* Prevent flex overflow */
+        }
+
+        /* --- Top Bar --- */
+        #top-bar {
+            height: 50px;
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            flex-shrink: 0;
+        }
+
+        .app-title {
+            font-weight: bold;
+            color: var(--accent-color);
+            font-size: 1.1em;
+        }
+
+        .status-container {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 0.9em;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-track {
+            width: 80px;
+            height: 6px;
+            background: #2f3549;
+            border-radius: 3px;
             overflow: hidden;
         }
 
-        #file-browser {
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%;
+            transition: width 0.5s;
+        }
+
+        /* --- Views Container --- */
+        #views-container {
             flex: 1;
-            min-width: 300px;
-            border: 1px solid #414868;
+            position: relative;
+            overflow: hidden;
+            background-color: #1a1b26;
         }
 
-        #right-panel {
-            flex: 2;
-            border: 1px solid #414868;
-            padding: 0; /* Tabs handle padding */
+        .view-section {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
         }
 
-        h2 {
-            margin-top: 0;
-            color: var(--accent-color);
-            border-bottom: 1px solid #414868;
+        .view-section.active {
+            display: flex;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- File Browser Styles --- */
+        .browser-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
             padding-bottom: 10px;
         }
 
-        /* File List Styles */
+        .browser-tabs {
+            display: flex;
+            gap: 20px;
+        }
+
+        .browser-tab {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1em;
+            padding-bottom: 5px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .browser-tab.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+
+        #file-list-container {
+            flex: 1;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
         #file-list {
             list-style: none;
             padding: 0;
             margin: 0;
             overflow-y: auto;
-            flex-grow: 1;
+            flex: 1;
         }
 
         .file-item {
-            padding: 8px 12px;
+            padding: 10px 15px;
             cursor: pointer;
             border-bottom: 1px solid #2f3549;
             display: flex;
             align-items: center;
         }
 
-        .file-item:hover {
-            background-color: #2f3549;
-        }
+        .file-item:hover { background-color: #2f3549; }
+        .file-item.selected { background-color: #3b4261; color: var(--accent-color); }
 
-        .file-item.selected {
-            background-color: #3b4261;
-            color: var(--accent-color);
-        }
-
-        .icon {
-            margin-right: 10px;
-            font-weight: bold;
-        }
-
+        .icon { margin-right: 12px; font-weight: bold; font-size: 1.1em; }
         .dir-icon { color: var(--accent-color); }
         .file-icon { color: #565f89; }
         .par2-icon { color: var(--success-color); }
 
-        /* Controls */
+        /* --- Controls Area --- */
+        #controls-area {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: var(--panel-bg);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
         #controls {
-            margin-top: 10px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
             flex-wrap: wrap;
+            gap: 10px;
         }
 
-        #settings-btn:hover {
-            background-color: var(--accent-color) !important;
-        }
-
+        /* Button Styles */
         button {
             background-color: var(--accent-color);
             color: #15161e;
@@ -113,24 +266,8 @@
             font-weight: bold;
             font-family: inherit;
             flex: 1;
-        }
-
-        button.secondary { background-color: #9ece6a; }
-        button.danger { background-color: #f7768e; }
-        button.purple-btn { background-color: #bb9af7; }
-        button.info-btn { background-color: #7dcfff; }
-        button.warning-btn { background-color: #e0af68; }
-
-        button.icon-btn {
-            flex: 0;
-            padding: 10px 15px;
-            min-width: 50px;
-        }
-
-        .file-item input[type="checkbox"] {
-            margin-right: 10px;
-            transform: scale(1.2);
-            cursor: pointer;
+            min-width: 100px;
+            transition: opacity 0.2s;
         }
 
         button:disabled {
@@ -139,543 +276,436 @@
             cursor: not-allowed;
         }
 
-        button:hover:not(:disabled) {
-            opacity: 0.9;
+        button:hover:not(:disabled) { opacity: 0.9; }
+
+        button.secondary { background-color: var(--success-color); }
+        button.danger { background-color: var(--error-color); }
+        button.purple-btn { background-color: #bb9af7; }
+        button.info-btn { background-color: #7dcfff; }
+        button.warning-btn { background-color: var(--warning-color); }
+
+        button.icon-btn {
+            flex: 0;
+            padding: 8px 12px;
+            min-width: auto;
         }
 
-        /* Tabs */
-        .tab-container {
-            display: flex;
-            border-bottom: 1px solid #414868;
-            margin-bottom: 0;
-            background-color: #1f2335;
-            flex: 0 0 auto;
-        }
-
-        .tab-btn {
-            padding: 12px 20px;
-            cursor: pointer;
-            border: none;
-            background: none;
-            color: #737aa2;
-            font-weight: bold;
-            font-family: inherit;
-            border-right: 1px solid #414868;
-            border-radius: 0;
-            flex: 0 0 auto;
-        }
-
-        .tab-btn.active {
-            background-color: var(--panel-bg);
-            color: var(--accent-color);
-            border-bottom: 2px solid var(--accent-color);
-        }
-
-        .tab-btn:hover:not(.active) {
-            background-color: #292e42;
-            color: #c0caf5;
-        }
-
-        .tab-content {
-            display: none;
-            flex-grow: 1;
-            flex-direction: column;
-            overflow: hidden;
-            height: 100%;
-            position: relative;
-        }
-
-        .tab-content.active {
-            display: flex;
-        }
-
-        /* Log Console */
-        #console {
-            background-color: #15161e;
-            color: #c0caf5;
-            font-family: 'Courier New', Courier, monospace;
-            padding: 10px;
-            overflow-y: auto;
-            flex-grow: 1;
-            white-space: pre-wrap;
-            font-size: 14px;
-            margin: 10px; /* margin within tab */
-            border-radius: 4px;
-        }
-
-        /* Job Queue Styles */
+        /* --- Job Queue View --- */
         #job-queue-container {
-            overflow-y: auto;
-            padding: 15px;
-            flex-grow: 1;
-        }
-
-        .job-section { margin-bottom: 25px; }
-        .job-section h3 {
-            font-size: 1em;
-            color: #737aa2;
-            border-bottom: 1px solid #414868;
-            padding-bottom: 5px;
-            margin-top: 0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
         }
 
         .job-card {
-            background-color: #1f2335;
-            border: 1px solid #414868;
-            border-radius: 4px;
-            padding: 12px;
-            margin-bottom: 10px;
-            display: flex;
-            flex-direction: column; /* Changed for expansion */
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
             cursor: pointer;
-            transition: background-color 0.2s;
         }
 
-        .job-card:hover { background-color: #262b40; }
+        .job-card:hover { background-color: #2a2f45; }
+        .job-card.running { border-left: 4px solid var(--accent-color); }
+        .job-card.queued { border-left: 4px solid var(--text-muted); }
+        .job-card.completed { border-left: 4px solid var(--success-color); }
+        .job-card.failed { border-left: 4px solid var(--error-color); }
 
-        .job-card.running { border-left: 3px solid var(--accent-color); }
-        .job-card.queued { border-left: 3px solid #737aa2; }
-        .job-card.completed { border-left: 3px solid var(--success-color); }
-        .job-card.failed { border-left: 3px solid var(--error-color); }
-        .job-card.cancelled { border-left: 3px solid #e0af68; }
-
-        .job-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-        }
-
-        .job-info { flex-grow: 1; }
-        .job-name { font-weight: bold; color: #c0caf5; display: block; margin-bottom: 4px; }
-        .job-meta { font-size: 0.85em; color: #737aa2; }
+        .job-header { display: flex; justify-content: space-between; align-items: center; }
+        .job-name { font-size: 1.1em; font-weight: bold; color: #c0caf5; display: block; margin-bottom: 5px; }
+        .job-meta { color: var(--text-muted); font-size: 0.9em; }
 
         .job-details {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
             display: none;
-            width: 100%;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #2f3549;
-            font-size: 0.85em;
-            color: #a9b1d6;
+            font-size: 0.9em;
         }
-
         .job-details.expanded { display: block; }
-
-        .detail-row {
-            display: flex;
-            margin-bottom: 4px;
-        }
-        .detail-key { width: 100px; color: #737aa2; font-weight: bold; }
-        .detail-val { flex: 1; color: #c0caf5; word-break: break-all; }
 
         .btn-cancel {
             background-color: var(--error-color);
             color: #15161e;
-            padding: 6px 12px;
-            font-size: 0.85em;
+            padding: 5px 10px;
+            font-size: 0.8em;
             border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            flex: 0 0 auto;
-            margin-left: 15px;
-            font-weight: bold;
+            margin-left: 10px;
         }
-        .btn-cancel:hover { opacity: 0.9; }
 
+        /* --- Logs View --- */
+        #console {
+            background-color: #15161e;
+            color: #c0caf5;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 20px;
+            height: 100%;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
 
-        /* Modal Styles */
+        /* --- Settings View --- */
+        .settings-container {
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+            background-color: var(--panel-bg);
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .settings-header {
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            color: var(--accent-color);
+        }
+
+        /* Form Inputs */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-color); font-weight: bold; }
+        .form-group input[type="text"], .form-group input[type="number"], .form-group select {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            background: #1a1b26;
+            border: 1px solid var(--border-color);
+            color: #c0caf5;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        .form-group input:focus { outline: none; border-color: var(--accent-color); }
+
+        /* Modals (Keep existing style) */
         .modal {
             display: none;
             position: fixed;
-            z-index: 100;
+            z-index: 1000;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.7);
+            background-color: rgba(0,0,0,0.8);
+            backdrop-filter: blur(2px);
         }
 
         .modal-content {
             background-color: var(--panel-bg);
             margin: 10% auto;
-            padding: 20px;
-            border: 1px solid #414868;
-            width: 400px;
+            padding: 25px;
+            border: 1px solid var(--border-color);
+            width: 500px;
             border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
 
-        .modal-header {
-            margin-bottom: 20px;
-            border-bottom: 1px solid #414868;
-            padding-bottom: 10px;
-        }
+        .modal-header h3 { margin: 0 0 20px 0; color: var(--accent-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;}
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;}
 
-        .modal-header h3 { margin: 0; color: var(--accent-color); }
-
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; color: #a9b1d6; }
-        .form-group input:not([type="checkbox"]):not([type="radio"]), .form-group select {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-            background: #1a1b26;
-            border: 1px solid #414868;
-            color: #c0caf5;
-            border-radius: 4px;
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .breadcrumb {
-            margin-bottom: 10px;
-            font-size: 0.9em;
-            color: #737aa2;
-        }
-
-        .breadcrumb span:hover {
-            color: var(--accent-color);
-            cursor: pointer;
-            text-decoration: underline;
-        }
-
-        /* Toast Notification Styles */
-        #toast-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 2000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
+        /* Toasts */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .toast {
             background-color: var(--panel-bg);
             border-left: 5px solid var(--accent-color);
             color: #fff;
             padding: 15px 20px;
             border-radius: 4px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             min-width: 250px;
             opacity: 0;
             transform: translateX(100%);
             transition: all 0.3s ease-in-out;
         }
-
-        .toast.show {
-            opacity: 1;
-            transform: translateX(0);
-        }
-
+        .toast.show { opacity: 1; transform: translateX(0); }
         .toast.error { border-left-color: var(--error-color); }
         .toast.success { border-left-color: var(--success-color); }
+
+        /* Breadcrumb */
+        .breadcrumb { margin-bottom: 10px; color: var(--text-muted); font-size: 0.95em; }
+        .breadcrumb span:hover { color: var(--accent-color); cursor: pointer; text-decoration: underline; }
     </style>
 </head>
 <body>
-    <div id="toast-container"></div>
 
-    <!-- Left Panel: File Browser -->
-    <div id="file-browser" class="panel">
-        <!-- Browser Mode Switcher -->
-        <div style="display:flex; border-bottom: 1px solid #414868; margin-bottom: 10px;">
-            <button id="tab-local" class="tab-btn active" style="flex:1; border:none; border-bottom: 2px solid var(--accent-color);" onclick="switchBrowserMode('local')">Local Storage</button>
-            <button id="tab-cloud" class="tab-btn" style="flex:1; border:none; border-bottom: 2px solid transparent;" onclick="switchBrowserMode('cloud')">Cloud Remotes</button>
+    <!-- Sidebar -->
+    <aside id="sidebar">
+        <div class="nav-item active" onclick="switchView('files')">
+            <div class="nav-icon">📂</div>
+            <div class="nav-label">Files</div>
         </div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2 id="browser-title" style="border:none; padding:0; margin:0; font-size:1.2em;">Local Files</h2>
-            <div style="display:flex; gap:8px; align-items:center;">
-                <label style="cursor:pointer; font-size:0.9em; user-select:none; color:#a9b1d6;" title="Select All / None">
-                    <input type="checkbox" id="select-all-check"> All
-                </label>
-                <button id="refresh-btn" class="icon-btn" style="background:none; border:1px solid #414868; color:var(--accent-color);" title="Refresh">🔄</button>
-                <button id="new-folder-btn" class="icon-btn" style="background:none; border:1px solid #414868; color:var(--accent-color);" title="New Folder">📂+</button>
-            </div>
+        <div class="nav-item" onclick="switchView('queue')">
+            <div class="nav-icon">⏳</div>
+            <div class="nav-label">Queue</div>
         </div>
-        <div id="current-path" class="breadcrumb">/</div>
-        <ul id="file-list">
-            <!-- Items injected via JS -->
-        </ul>
+        <div class="nav-item" onclick="switchView('logs')">
+            <div class="nav-icon">📜</div>
+            <div class="nav-label">Logs</div>
+        </div>
+        <div class="nav-item" style="margin-top: auto;" onclick="switchView('settings')">
+            <div class="nav-icon">⚙️</div>
+            <div class="nav-label">Settings</div>
+        </div>
+    </aside>
 
-        <!-- Controls Container -->
-        <div id="controls">
-            <!-- Local Controls -->
-            <div id="local-controls" style="display:contents;">
-                <button id="repair-btn" disabled>Repair</button>
-                <button id="extract-btn" style="background-color:#00d9ff;" disabled>Extract</button>
-                <button id="archive-btn" class="secondary" disabled>Pack</button>
-                <button id="upload-btn" class="purple-btn" disabled>Upload</button>
-                <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
-                <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
-                <button id="rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
-                <button id="delete-btn" class="danger" disabled>🗑️</button>
+    <!-- Main Content -->
+    <div id="main-wrapper">
+
+        <!-- Top Bar -->
+        <header id="top-bar">
+            <div class="app-title">ParFix Pro</div>
+
+            <!-- Active Job Widget -->
+            <div id="active-job-widget" style="margin-left: 20px; flex: 1; color: var(--text-muted); font-size: 0.9em; display:flex; align-items:center;">
+                <!-- JS will update this -->
+                <span id="active-job-text">Idle</span>
             </div>
 
-            <!-- Cloud Controls -->
-            <div id="cloud-controls" style="display:none; width:100%;">
-                <button id="download-btn" class="purple-btn" style="width:100%; display:block;" disabled>☁️ Download to VPS</button>
-            </div>
-
-            <button id="settings-btn" class="icon-btn" title="Settings" style="background-color:dimgray; color:white;">⚙️</button>
-        </div>
-    </div>
-
-    <!-- Right Panel: Logs & Queue -->
-    <div id="right-panel" class="panel">
-        <div class="tab-container">
-            <button class="tab-btn active" onclick="openTab('logs', this)">System Logs</button>
-            <button class="tab-btn" onclick="openTab('queue', this)">Job Queue</button>
-        </div>
-
-        <div id="tab-logs" class="tab-content active">
-             <div id="console">Waiting for jobs...</div>
-        </div>
-
-        <div id="tab-queue" class="tab-content">
-            <div id="job-queue-container">
-                <div style="color: #565f89; text-align: center; margin-top: 50px;">
-                    Loading Job Queue...
+            <div class="status-container">
+                <div class="stat-item">
+                    <span>💾</span>
+                    <div class="progress-track"><div id="stat-disk-bar" class="progress-fill"></div></div>
+                    <span id="stat-disk-text">0%</span>
+                </div>
+                <div class="stat-item">
+                    <span>🧠</span>
+                    <div class="progress-track"><div id="stat-ram-bar" class="progress-fill" style="background:#bb9af7"></div></div>
+                    <span id="stat-ram-text">0%</span>
+                </div>
+                <div class="stat-item">
+                    <span>⚙️</span>
+                    <span id="stat-cpu-text">0%</span>
                 </div>
             </div>
+        </header>
+
+        <!-- Views Container -->
+        <div id="views-container">
+
+            <!-- VIEW: FILES -->
+            <div id="view-files" class="view-section active">
+
+                <div class="browser-header">
+                    <div class="browser-tabs">
+                        <button id="tab-local" class="browser-tab active" onclick="switchBrowserMode('local')">Local Files</button>
+                        <button id="tab-cloud" class="browser-tab" onclick="switchBrowserMode('cloud')">Cloud Remotes</button>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <label style="cursor:pointer; font-size:0.9em; color:var(--text-muted); margin-right: 10px;">
+                            <input type="checkbox" id="select-all-check"> Select All
+                        </label>
+                        <button id="new-folder-btn" class="icon-btn" style="background:none; border:1px solid var(--border-color); color:var(--accent-color);" title="New Folder">📂+</button>
+                        <button id="refresh-btn" class="icon-btn" style="background:none; border:1px solid var(--border-color); color:var(--accent-color);" title="Refresh">🔄</button>
+                    </div>
+                </div>
+
+                <div id="current-path" class="breadcrumb">/</div>
+
+                <div id="file-list-container">
+                    <ul id="file-list">
+                        <!-- JS Injected -->
+                    </ul>
+                </div>
+
+                <div id="controls-area">
+                    <!-- Local Controls -->
+                    <div id="local-controls" style="display:contents;">
+                        <div id="controls">
+                            <button id="repair-btn" disabled>Repair</button>
+                            <button id="extract-btn" style="background-color:#00d9ff;" disabled>Extract</button>
+                            <button id="archive-btn" class="secondary" disabled>Pack</button>
+                            <button id="upload-btn" class="purple-btn" disabled>Upload</button>
+                            <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
+                            <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
+                            <button id="rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
+                            <button id="inspect-btn" class="purple-btn" disabled>ℹ️ Info</button>
+                            <button id="delete-btn" class="danger" disabled>🗑️</button>
+                        </div>
+                    </div>
+
+                    <!-- Cloud Controls -->
+                    <div id="cloud-controls" style="display:none; width:100%;">
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button id="cloud-move-btn" class="warning-btn" disabled>➡️ Move</button>
+                            <button id="cloud-copy-btn" class="info-btn" disabled>📋 Copy</button>
+                            <button id="cloud-rename-btn" class="warning-btn" style="background-color:#e0af68;" disabled>✏️ Rename</button>
+                            <button id="cloud-delete-btn" class="danger" disabled>🗑️ Delete</button>
+                            <button id="download-btn" class="purple-btn" style="flex: 2;" disabled>☁️ Download to VPS</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- VIEW: QUEUE -->
+            <div id="view-queue" class="view-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="margin:0; border:none;">Job Queue</h2>
+                    <button class="secondary" onclick="fetchJobs()" style="flex:0;">Refresh</button>
+                </div>
+                <div id="job-queue-container">
+                    <!-- JS Injected -->
+                </div>
+            </div>
+
+            <!-- VIEW: LOGS -->
+            <div id="view-logs" class="view-section">
+                <h2 style="margin-top:0; border:none; margin-bottom:10px;">System Logs</h2>
+                <div id="console">Waiting for logs...</div>
+            </div>
+
+            <!-- VIEW: SETTINGS -->
+            <div id="view-settings" class="view-section">
+                <div class="settings-container">
+                    <h2 class="settings-header">Configuration</h2>
+
+                    <div class="form-group">
+                        <label>Discord Webhook URL</label>
+                        <input type="text" id="set-discord" placeholder="https://discord.com/api/webhooks/...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Telegram Bot Token</label>
+                        <input type="text" id="set-tg-token" placeholder="123456:ABC-DEF...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Telegram Chat ID</label>
+                        <input type="text" id="set-tg-chat" placeholder="123456789">
+                    </div>
+
+                    <div class="form-group" style="border-top:1px solid var(--border-color); padding-top:20px;">
+                        <label>Upload Rclone Config (rclone.conf)</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="file" id="config-file-input" style="background:none; border:none; padding:0; color:#a9b1d6;">
+                            <button id="upload-config-btn" class="purple-btn" style="flex:0; min-width:100px;">Upload</button>
+                        </div>
+                    </div>
+
+                    <div style="text-align:right; margin-top:30px;">
+                        <button id="save-set" class="secondary" style="width:200px;">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
+    <!-- Modals (Hidden by default) -->
     <!-- Archive Modal -->
     <div id="archive-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Create Archive (Pack)</h3>
-            </div>
-            <div class="form-group">
-                <label>Archive Name:</label>
-                <input type="text" id="arc-name" placeholder="Movie.Name">
-            </div>
-            <div class="form-group">
-                <label>Format:</label>
-                <select id="arc-fmt">
-                    <option value="rar" selected>RAR (Recommended)</option>
-                    <option value="7z">7-Zip</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Split Size:</label>
-                <select id="arc-size">
-                    <option value="100M">100 MB</option>
-                    <option value="200M">200 MB</option>
-                    <option value="300M">300 MB</option>
-                    <option value="400M">400 MB</option>
-                    <option value="500M">500 MB</option>
-                    <option value="600M">600 MB</option>
-                    <option value="700M">700 MB</option>
-                    <option value="800M">800 MB</option>
-                    <option value="900M">900 MB</option>
-                    <option value="1024M" selected>1 GB</option>
-                    <option value="1536M">1.5 GB</option>
-                    <option value="2048M">2 GB</option>
-                    <option value="2560M">2.5 GB</option>
-                    <option value="3072M">3 GB</option>
-                    <option value="3584M">3.5 GB</option>
-                    <option value="4096M">4 GB</option>
-                    <option value="4608M">4.5 GB</option>
-                    <option value="5120M">5 GB</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Password (Optional):</label>
-                <input type="text" id="arc-pass" placeholder="Leave empty for none">
-            </div>
-            <div class="form-group">
-                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
-                    <input type="checkbox" id="arc-par2" checked>
-                    Create PAR2 Recovery Files (Recommended)
-                </label>
-            </div>
-            <div class="form-group">
-                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
-                    <input type="checkbox" id="arc-upload">
-                    Upload to Cloud after Packing
-                </label>
-            </div>
-            <div id="arc-upload-opts" style="display:none; padding-left:20px; border-left: 2px solid #414868;">
-                <div class="form-group">
-                    <label>Remote:</label>
-                    <select id="arc-remote"></select>
-                </div>
-                <div class="form-group">
-                    <label>Upload Path:</label>
-                    <input type="text" id="arc-upload-path" placeholder="ParFix_Uploads/Archives/">
-                </div>
+            <div class="modal-header"><h3>Create Archive (Pack)</h3></div>
+            <div class="form-group"><label>Name:</label><input type="text" id="arc-name"></div>
+            <div class="form-group"><label>Format:</label><select id="arc-fmt"><option value="rar">RAR</option><option value="7z">7-Zip</option></select></div>
+            <div class="form-group"><label>Split:</label><select id="arc-size"><option value="100M">100M</option><option value="500M">500M</option><option value="1024M" selected>1GB</option><option value="2048M">2GB</option><option value="5120M">5GB</option></select></div>
+            <div class="form-group"><label>Pass:</label><input type="text" id="arc-pass"></div>
+            <div class="form-group"><label><input type="checkbox" id="arc-par2" checked> Create PAR2</label></div>
+            <div class="form-group"><label><input type="checkbox" id="arc-upload"> Upload after</label></div>
+            <div id="arc-upload-opts" style="display:none; padding-left:15px; border-left:2px solid var(--border-color);">
+                <div class="form-group"><label>Remote:</label><select id="arc-remote"></select></div>
+                <div class="form-group"><label>Path:</label><input type="text" id="arc-upload-path" placeholder="ParFix_Uploads/"></div>
             </div>
             <div class="modal-actions">
-                <button id="cancel-arc" style="background:#f7768e">Cancel</button>
-                <button id="start-arc" class="secondary">Start Packing</button>
+                <button id="cancel-arc" class="danger">Cancel</button>
+                <button id="start-arc" class="secondary">Pack</button>
             </div>
         </div>
     </div>
 
-    <!-- Manual Upload Modal -->
+    <!-- Upload Modal -->
     <div id="upload-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Manual Cloud Upload</h3>
-            </div>
-            <div class="form-group">
-                <label>Target Remote:</label>
-                <select id="up-remote"></select>
-            </div>
-            <div class="form-group">
-                <label>Remote Path:</label>
-                <input type="text" id="up-path" placeholder="ParFix_Uploads/">
-                <small style="color:#737aa2; display:block; margin-top:2px;">Files go here. Folders get a subfolder here.</small>
-            </div>
-            <div class="form-group">
-                <label>Parallel Transfers (Concurrency):</label>
-                <input type="number" id="up-transfers" value="4" min="1" max="16">
-            </div>
-            <div class="modal-actions">
-                <button id="cancel-up" style="background:#f7768e">Cancel</button>
-                <button id="start-up" class="secondary">Start Upload</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Settings (Notifications)</h3>
-            </div>
-            <div class="form-group">
-                <label>Discord Webhook URL:</label>
-                <input type="text" id="set-discord" placeholder="https://discord.com/api/webhooks/...">
-            </div>
-            <div class="form-group">
-                <label>Telegram Bot Token:</label>
-                <input type="text" id="set-tg-token" placeholder="123456:ABC-DEF...">
-            </div>
-            <div class="form-group">
-                <label>Telegram Chat ID:</label>
-                <input type="text" id="set-tg-chat" placeholder="123456789">
-            </div>
-            <div class="modal-actions">
-                <button id="cancel-set" style="background:#f7768e">Cancel</button>
-                <button id="save-set" class="secondary">Save Settings</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Move/Copy/Download Modal -->
-    <div id="move-copy-modal" class="modal">
-        <div class="modal-content" style="width: 500px;">
-            <div class="modal-header">
-                <h3 id="mc-title">Select Destination</h3>
-            </div>
-            <div class="form-group">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                    <label style="margin:0;">Destination Folder:</label>
-                    <button id="mc-new-folder-btn" class="icon-btn" style="padding: 2px 8px; font-size: 0.8em;" title="Create New Folder Here">📂+ New</button>
-                </div>
-                <div id="mc-browser" style="border: 1px solid #414868; height: 200px; overflow-y: auto; background: #15161e; padding: 5px; margin-bottom: 10px;">
-                    <!-- Folder list -->
-                </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <span style="color:#737aa2;">Current:</span>
-                    <strong id="mc-selected-path" style="color:#7aa2f7;">/</strong>
-                    <button id="mc-up-btn" class="icon-btn" style="padding: 2px 8px; min-width: 30px;">⬆️</button>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button id="cancel-mc" style="background:#f7768e">Cancel</button>
-                <button id="confirm-mc" class="secondary">Confirm Here</button>
-            </div>
+            <div class="modal-header"><h3>Manual Upload</h3></div>
+            <div class="form-group"><label>Remote:</label><select id="up-remote"></select></div>
+            <div class="form-group"><label>Path:</label><input type="text" id="up-path" placeholder="ParFix_Uploads/"></div>
+            <div class="form-group"><label>Transfers:</label><input type="number" id="up-transfers" value="4"></div>
+            <div class="modal-actions"><button id="cancel-up" class="danger">Cancel</button><button id="start-up" class="secondary">Start</button></div>
         </div>
     </div>
 
     <!-- Extract Modal -->
     <div id="extract-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Extract Archive</h3>
-            </div>
-            <div class="form-group">
-                <label>Method:</label>
-                <select id="ext-method">
-                    <option value="unrar" selected>UnRAR (Default)</option>
-                    <option value="7z">7-Zip</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Password (Optional):</label>
-                <input type="text" id="ext-pass" placeholder="Password if protected">
-            </div>
-            <div class="modal-actions">
-                <button id="cancel-ext" style="background:#f7768e">Cancel</button>
-                <button id="confirm-ext" class="secondary">Extract Here</button>
-            </div>
+            <div class="modal-header"><h3>Extract</h3></div>
+            <div class="form-group"><label>Method:</label><select id="ext-method"><option value="unrar">UnRAR</option><option value="7z">7-Zip</option></select></div>
+            <div class="form-group"><label>Password:</label><input type="text" id="ext-pass"></div>
+            <div class="modal-actions"><button id="cancel-ext" class="danger">Cancel</button><button id="confirm-ext" class="secondary">Extract</button></div>
         </div>
     </div>
 
-    <!-- Rename Modal -->
-    <div id="rename-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Rename Item</h3>
+    <!-- Move/Copy/Download Modal -->
+    <div id="move-copy-modal" class="modal">
+        <div class="modal-content" style="width: 500px;">
+            <div class="modal-header"><h3 id="mc-title">Select Destination</h3></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <label>Browser:</label>
+                <button id="mc-new-folder-btn" class="icon-btn" style="font-size:0.8em;">📂+</button>
             </div>
-            <div class="form-group">
-                <label>New Name:</label>
-                <input type="text" id="rename-input" placeholder="NewName.ext">
+            <div id="mc-browser" style="border:1px solid var(--border-color); height:200px; overflow-y:auto; background:#15161e; padding:5px; margin-bottom:10px;"></div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <strong id="mc-selected-path" style="color:var(--accent-color);">/</strong>
+                <button id="mc-up-btn" class="icon-btn">⬆️</button>
             </div>
-            <div class="modal-actions">
-                <button id="cancel-rename" style="background:#f7768e">Cancel</button>
-                <button id="confirm-rename" class="secondary">Rename</button>
-            </div>
+            <div class="modal-actions"><button id="cancel-mc" class="danger">Cancel</button><button id="confirm-mc" class="secondary">Confirm</button></div>
         </div>
     </div>
 
-    <!-- New Folder Modal -->
-    <div id="mkdir-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Create New Folder</h3>
-            </div>
-            <div class="form-group">
-                <label>Folder Name:</label>
-                <input type="text" id="mkdir-name" placeholder="New Folder">
-            </div>
-            <div class="modal-actions">
-                <button id="cancel-mkdir" style="background:#f7768e">Cancel</button>
-                <button id="confirm-mkdir" class="secondary">Create</button>
-            </div>
-        </div>
-    </div>
+    <!-- Rename/Mkdir/Inspect Modals -->
+    <div id="rename-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>Rename</h3></div><input type="text" id="rename-input" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-rename" class="danger">Cancel</button><button id="confirm-rename" class="secondary">Rename</button></div></div></div>
+    <div id="mkdir-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>New Folder</h3></div><input type="text" id="mkdir-name" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-mkdir" class="danger">Cancel</button><button id="confirm-mkdir" class="secondary">Create</button></div></div></div>
+    <div id="inspect-modal" class="modal"><div class="modal-content" style="width:600px;"><div class="modal-header"><h3>File Info</h3></div><div id="inspect-content" style="max-height:400px; overflow-y:auto;"></div><div class="modal-actions"><button id="close-inspect" class="secondary">Close</button></div></div></div>
+
+    <div id="toast-container"></div>
 
     <script>
-        let currentPath = '';
-        let selectedPaths = []; // Track selections
-        let expandedJobIds = new Set(); // Track expanded job cards
-        let browserMode = 'local'; // 'local' or 'cloud'
-        let currentRemote = ''; // Store selected remote name
+        // --- View Router ---
+        function switchView(viewName) {
+            // Hide all views
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(`view-${viewName}`).classList.add('active');
 
+            // Update Sidebar
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            // Find the item with correct click handler logic (simple matching)
+            const navItems = document.querySelectorAll('.nav-item');
+            if(viewName === 'files') navItems[0].classList.add('active');
+            if(viewName === 'queue') navItems[1].classList.add('active');
+            if(viewName === 'logs') navItems[2].classList.add('active');
+            if(viewName === 'settings') {
+                navItems[3].classList.add('active');
+                loadSettings(); // Auto-load
+            }
+        }
+
+        // --- Globals ---
+        let currentPath = '';
+        let selectedPaths = [];
+        let expandedJobIds = new Set();
+        let browserMode = 'local';
+        let currentRemote = '';
+        let mcAction = 'move';
+        let mcCurrentBrowserPath = '';
+        let mcContext = 'local';
+
+        // --- DOM Elements ---
         const fileList = document.getElementById('file-list');
         const breadcrumb = document.getElementById('current-path');
-
-        // Mode UI
-        const tabLocal = document.getElementById('tab-local');
-        const tabCloud = document.getElementById('tab-cloud');
-        const browserTitle = document.getElementById('browser-title');
+        const selectAllCheck = document.getElementById('select-all-check');
         const localControls = document.getElementById('local-controls');
         const cloudControls = document.getElementById('cloud-controls');
-        const downloadBtn = document.getElementById('download-btn');
 
         // Buttons
+        const tabLocal = document.getElementById('tab-local');
+        const tabCloud = document.getElementById('tab-cloud');
+        const newFolderBtn = document.getElementById('new-folder-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+
+        // Control Buttons
         const repairBtn = document.getElementById('repair-btn');
         const extractBtn = document.getElementById('extract-btn');
         const archiveBtn = document.getElementById('archive-btn');
@@ -683,115 +713,64 @@
         const moveBtn = document.getElementById('move-btn');
         const copyBtn = document.getElementById('copy-btn');
         const renameBtn = document.getElementById('rename-btn');
+        const inspectBtn = document.getElementById('inspect-btn');
         const deleteBtn = document.getElementById('delete-btn');
-        const settingsBtn = document.getElementById('settings-btn');
-        const newFolderBtn = document.getElementById('new-folder-btn');
-        const refreshBtn = document.getElementById('refresh-btn');
-        const selectAllCheck = document.getElementById('select-all-check');
 
-        const consoleDiv = document.getElementById('console');
-        const jobQueueContainer = document.getElementById('job-queue-container');
+        const cloudMoveBtn = document.getElementById('cloud-move-btn');
+        const cloudCopyBtn = document.getElementById('cloud-copy-btn');
+        const cloudRenameBtn = document.getElementById('cloud-rename-btn');
+        const cloudDeleteBtn = document.getElementById('cloud-delete-btn');
+        const downloadBtn = document.getElementById('download-btn');
 
-        // Archive Modal Elements
-        const modal = document.getElementById('archive-modal');
-        const startArcBtn = document.getElementById('start-arc');
-        const cancelArcBtn = document.getElementById('cancel-arc');
-        const arcNameInput = document.getElementById('arc-name');
-        const arcSizeInput = document.getElementById('arc-size');
-        const arcPassInput = document.getElementById('arc-pass');
-        const arcFmtInput = document.getElementById('arc-fmt');
-        const arcPar2Input = document.getElementById('arc-par2');
-        const arcUploadCheck = document.getElementById('arc-upload');
-        const arcUploadOpts = document.getElementById('arc-upload-opts');
-        const arcRemoteSelect = document.getElementById('arc-remote');
-        const arcUploadPath = document.getElementById('arc-upload-path');
-
-        // Upload Modal Elements
-        const upModal = document.getElementById('upload-modal');
-        const upRemoteSelect = document.getElementById('up-remote');
-        const upPathInput = document.getElementById('up-path');
-        const upTransfersInput = document.getElementById('up-transfers');
-        const startUpBtn = document.getElementById('start-up');
-        const cancelUpBtn = document.getElementById('cancel-up');
-
-        // Settings Modal Elements
-        const setModal = document.getElementById('settings-modal');
+        // Settings Elements
         const setDiscordInput = document.getElementById('set-discord');
         const setTgTokenInput = document.getElementById('set-tg-token');
         const setTgChatInput = document.getElementById('set-tg-chat');
         const saveSetBtn = document.getElementById('save-set');
-        const cancelSetBtn = document.getElementById('cancel-set');
+        const uploadConfigBtn = document.getElementById('upload-config-btn');
+        const configFileInput = document.getElementById('config-file-input');
 
-        // Move/Copy/Download Modal Elements
+        // Modals
+        const arcModal = document.getElementById('archive-modal');
+        const upModal = document.getElementById('upload-modal');
         const mcModal = document.getElementById('move-copy-modal');
-        const mcTitle = document.getElementById('mc-title');
-        const mcBrowser = document.getElementById('mc-browser');
-        const mcSelectedPath = document.getElementById('mc-selected-path');
-        const mcUpBtn = document.getElementById('mc-up-btn');
-        const mcNewFolderBtn = document.getElementById('mc-new-folder-btn');
-        const confirmMcBtn = document.getElementById('confirm-mc');
-        const cancelMcBtn = document.getElementById('cancel-mc');
-        let mcAction = 'move'; // 'move', 'copy', or 'download'
-        let mcCurrentBrowserPath = '';
-
-        // Rename Modal Elements
-        const renameModal = document.getElementById('rename-modal');
-        const renameInput = document.getElementById('rename-input');
-        const confirmRenameBtn = document.getElementById('confirm-rename');
-        const cancelRenameBtn = document.getElementById('cancel-rename');
-
-        // Mkdir Modal Elements
-        const mkdirModal = document.getElementById('mkdir-modal');
-        const mkdirNameInput = document.getElementById('mkdir-name');
-        const confirmMkdirBtn = document.getElementById('confirm-mkdir');
-        const cancelMkdirBtn = document.getElementById('cancel-mkdir');
-
-        // Extract Modal Elements
         const extModal = document.getElementById('extract-modal');
-        const extMethod = document.getElementById('ext-method');
-        const extPass = document.getElementById('ext-pass');
-        const confirmExtBtn = document.getElementById('confirm-ext');
-        const cancelExtBtn = document.getElementById('cancel-ext');
+        const renameModal = document.getElementById('rename-modal');
+        const mkdirModal = document.getElementById('mkdir-modal');
+        const inspectModal = document.getElementById('inspect-modal');
 
-        // Initial Load
+        // Inputs for modals
+        const arcNameInput = document.getElementById('arc-name');
+        const arcRemoteSelect = document.getElementById('arc-remote');
+        const upRemoteSelect = document.getElementById('up-remote');
+        const upPathInput = document.getElementById('up-path');
+        const renameInput = document.getElementById('rename-input');
+        const mkdirNameInput = document.getElementById('mkdir-name');
+
+        // --- Initialization ---
         loadPath('');
+        startStatsPoller();
         startJobPoller();
 
-        // --- Browser Mode Switcher ---
-        function switchBrowserMode(mode) {
-            browserMode = mode;
-            selectedPaths = [];
-            selectAllCheck.checked = false;
-
-            if (mode === 'local') {
-                tabLocal.classList.add('active');
-                tabLocal.style.borderBottom = '2px solid var(--accent-color)';
-                tabCloud.classList.remove('active');
-                tabCloud.style.borderBottom = '2px solid transparent';
-
-                browserTitle.textContent = "Local Files";
-                localControls.style.display = 'contents';
-                cloudControls.style.display = 'none';
-                newFolderBtn.style.display = 'inline-block';
-
-                loadPath(''); // Reset to local root
-            } else {
-                tabCloud.classList.add('active');
-                tabCloud.style.borderBottom = '2px solid var(--accent-color)';
-                tabLocal.classList.remove('active');
-                tabLocal.style.borderBottom = '2px solid transparent';
-
-                browserTitle.textContent = "Cloud Remotes";
-                localControls.style.display = 'none';
-                cloudControls.style.display = 'block';
-                newFolderBtn.style.display = 'none'; // Cannot create folder in remote root easily yet
-
-                loadRemotesList(); // Load root remotes
-            }
-            updateButtonState();
+        // --- Stats ---
+        function startStatsPoller() {
+            fetchStats();
+            setInterval(fetchStats, 5000);
+        }
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/system/stats');
+                const data = await res.json();
+                document.getElementById('stat-disk-bar').style.width = data.disk.percent + '%';
+                document.getElementById('stat-disk-text').textContent = data.disk.free_gb + 'GB Free';
+                document.getElementById('stat-ram-bar').style.width = data.ram + '%';
+                document.getElementById('stat-ram-text').textContent = data.ram + '%';
+                document.getElementById('stat-cpu-text').textContent = data.cpu + '%';
+            } catch(e) {}
         }
 
-        // Listen for logs
+        // --- Logs ---
+        const consoleDiv = document.getElementById('console');
         const evtSource = new EventSource("/api/logs");
         evtSource.onmessage = function(event) {
             const newLog = document.createElement('div');
@@ -800,83 +779,53 @@
             consoleDiv.scrollTop = consoleDiv.scrollHeight;
         };
 
-        // --- Tabs Logic ---
-        window.openTab = function(tabName, btn) {
-            // Hide all tab content
-            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-            // Remove active class from buttons
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        // --- Jobs ---
+        const jobQueueContainer = document.getElementById('job-queue-container');
+        const activeJobText = document.getElementById('active-job-text');
 
-            // Show selected tab
-            document.getElementById('tab-' + tabName).style.display = 'flex';
-            // Set active button
-            if(btn) btn.classList.add('active');
-        }
-        // Ensure default state
-        document.getElementById('tab-logs').style.display = 'flex';
-        document.getElementById('tab-queue').style.display = 'none';
-
-        // --- Job Queue Poller ---
         function startJobPoller() {
             fetchJobs();
             setInterval(fetchJobs, 2000);
         }
-
         async function fetchJobs() {
             try {
                 const res = await fetch('/api/jobs');
                 const data = await res.json();
                 renderJobQueue(data);
-            } catch (e) {
-                console.error("Failed to fetch jobs", e);
+                updateActiveJobWidget(data);
+            } catch (e) {}
+        }
+
+        function updateActiveJobWidget(data) {
+            if(data.current) {
+                activeJobText.textContent = `Running: ${data.current.name}`;
+                activeJobText.style.color = 'var(--accent-color)';
+            } else if (data.pending && data.pending.length > 0) {
+                activeJobText.textContent = `${data.pending.length} Jobs Queued`;
+                activeJobText.style.color = 'var(--text-muted)';
+            } else {
+                activeJobText.textContent = "Idle";
+                activeJobText.style.color = 'var(--text-muted)';
             }
         }
 
         function renderJobQueue(data) {
             jobQueueContainer.innerHTML = '';
 
-            // Current Job
             if (data.current) {
-                const section = document.createElement('div');
-                section.className = 'job-section';
-                section.innerHTML = '<h3>Currently Running</h3>';
-
-                const card = createJobCard(data.current, 'running');
-                section.appendChild(card);
-                jobQueueContainer.appendChild(section);
+                jobQueueContainer.innerHTML += '<h3>Running</h3>';
+                jobQueueContainer.appendChild(createJobCard(data.current, 'running'));
             }
-
-            // Pending Jobs
             if (data.pending && data.pending.length > 0) {
-                const section = document.createElement('div');
-                section.className = 'job-section';
-                section.innerHTML = `<h3>Pending Jobs (${data.pending.length})</h3>`;
-
-                data.pending.forEach(job => {
-                    const card = createJobCard(job, 'queued');
-                    section.appendChild(card);
-                });
-                jobQueueContainer.appendChild(section);
+                jobQueueContainer.innerHTML += '<h3>Pending</h3>';
+                data.pending.forEach(j => jobQueueContainer.appendChild(createJobCard(j, 'queued')));
             }
-
-            // History
             if (data.history && data.history.length > 0) {
-                const section = document.createElement('div');
-                section.className = 'job-section';
-                section.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #414868; padding-bottom: 5px;">
-                    <h3 style="border:none; padding:0; margin:0;">Job History</h3>
-                    <button class="icon-btn" onclick="clearHistory()" style="padding: 2px 8px; font-size:0.8em; min-width:auto;">Clear</button>
-                </div>`;
-
-                data.history.forEach(job => {
-                    const card = createJobCard(job, job.status || 'completed');
-                    section.appendChild(card);
-                });
-                jobQueueContainer.appendChild(section);
+                jobQueueContainer.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;border-bottom:1px solid #414868;padding-bottom:5px;"><h3>History</h3><button class="icon-btn" onclick="clearHistory()">Clear</button></div>`;
+                data.history.forEach(j => jobQueueContainer.appendChild(createJobCard(j, j.status || 'completed')));
             }
-
             if (!data.current && (!data.pending || data.pending.length === 0) && (!data.history || data.history.length === 0)) {
-                jobQueueContainer.innerHTML = '<div style="color: #565f89; text-align: center; margin-top: 50px;">No jobs running or queued.</div>';
+                jobQueueContainer.innerHTML = '<div style="text-align:center;color:var(--text-muted);margin-top:50px;">Queue is empty</div>';
             }
         }
 
@@ -884,273 +833,146 @@
             const card = document.createElement('div');
             card.className = `job-card ${status}`;
 
-            // Header Section
-            const header = document.createElement('div');
-            header.className = 'job-header';
+            let statusText = status.toUpperCase();
+            if(status==='running') statusText = 'RUNNING...';
 
-            const info = document.createElement('div');
-            info.className = 'job-info';
+            card.innerHTML = `
+                <div class="job-header">
+                    <div>
+                        <span class="job-name">${job.name}</span>
+                        <span class="job-meta">${statusText}</span>
+                    </div>
+                    ${(status==='running'||status==='queued') ? `<button class="btn-cancel" onclick="cancelJob('${job.id}', event)">Cancel</button>` : ''}
+                </div>
+                <div class="job-details" id="details-${job.id}">${renderJobDetails(job.details)}</div>
+            `;
 
-            const name = document.createElement('span');
-            name.className = 'job-name';
-            name.textContent = job.name;
+            if(expandedJobIds.has(job.id)) card.querySelector('.job-details').classList.add('expanded');
 
-            const meta = document.createElement('div');
-            meta.className = 'job-meta';
-
-            let statusText = status.charAt(0).toUpperCase() + status.slice(1);
-            if (status === 'running') statusText += ' (Click for details)';
-            else if (status !== 'queued') statusText += ' (Click for reason)';
-
-            meta.textContent = `Status: ${statusText}`;
-
-            info.appendChild(name);
-            info.appendChild(meta);
-
-            header.appendChild(info);
-
-            // Add Cancel button only for running or queued jobs
-            if (status === 'running' || status === 'queued') {
-                const cancelBtn = document.createElement('button');
-                cancelBtn.className = 'btn-cancel';
-                cancelBtn.textContent = 'Cancel';
-                cancelBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    cancelJob(job.id);
-                };
-                header.appendChild(cancelBtn);
-            }
-
-            card.appendChild(header);
-
-            // Details Section
-            const detailsDiv = document.createElement('div');
-            detailsDiv.className = 'job-details';
-            detailsDiv.id = `details-${job.id}`;
-
-            // Restore expanded state
-            if (expandedJobIds.has(job.id)) {
-                detailsDiv.classList.add('expanded');
-            }
-
-            // Populate details if available
-            if (job.details) {
-                // Special handling for 'targets' list
-                const detailsCopy = {...job.details};
-                let targetList = null;
-                if (detailsCopy.targets) {
-                    targetList = detailsCopy.targets;
-                    delete detailsCopy.targets;
-                }
-
-                for (const [key, value] of Object.entries(detailsCopy)) {
-                    // Format key for display (e.g., current_item -> Current Item)
-                    const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-                    const row = document.createElement('div');
-                    row.className = 'detail-row';
-                    // Highlight error if present
-                    if (key === 'error') {
-                        row.innerHTML = `<span class="detail-key" style="color:var(--error-color)">Error:</span> <span class="detail-val" style="color:#f7768e">${value}</span>`;
-                    } else {
-                        row.innerHTML = `<span class="detail-key">${displayKey}:</span> <span class="detail-val">${value}</span>`;
-                    }
-                    detailsDiv.appendChild(row);
-                }
-
-                // Render Targets List if present
-                if (targetList && Array.isArray(targetList)) {
-                     const row = document.createElement('div');
-                     row.style.marginTop = "8px";
-                     row.innerHTML = `<strong style="color:#737aa2; display:block; margin-bottom:4px;">Target Files (${targetList.length}):</strong>`;
-
-                     const ul = document.createElement('ul');
-                     ul.style.margin = "0";
-                     ul.style.paddingLeft = "20px";
-                     ul.style.color = "#a9b1d6";
-                     ul.style.maxHeight = "150px";
-                     ul.style.overflowY = "auto";
-
-                     targetList.forEach(t => {
-                         const li = document.createElement('li');
-                         li.textContent = t;
-                         ul.appendChild(li);
-                     });
-                     row.appendChild(ul);
-                     detailsDiv.appendChild(row);
-                }
-
-                // If both detailsCopy and targetList are empty/null, show default message
-                if (Object.keys(detailsCopy).length === 0 && (!targetList || targetList.length === 0)) {
-                    detailsDiv.textContent = "No additional details.";
-                }
-
-            } else {
-                detailsDiv.textContent = "No additional details.";
-            }
-
-            card.appendChild(detailsDiv);
-
-            // Toggle Expand
-            card.onclick = () => {
-                const isExpanded = detailsDiv.classList.contains('expanded');
-                if (isExpanded) {
-                    detailsDiv.classList.remove('expanded');
+            card.onclick = (e) => {
+                if(e.target.tagName === 'BUTTON') return;
+                const det = card.querySelector('.job-details');
+                if(det.classList.contains('expanded')) {
+                    det.classList.remove('expanded');
                     expandedJobIds.delete(job.id);
                 } else {
-                    detailsDiv.classList.add('expanded');
+                    det.classList.add('expanded');
                     expandedJobIds.add(job.id);
                 }
             };
-
             return card;
         }
 
-        async function clearHistory() {
-            if(!confirm("Clear job history?")) return;
-            await fetch('/api/jobs/history/clear', { method: 'POST' });
-            fetchJobs();
+        function renderJobDetails(details) {
+            if(!details) return 'No details.';
+            let html = '';
+            // Render basic keys
+            for(const [k,v] of Object.entries(details)) {
+                if(k==='targets') continue;
+                html += `<div><strong>${k}:</strong> ${v}</div>`;
+            }
+            // Render targets
+            if(details.targets && Array.isArray(details.targets)) {
+                html += `<div style="margin-top:5px;"><strong>Files:</strong><ul style="margin:0;padding-left:20px;max-height:100px;overflow-y:auto;">${details.targets.map(t=>`<li>${t}</li>`).join('')}</ul></div>`;
+            }
+            return html || 'No details.';
         }
 
-        async function cancelJob(jobId) {
-            if(!confirm("Are you sure you want to cancel this job?")) return;
-            try {
-                const res = await fetch(`/api/jobs/cancel/${jobId}`, { method: 'POST' });
-                if (res.ok) {
-                    showToast("Job cancelled", "success");
-                    fetchJobs(); // Update immediately
-                } else {
-                    showToast("Failed to cancel job", "error");
-                }
-            } catch (e) {
-                showToast("Request failed", "error");
+        async function cancelJob(id, e) {
+            if(e) e.stopPropagation();
+            if(confirm("Cancel Job?")) {
+                await fetch(`/api/jobs/cancel/${id}`, {method:'POST'});
+                fetchJobs();
+            }
+        }
+        async function clearHistory() {
+            if(confirm("Clear History?")) {
+                await fetch('/api/jobs/history/clear', {method:'POST'});
+                fetchJobs();
             }
         }
 
+        // --- Browser Logic ---
+        function switchBrowserMode(mode) {
+            browserMode = mode;
+            selectedPaths = [];
+            selectAllCheck.checked = false;
 
-        // Toast Notification Function
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-
-            container.appendChild(toast);
-
-            // Trigger animation
-            setTimeout(() => toast.classList.add('show'), 10);
-
-            // Auto remove
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
+            if(mode === 'local') {
+                tabLocal.classList.add('active');
+                tabCloud.classList.remove('active');
+                localControls.style.display = 'contents';
+                cloudControls.style.display = 'none';
+                loadPath('');
+            } else {
+                tabCloud.classList.add('active');
+                tabLocal.classList.remove('active');
+                localControls.style.display = 'none';
+                cloudControls.style.display = 'block';
+                loadRemotesList();
+            }
+            updateButtonState();
         }
 
         async function loadPath(path) {
-            // Decider: Local or Cloud?
-            if (browserMode === 'local') {
-                await loadLocalPath(path);
-            } else {
-                await loadCloudPath(path);
-            }
+            if(browserMode==='local') loadLocalPath(path);
+            else loadCloudPath(path);
         }
 
         async function loadLocalPath(path) {
             try {
-                fileList.innerHTML = '<div style="color:#737aa2; text-align:center; padding:20px;">Loading...</div>';
-                const response = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
-                const data = await response.json();
-
-                if (data.error) {
-                    showToast(data.error, 'error');
-                    fileList.innerHTML = '';
-                    return;
-                }
+                fileList.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Loading...</div>';
+                const res = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
+                const data = await res.json();
+                if(data.error) throw new Error(data.error);
 
                 currentPath = data.current_path;
-                selectedPaths = [];
-                selectAllCheck.checked = false;
-                updateButtonState();
-
                 renderBreadcrumb(currentPath, 'local');
                 renderFiles(data.items, data.parent_path);
-
-            } catch (err) {
-                console.error('Failed to load local path', err);
-                fileList.innerHTML = '<div style="color:var(--error-color); text-align:center;">Failed to load.</div>';
-            }
+            } catch(e) { showToast(e.message, 'error'); }
         }
 
         async function loadRemotesList() {
             try {
-                fileList.innerHTML = '<div style="color:#737aa2; text-align:center; padding:20px;">Loading Remotes...</div>';
+                fileList.innerHTML = '<div style="padding:20px;text-align:center;">Loading Remotes...</div>';
                 const res = await fetch('/api/remotes');
                 const remotes = await res.json();
 
-                currentPath = ''; // Root level of remotes
-                currentRemote = '';
-                selectedPaths = [];
-                selectAllCheck.checked = false;
-                updateButtonState();
-
-                breadcrumb.innerHTML = '<span style="color:var(--accent-color); font-weight:bold;">Cloud Remotes</span>';
+                currentPath = ''; currentRemote = '';
+                breadcrumb.innerHTML = '<span style="color:var(--accent-color);">Cloud Remotes</span>';
 
                 fileList.innerHTML = '';
                 remotes.forEach(r => {
                     const li = document.createElement('li');
                     li.className = 'file-item';
-                    li.onclick = () => loadCloudPath('', r); // Click to enter remote root
-
-                    li.innerHTML = `
-                        <span class="icon" style="color:#bb9af7">☁️</span>
-                        <span>${r}</span>
-                    `;
+                    li.innerHTML = `<span class="icon" style="color:#bb9af7">☁️</span> ${r}`;
+                    li.onclick = () => loadCloudPath('', r);
                     fileList.appendChild(li);
                 });
-
-            } catch (e) {
-                showToast("Failed to list remotes", "error");
-            }
+            } catch(e) { showToast('Error loading remotes', 'error'); }
         }
 
         async function loadCloudPath(path, remoteOverride=null) {
-            if (remoteOverride) currentRemote = remoteOverride;
-            if (!currentRemote) { loadRemotesList(); return; }
+            if(remoteOverride) currentRemote = remoteOverride;
+            if(!currentRemote) { loadRemotesList(); return; }
 
             try {
-                fileList.innerHTML = '<div style="color:#737aa2; text-align:center; padding:20px;">Loading Cloud Files...</div>';
+                fileList.innerHTML = '<div style="padding:20px;text-align:center;">Loading Cloud...</div>';
                 const res = await fetch(`/api/rclone/list?remote=${encodeURIComponent(currentRemote)}&path=${encodeURIComponent(path)}`);
                 const data = await res.json();
-
-                if (data.error) {
-                    showToast(data.error, 'error');
-                    fileList.innerHTML = '';
-                    return;
-                }
+                if(data.error) throw new Error(data.error);
 
                 currentPath = data.current_path;
-                selectedPaths = [];
-                selectAllCheck.checked = false;
-                updateButtonState();
-
                 renderBreadcrumb(currentPath, 'cloud');
 
-                // For cloud, parent handling is tricky if at root.
-                // data.parent_path handles subfolders. If at root of remote, we want link back to Remotes List.
-
                 fileList.innerHTML = '';
-
-                if (currentPath === '') {
-                    // We are at root of remote. Back button goes to Remotes List.
-                    const li = document.createElement('li');
-                    li.className = 'file-item';
-                    li.innerHTML = '<span class="icon dir-icon">📁</span> .. (Remotes List)';
+                if(currentPath==='') {
+                    const li = document.createElement('li'); li.className='file-item';
+                    li.innerHTML = '<span class="icon dir-icon">📁</span> .. (Remotes)';
                     li.onclick = () => loadRemotesList();
                     fileList.appendChild(li);
-                } else if (data.parent_path !== null) {
-                    const li = document.createElement('li');
-                    li.className = 'file-item';
+                } else if(data.parent_path !== null) {
+                    const li = document.createElement('li'); li.className='file-item';
                     li.innerHTML = '<span class="icon dir-icon">📁</span> ..';
                     li.onclick = () => loadCloudPath(data.parent_path);
                     fileList.appendChild(li);
@@ -1160,754 +982,411 @@
                     const li = document.createElement('li');
                     li.className = 'file-item';
 
-                    // Checkbox
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.dataset.path = item.path; // Store relative path
-                    checkbox.onclick = (e) => {
-                        e.stopPropagation();
-                        toggleSelection(item.path, checkbox.checked);
-                    };
+                    const cb = document.createElement('input'); cb.type='checkbox';
+                    cb.dataset.path = item.path;
+                    cb.onclick = (e) => { e.stopPropagation(); toggleSelection(item.path, cb.checked); };
 
                     let icon = item.is_dir ? '📁' : '📄';
-                    let iconClass = item.is_dir ? 'dir-icon' : 'file-icon';
+                    let cls = item.is_dir ? 'dir-icon' : 'file-icon';
+                    if(!item.is_dir && /\.(mkv|mp4|avi)$/i.test(item.name)) icon = '🎬';
+                    if(!item.is_dir && item.name.endsWith('.par2')) { icon='🔧'; cls='par2-icon'; }
 
-                    if (item.name.toLowerCase().endsWith('.mkv') || item.name.toLowerCase().endsWith('.mp4')) icon = '🎬';
+                    li.innerHTML = `<span class="${cls} icon">${icon}</span> <span>${item.name}</span>`;
+                    li.prepend(cb);
 
-                    const span = document.createElement('span');
-                    span.className = `icon ${iconClass}`;
-                    span.textContent = icon;
-
-                    const nameSpan = document.createElement('span');
-                    nameSpan.textContent = item.name;
-
-                    // Size badge
-                    if (!item.is_dir && item.size) {
-                        const sizeSpan = document.createElement('span');
-                        sizeSpan.style.marginLeft = 'auto';
-                        sizeSpan.style.color = '#565f89';
-                        sizeSpan.style.fontSize = '0.8em';
-                        sizeSpan.textContent = formatBytes(item.size);
-                        li.appendChild(checkbox);
-                        li.appendChild(span);
-                        li.appendChild(nameSpan);
-                        li.appendChild(sizeSpan);
-                    } else {
-                        li.appendChild(checkbox);
-                        li.appendChild(span);
-                        li.appendChild(nameSpan);
+                    if(item.size) {
+                        const sz = document.createElement('span');
+                        sz.style.marginLeft='auto'; sz.style.fontSize='0.8em'; sz.style.color='var(--text-muted)';
+                        sz.textContent = formatBytes(item.size);
+                        li.appendChild(sz);
                     }
 
-                    if (item.is_dir) {
-                        li.onclick = (e) => {
-                            if (e.target !== checkbox) loadCloudPath(item.path);
-                        };
-                    }
+                    if(item.is_dir) li.onclick = (e) => { if(e.target!==cb) loadCloudPath(item.path); };
 
                     fileList.appendChild(li);
                 });
-
-            } catch (e) {
-                console.error(e);
-                showToast("Failed to load cloud path", "error");
-            }
-        }
-
-        async function loadRemotes() {
-            try {
-                const res = await fetch('/api/remotes');
-                const remotes = await res.json();
-
-                // Populate both dropdowns
-                [arcRemoteSelect, upRemoteSelect].forEach(select => {
-                    select.innerHTML = '';
-                    remotes.forEach(r => {
-                        const opt = document.createElement('option');
-                        opt.value = r;
-                        opt.textContent = r;
-                        select.appendChild(opt);
-                    });
-                });
-            } catch (err) {
-                console.error("Failed to load remotes", err);
-            }
-        }
-
-        async function loadSettings() {
-            try {
-                const res = await fetch('/api/settings');
-                const data = await res.json();
-                setDiscordInput.value = data.discord_webhook || '';
-                setTgTokenInput.value = data.telegram_token || '';
-                setTgChatInput.value = data.telegram_chat_id || '';
-            } catch (err) {
-                console.error("Failed to load settings", err);
-            }
+            } catch(e) { showToast(e.message, 'error'); }
         }
 
         function renderBreadcrumb(path, mode) {
             breadcrumb.innerHTML = '';
-
-            if (mode === 'local') {
-                const rootSpan = document.createElement('span');
-                rootSpan.textContent = 'ROOT / ';
-                rootSpan.onclick = () => loadPath('');
-                breadcrumb.appendChild(rootSpan);
+            if(mode==='local') {
+                breadcrumb.innerHTML = '<span onclick="loadPath(\'\')">ROOT</span> / ';
             } else {
-                // Cloud mode
-                const rootSpan = document.createElement('span');
-                rootSpan.textContent = 'REMOTES';
-                rootSpan.onclick = () => loadRemotesList();
-                breadcrumb.appendChild(rootSpan);
-
-                const sep1 = document.createElement('span');
-                sep1.textContent = ' / ';
-                breadcrumb.appendChild(sep1);
-
-                const remoteSpan = document.createElement('span');
-                remoteSpan.textContent = currentRemote + ' / ';
-                remoteSpan.onclick = () => loadCloudPath('');
-                breadcrumb.appendChild(remoteSpan);
+                breadcrumb.innerHTML = '<span onclick="loadRemotesList()">REMOTES</span> / <span onclick="loadCloudPath(\'\')">'+currentRemote+'</span> / ';
             }
-
             const parts = path.split('/').filter(Boolean);
-            let accumulated = '';
-
-            parts.forEach((part, index) => {
-                accumulated += (accumulated ? '/' : '') + part;
-                const span = document.createElement('span');
-                span.textContent = part + (index < parts.length - 1 ? ' / ' : '');
-                const target = accumulated; // closure capture
-                span.onclick = () => loadPath(target); // loadPath dispatches based on mode
-                breadcrumb.appendChild(span);
+            let acc = '';
+            parts.forEach((p,i) => {
+                acc += (acc?'/':'')+p;
+                const sp = document.createElement('span');
+                sp.textContent = p + (i<parts.length-1 ? ' / ' : '');
+                const target = acc;
+                sp.onclick = () => loadPath(target);
+                breadcrumb.appendChild(sp);
             });
-        }
-
-        function formatBytes(bytes, decimals = 2) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const dm = decimals < 0 ? 0 : decimals;
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
         function renderFiles(items, parentPath) {
             fileList.innerHTML = '';
-
-            // Parent link
-            if (parentPath !== null) {
-                const li = document.createElement('li');
-                li.className = 'file-item';
+            if(parentPath!==null) {
+                const li = document.createElement('li'); li.className='file-item';
                 li.innerHTML = '<span class="icon dir-icon">📁</span> ..';
                 li.onclick = () => loadPath(parentPath);
                 fileList.appendChild(li);
             }
-
             items.forEach(item => {
-                const li = document.createElement('li');
-                li.className = 'file-item';
+                const li = document.createElement('li'); li.className='file-item';
+                const cb = document.createElement('input'); cb.type='checkbox';
+                cb.dataset.path = item.path;
+                cb.onclick = (e) => { e.stopPropagation(); toggleSelection(item.path, cb.checked); };
 
-                // Checkbox
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.dataset.path = item.path; // Store path for Select All
-                checkbox.onclick = (e) => {
-                    e.stopPropagation();
-                    toggleSelection(item.path, checkbox.checked);
-                };
+                let icon = item.is_dir ? '📁' : '📄';
+                let cls = item.is_dir ? 'dir-icon' : 'file-icon';
+                if(!item.is_dir && item.name.endsWith('.par2')) { icon='🔧'; cls='par2-icon'; }
 
-                let icon = '📄';
-                let iconClass = 'file-icon';
+                li.innerHTML = `<span class="${cls} icon">${icon}</span> <span>${item.name}</span>`;
+                li.prepend(cb);
 
-                const span = document.createElement('span');
-                span.className = `icon ${iconClass}`;
-
-                if (item.is_dir) {
-                    icon = '📁';
-                    span.className = `icon dir-icon`;
-                    // Clicking the row (not checkbox) navigates
-                    li.onclick = (e) => {
-                        if (e.target !== checkbox) loadPath(item.path);
-                    };
-                } else {
-                    if (item.name.endsWith('.par2')) {
-                        icon = '🔧';
-                        span.className = `icon par2-icon`;
-                    } else if (item.name.endsWith('.rar')) {
-                        icon = '📦';
-                    }
-                }
-                span.textContent = icon;
-
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = item.name;
-
-                li.appendChild(checkbox);
-                li.appendChild(span);
-                li.appendChild(nameSpan);
+                if(item.is_dir) li.onclick = (e) => { if(e.target!==cb) loadPath(item.path); };
                 fileList.appendChild(li);
             });
         }
 
         function toggleSelection(path, checked) {
-            if (checked) {
-                selectedPaths.push(path);
-            } else {
-                selectedPaths = selectedPaths.filter(p => p !== path);
-                selectAllCheck.checked = false; // Uncheck master if any item is unchecked
-            }
+            if(checked) selectedPaths.push(path);
+            else selectedPaths = selectedPaths.filter(p=>p!==path);
             updateButtonState();
         }
 
-        // --- Refresh Logic ---
-        refreshBtn.onclick = () => {
-            if (browserMode === 'local') loadLocalPath(currentPath);
-            else {
-                if (currentRemote) loadCloudPath(currentPath);
-                else loadRemotesList();
-            }
-        };
-
-        // --- Download Logic ---
-        downloadBtn.onclick = async () => {
-            if (!selectedPaths.length) return;
-
-            if(!confirm(`Download ${selectedPaths.length} items from ${currentRemote} to VPS Download Folder?`)) return;
-
-            downloadBtn.disabled = true;
-            try {
-                const res = await fetch('/api/rclone/download', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        remote: currentRemote,
-                        paths: selectedPaths,
-                        transfers: 4 // default
-                    })
-                });
-                const data = await res.json();
-                if (data.status === 'queued') {
-                    showToast("Download Queued", "success");
-                } else {
-                    showToast("Error: " + data.error, "error");
-                }
-            } catch (e) {
-                showToast("Request failed", "error");
-            }
-            // Reset button state is handled by user action or page refresh mostly, but let's re-enable after timeout
-            setTimeout(() => updateButtonState(), 2000);
-        };
-
-        // --- Select All Logic ---
         selectAllCheck.onclick = () => {
-            const isChecked = selectAllCheck.checked;
-            const checkboxes = fileList.querySelectorAll('input[type="checkbox"]');
-
-            selectedPaths = []; // Reset and rebuild
-
-            checkboxes.forEach(cb => {
-                cb.checked = isChecked;
-                if (isChecked) {
-                    if (cb.dataset.path) {
-                        selectedPaths.push(cb.dataset.path);
-                    }
+            const checked = selectAllCheck.checked;
+            fileList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.checked = checked;
+                if(checked && cb.dataset.path) {
+                    if(!selectedPaths.includes(cb.dataset.path)) selectedPaths.push(cb.dataset.path);
                 }
             });
+            if(!checked) selectedPaths = [];
             updateButtonState();
         };
 
         function updateButtonState() {
-            const count = selectedPaths.length;
-            const hasSelection = count > 0;
+            const has = selectedPaths.length > 0;
+            const single = selectedPaths.length === 1;
 
-            if (browserMode === 'local') {
-                deleteBtn.disabled = !hasSelection;
-                uploadBtn.disabled = !hasSelection;
-                moveBtn.disabled = !hasSelection;
-                copyBtn.disabled = !hasSelection;
-                repairBtn.disabled = count !== 1;
-                archiveBtn.disabled = count !== 1;
-                renameBtn.disabled = count !== 1;
-                extractBtn.disabled = count !== 1;
+            if(browserMode === 'local') {
+                newFolderBtn.disabled = false;
+                repairBtn.disabled = !single;
+                extractBtn.disabled = !single;
+                archiveBtn.disabled = !single;
+                renameBtn.disabled = !single;
+                inspectBtn.disabled = !single;
+                uploadBtn.disabled = !has;
+                moveBtn.disabled = !has;
+                copyBtn.disabled = !has;
+                deleteBtn.disabled = !has;
             } else {
-                // Cloud Mode
-                downloadBtn.disabled = !hasSelection;
-                downloadBtn.textContent = hasSelection ? `☁️ Download ${count} Item${count > 1 ? 's' : ''} to VPS` : '☁️ Download to VPS';
+                newFolderBtn.disabled = !currentRemote;
+                downloadBtn.disabled = !has;
+                cloudMoveBtn.disabled = !has;
+                cloudCopyBtn.disabled = !has;
+                cloudDeleteBtn.disabled = !has;
+                cloudRenameBtn.disabled = !single;
             }
         }
+
+        // --- Action Handlers ---
+        refreshBtn.onclick = () => loadPath(currentPath);
 
         repairBtn.onclick = async () => {
-            const target = selectedPaths[0]; // Logic works on selection now
-            if (!target) return;
-
-            if (!confirm(`Are you sure you want to run repair in:\n${target}?`)) return;
-
-            repairBtn.disabled = true;
-            repairBtn.textContent = "Starting...";
-
-            try {
-                const res = await fetch('/api/repair', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ path: target })
-                });
-                const data = await res.json();
-                if (data.status === 'queued' || data.status === 'started') {
-                     showToast("Repair job queued", "success");
-                     repairBtn.textContent = "Queued";
-                     setTimeout(() => repairBtn.textContent = "Repair", 2000);
-                } else {
-                    showToast('Error: ' + data.error, 'error');
-                    repairBtn.disabled = false;
-                    repairBtn.textContent = "Repair";
-                }
-            } catch (err) {
-                showToast('Request failed', 'error');
-                repairBtn.disabled = false;
-                repairBtn.textContent = "Repair";
-            }
+             if(confirm(`Repair ${selectedPaths[0]}?`)) {
+                 await fetch('/api/repair', {
+                     method: 'POST',
+                     headers:{'Content-Type':'application/json'},
+                     body: JSON.stringify({path: selectedPaths[0]})
+                 });
+                 showToast('Repair Queued', 'success');
+             }
         };
 
-        // --- Archive Modal Logic ---
-        archiveBtn.onclick = () => {
-            loadRemotes();
-            const target = selectedPaths[0]; // Assume single selection for packing
-            if (!target) return;
-
-            const parts = target.split('/');
-            const defaultName = parts[parts.length-1] || 'Archive';
-            arcNameInput.value = defaultName;
-
-            // Smart Default Path
-            arcUploadPath.value = `ParFix_Uploads/Archives/${defaultName}/`;
-
-            modal.style.display = "block";
+        // Archive
+        archiveBtn.onclick = async () => {
+            loadRemotesSelect(arcRemoteSelect);
+            arcNameInput.value = selectedPaths[0].split('/').pop();
+            arcModal.style.display = 'block';
+        };
+        document.getElementById('start-arc').onclick = async () => {
+             arcModal.style.display = 'none';
+             await fetch('/api/archive', {
+                 method:'POST',
+                 headers:{'Content-Type':'application/json'},
+                 body: JSON.stringify({
+                     path: selectedPaths[0],
+                     name: arcNameInput.value,
+                     split_size: document.getElementById('arc-size').value,
+                     password: document.getElementById('arc-pass').value,
+                     format: document.getElementById('arc-fmt').value,
+                     create_par2: document.getElementById('arc-par2').checked,
+                     upload: document.getElementById('arc-upload').checked,
+                     remote: arcRemoteSelect.value,
+                     upload_path: document.getElementById('arc-upload-path').value
+                 })
+             });
+             showToast('Pack Queued', 'success');
+        };
+        document.getElementById('arc-upload').onchange = (e) => {
+            document.getElementById('arc-upload-opts').style.display = e.target.checked ? 'block' : 'none';
         };
 
-        cancelArcBtn.onclick = () => modal.style.display = "none";
-
-        arcUploadCheck.onchange = () => {
-            arcUploadOpts.style.display = arcUploadCheck.checked ? 'block' : 'none';
-        };
-
-        startArcBtn.onclick = async () => {
-            const target = selectedPaths[0]; // Assume single selection
-            const name = arcNameInput.value;
-            const size = arcSizeInput.value;
-            const password = arcPassInput.value;
-            const fmt = arcFmtInput.value;
-            const createPar2 = arcPar2Input.checked;
-            const upload = arcUploadCheck.checked;
-            const remote = arcRemoteSelect.value;
-            const upPath = arcUploadPath.value;
-
-            if (!name) { alert("Name is required"); return; }
-            if (upload && !remote) { alert("Select a remote for upload"); return; }
-
-            modal.style.display = "none";
-            archiveBtn.disabled = true;
-            archiveBtn.textContent = "Packing...";
-
-            try {
-                const res = await fetch('/api/archive', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        path: target,
-                        name: name,
-                        split_size: size,
-                        password: password,
-                        format: fmt,
-                        create_par2: createPar2,
-                        upload: upload,
-                        remote: remote,
-                        upload_path: upPath
-                    })
-                });
-                const data = await res.json();
-
-                if (data.status === 'queued' || data.status === 'started') {
-                     showToast("Archive job queued", "success");
-                } else {
-                    showToast('Error: ' + data.error, 'error');
-                    archiveBtn.disabled = false;
-                    archiveBtn.textContent = "Create Archive";
-                }
-            } catch (err) {
-                showToast('Request failed', 'error');
-                archiveBtn.disabled = false;
-                archiveBtn.textContent = "Create Archive";
-            }
-        };
-
-        // --- Manual Upload Logic ---
-        uploadBtn.onclick = () => {
-            loadRemotes();
-
-            // FIXED: Always default to base upload folder as requested
-            let defaultPath = "ParFix_Uploads/";
-
-            upPathInput.value = defaultPath;
-            upModal.style.display = "block";
-        };
-
-        cancelUpBtn.onclick = () => upModal.style.display = "none";
-
-        startUpBtn.onclick = async () => {
-            const remote = upRemoteSelect.value;
-            const path = upPathInput.value;
-            const transfers = upTransfersInput.value;
-
-            if (!remote) { showToast("Select remote", "error"); return; }
-
-            upModal.style.display = "none";
-            try {
-                const res = await fetch('/api/upload', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        paths: selectedPaths,
-                        remote: remote,
-                        upload_path: path,
-                        transfers: transfers
-                    })
-                });
-                const data = await res.json();
-                if (data.status === 'queued') showToast("Upload queued", "success");
-            } catch (e) { showToast("Upload request failed", "error"); }
-        };
-
-        // --- Delete Logic ---
-        deleteBtn.onclick = async () => {
-            if (selectedPaths.length === 0) return;
-
-            if (!confirm(`Are you sure you want to PERMANENTLY DELETE ${selectedPaths.length} items?`)) return;
-
-            deleteBtn.disabled = true;
-            try {
-                const res = await fetch('/api/delete', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ paths: selectedPaths })
-                });
-                const data = await res.json();
-
-                showToast(`Deleted ${data.deleted} items.`, 'success');
-                loadPath(currentPath); // Refresh view
-
-            } catch(e) {
-                showToast("Delete failed", 'error');
-            }
-        };
-
-        // --- Settings Logic ---
-        settingsBtn.onclick = () => {
-            loadSettings();
-            setModal.style.display = "block";
-        };
-
-        cancelSetBtn.onclick = () => setModal.style.display = "none";
-
-        saveSetBtn.onclick = async () => {
-            const payload = {
-                discord_webhook: setDiscordInput.value,
-                telegram_token: setTgTokenInput.value,
-                telegram_chat_id: setTgChatInput.value
-            };
-
-            await fetch('/api/settings', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
+        // Upload
+        uploadBtn.onclick = () => { loadRemotesSelect(upRemoteSelect); upModal.style.display='block'; };
+        document.getElementById('start-up').onclick = async () => {
+            upModal.style.display='none';
+            await fetch('/api/upload', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    paths: selectedPaths,
+                    remote: upRemoteSelect.value,
+                    upload_path: upPathInput.value,
+                    transfers: document.getElementById('up-transfers').value
+                })
             });
-            setModal.style.display = "none";
+            showToast('Upload Queued', 'success');
         };
 
-        // --- Move/Copy Logic (Enhanced with Browser) ---
+        // Delete
+        deleteBtn.onclick = async () => {
+            if(confirm(`Delete ${selectedPaths.length} items?`)) {
+                await fetch('/api/delete', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths:selectedPaths})});
+                loadPath(currentPath);
+                showToast('Deleted', 'success');
+            }
+        };
+
+        // Settings (Save)
+        saveSetBtn.onclick = async () => {
+            await fetch('/api/settings', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    discord_webhook: setDiscordInput.value,
+                    telegram_token: setTgTokenInput.value,
+                    telegram_chat_id: setTgChatInput.value
+                })
+            });
+            showToast('Settings Saved', 'success');
+        };
+
+        async function loadSettings() {
+             const res = await fetch('/api/settings');
+             const data = await res.json();
+             setDiscordInput.value = data.discord_webhook||'';
+             setTgTokenInput.value = data.telegram_token||'';
+             setTgChatInput.value = data.telegram_chat_id||'';
+        }
+
+        // Upload Config
+        uploadConfigBtn.onclick = async () => {
+            const f = configFileInput.files[0];
+            if(!f) return;
+            const fd = new FormData(); fd.append('file', f);
+            const res = await fetch('/api/settings/upload-config', {method:'POST', body:fd});
+            const d = await res.json();
+            if(d.status==='uploaded') showToast('Config Uploaded', 'success');
+            else showToast('Error', 'error');
+        };
+
+        // --- Common Helpers ---
+        function showToast(msg, type='info') {
+            const t = document.createElement('div'); t.className=`toast ${type}`; t.textContent=msg;
+            document.getElementById('toast-container').appendChild(t);
+            setTimeout(()=>t.classList.add('show'),10);
+            setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300)},4000);
+        }
+        function formatBytes(bytes) {
+            if(bytes===0) return '0 B';
+            if(!bytes || isNaN(bytes)) return '-';
+            const sizes=['B','KB','MB','GB','TB'];
+            const i=Math.floor(Math.log(bytes)/Math.log(1024));
+            return parseFloat((bytes/Math.pow(1024,i)).toFixed(2))+' '+sizes[i];
+        }
+        async function loadRemotesSelect(el) {
+            el.innerHTML='';
+            const r = await (await fetch('/api/remotes')).json();
+            r.forEach(x => { const o=document.createElement('option'); o.value=x; o.textContent=x; el.appendChild(o); });
+        }
+
+        // --- Modal Closers ---
+        document.querySelectorAll('.modal .danger, .modal .secondary').forEach(b => {
+            if(b.id.startsWith('cancel-') || b.id.startsWith('close-')) {
+                b.onclick = () => b.closest('.modal').style.display='none';
+            }
+        });
+        window.onclick = (e) => { if(e.target.classList.contains('modal')) e.target.style.display='none'; };
+
+        // --- Move/Copy Browser Logic ---
+        function openMcModal(action) {
+            mcAction=action;
+            mcContext = (browserMode==='cloud' && action!=='download') ? 'cloud' : 'local';
+            document.getElementById('mc-title').textContent = `${action.toUpperCase()} to ${mcContext.toUpperCase()}`;
+            loadMcBrowser('');
+            mcModal.style.display='block';
+        }
         async function loadMcBrowser(path) {
-             mcCurrentBrowserPath = path;
-             mcSelectedPath.textContent = path || '/';
-             mcBrowser.innerHTML = '<div style="color:#565f89; padding:5px;">Loading...</div>';
+            mcCurrentBrowserPath = path;
+            const disp = document.getElementById('mc-selected-path');
+            const cont = document.getElementById('mc-browser');
 
-             try {
-                const response = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
-                const data = await response.json();
+            disp.textContent = path || '/';
+            cont.innerHTML = 'Loading...';
 
-                mcBrowser.innerHTML = '';
-
-                // Show directories only usually, but list sends all. Filter for is_dir
-                const dirs = data.items.filter(i => i.is_dir);
-
-                if (dirs.length === 0) {
-                    mcBrowser.innerHTML = '<div style="color:#565f89; padding:5px;">No subfolders</div>';
-                    return;
+            try {
+                let items = [];
+                if(mcContext==='cloud') {
+                     if(!path) {
+                         const r = await(await fetch('/api/remotes')).json();
+                         items = r.map(x=>({name:x, is_dir:true, fullPath:x, is_remote:true}));
+                     } else {
+                         let remote=path, sub='';
+                         if(path.includes('/')) { remote=path.split('/')[0]; sub=path.substring(path.indexOf('/')+1); }
+                         const res = await(await fetch(`/api/rclone/list?remote=${remote}&path=${sub}`)).json();
+                         items = res.items.filter(i=>i.is_dir).map(i=>({name:i.name, is_dir:true, fullPath:remote+'/'+i.path}));
+                     }
+                } else {
+                    const res = await(await fetch(`/api/list?path=${path}`)).json();
+                    items = res.items.filter(i=>i.is_dir).map(i=>({name:i.name, is_dir:true, fullPath:i.path}));
                 }
 
-                const ul = document.createElement('ul');
-                ul.style.listStyle = 'none';
-                ul.style.padding = '0';
-                ul.style.margin = '0';
-
-                dirs.forEach(d => {
-                    const li = document.createElement('li');
-                    li.style.padding = '5px 10px';
-                    li.style.cursor = 'pointer';
-                    li.style.borderBottom = '1px solid #2f3549';
-                    li.style.display = 'flex';
-                    li.style.alignItems = 'center';
-                    li.innerHTML = '<span style="margin-right:10px;">📁</span> ' + d.name;
-
-                    li.onclick = () => loadMcBrowser(d.path);
-                    li.onmouseover = () => li.style.background = '#2f3549';
-                    li.onmouseout = () => li.style.background = 'transparent';
-
+                cont.innerHTML = '';
+                const ul = document.createElement('ul'); ul.style.listStyle='none'; ul.style.padding=0;
+                items.forEach(i => {
+                    const li = document.createElement('li'); li.style.padding='5px'; li.style.cursor='pointer';
+                    li.innerHTML = (i.is_remote?'☁️ ':'📁 ') + i.name;
+                    li.onclick = () => loadMcBrowser(i.fullPath);
                     ul.appendChild(li);
                 });
-                mcBrowser.appendChild(ul);
-
-             } catch(e) {
-                 mcBrowser.textContent = "Error loading path";
-             }
+                cont.appendChild(ul);
+            } catch(e) { cont.textContent = 'Error'; }
         }
 
-        function openMcModal(action) {
-            mcAction = action;
-            if (action === 'move') mcTitle.textContent = 'Move Items';
-            else if (action === 'copy') mcTitle.textContent = 'Copy Items';
-            else if (action === 'download') mcTitle.textContent = 'Download to...';
-
-            // Start browser at root
-            loadMcBrowser('');
-            mcModal.style.display = 'block';
-        }
-
-        mcUpBtn.onclick = () => {
-             // Calculate parent path
-             if (!mcCurrentBrowserPath) return; // Already at root
-             const parts = mcCurrentBrowserPath.split('/').filter(Boolean);
-             parts.pop();
-             const parent = parts.join('/');
-             loadMcBrowser(parent);
+        document.getElementById('mc-up-btn').onclick = () => {
+             if(!mcCurrentBrowserPath) return;
+             if(!mcCurrentBrowserPath.includes('/')) loadMcBrowser('');
+             else loadMcBrowser(mcCurrentBrowserPath.substring(0, mcCurrentBrowserPath.lastIndexOf('/')));
         };
 
-        mcNewFolderBtn.onclick = async () => {
-            const name = prompt("Enter new folder name:");
-            if (!name) return;
+        document.getElementById('confirm-mc').onclick = async () => {
+            mcModal.style.display='none';
+            const dest = mcCurrentBrowserPath;
 
-            try {
-                const res = await fetch('/api/mkdir', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        path: mcCurrentBrowserPath,
-                        name: name
-                    })
-                });
-                const data = await res.json();
-                if (data.status === 'created') {
-                    showToast("Folder created", "success");
-                    loadMcBrowser(mcCurrentBrowserPath); // Refresh
-                } else {
-                    showToast("Error: " + data.error, "error");
+            // Logic for Cloud/Cross-Remote
+            if(mcContext==='cloud') {
+                let r=currentRemote, p=dest, dr=currentRemote; // defaults
+                if(dest) {
+                    if(dest.includes('/')) { dr=dest.split('/')[0]; p=dest.substring(dest.indexOf('/')+1); }
+                    else { dr=dest; p=''; }
                 }
-            } catch (e) {
-                showToast("Request failed", "error");
+
+                const ep = (mcAction==='move'?'/api/rclone/move':'/api/rclone/copy');
+                await fetch(ep, {
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({remote:currentRemote, paths:selectedPaths, destination:p, dest_remote:dr})
+                });
+                showToast('Queued', 'success');
+            } else if(mcAction==='download') {
+                 await fetch('/api/rclone/download', {
+                     method:'POST',headers:{'Content-Type':'application/json'},
+                     body:JSON.stringify({remote:currentRemote, paths:selectedPaths, destination:dest, transfers:4})
+                 });
+                 showToast('Download Queued', 'success');
+            } else {
+                // Local to Local
+                 const ep = (mcAction==='move'?'/api/move':'/api/copy');
+                 await fetch(ep, {
+                     method:'POST',headers:{'Content-Type':'application/json'},
+                     body:JSON.stringify({paths:selectedPaths, destination:dest})
+                 });
+                 showToast('Completed', 'success');
+                 loadPath(currentPath);
             }
         };
 
+        // Wire remaining buttons
         moveBtn.onclick = () => openMcModal('move');
         copyBtn.onclick = () => openMcModal('copy');
-
-        cancelMcBtn.onclick = () => mcModal.style.display = 'none';
-
-        confirmMcBtn.onclick = async () => {
-            const dest = mcCurrentBrowserPath; // Use the path selected in browser
-            mcModal.style.display = 'none';
-
-            if (mcAction === 'download') {
-                // Download Logic
-                downloadBtn.disabled = true;
-                try {
-                    const res = await fetch('/api/rclone/download', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            remote: currentRemote,
-                            paths: selectedPaths,
-                            transfers: 4,
-                            destination: dest
-                        })
-                    });
-                    const data = await res.json();
-                    if (data.status === 'queued') {
-                        showToast("Download Queued", "success");
-                    } else {
-                        showToast("Error: " + data.error, "error");
-                    }
-                } catch (e) {
-                    showToast("Request failed", "error");
-                }
-                setTimeout(() => updateButtonState(), 2000);
-
+        newFolderBtn.onclick = () => mkdirModal.style.display='block';
+        document.getElementById('confirm-mkdir').onclick = async () => {
+            mkdirModal.style.display='none';
+            if(browserMode==='cloud') {
+                await fetch('/api/rclone/mkdir', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({remote:currentRemote, path:currentPath, name:mkdirNameInput.value})});
             } else {
-                // Move or Copy Logic
-                const endpoint = mcAction === 'move' ? '/api/move' : '/api/copy';
-                try {
-                    const res = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            paths: selectedPaths,
-                            destination: dest
-                        })
-                    });
-                    const data = await res.json();
-
-                    if (data.status === 'completed') {
-                        showToast(`${mcAction === 'move' ? 'Moved' : 'Copied'} ${data.moved || data.copied} items.`, 'success');
-                        loadPath(currentPath);
-                    } else {
-                        showToast('Error: ' + (data.error || 'Unknown error'), 'error');
-                    }
-                } catch (e) {
-                    showToast('Request failed', 'error');
-                }
+                await fetch('/api/mkdir', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:currentPath, name:mkdirNameInput.value})});
             }
+            loadPath(currentPath);
+        };
+        renameBtn.onclick = () => { renameInput.value=selectedPaths[0].split('/').pop(); renameModal.style.display='block'; };
+        document.getElementById('confirm-rename').onclick = async () => {
+            renameModal.style.display='none';
+            if(browserMode==='cloud') {
+                await fetch('/api/rclone/rename', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({remote:currentRemote, path:selectedPaths[0], new_name:renameInput.value})});
+            } else {
+                await fetch('/api/rename', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:selectedPaths[0], new_name:renameInput.value})});
+            }
+            loadPath(currentPath);
+        };
+        extractBtn.onclick = () => extModal.style.display='block';
+        document.getElementById('confirm-ext').onclick = async () => {
+            extModal.style.display='none';
+            await fetch('/api/extract', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:selectedPaths[0], method:document.getElementById('ext-method').value, password:document.getElementById('ext-pass').value})});
+            showToast('Extract Queued', 'success');
+        };
+        inspectBtn.onclick = async () => {
+            const res = await fetch('/api/inspect', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:selectedPaths[0]})});
+            const d = await res.json();
+            renderInspectModal(d);
+            inspectModal.style.display='block';
         };
 
-        // --- Rename Logic ---
-        renameBtn.onclick = () => {
-            if (selectedPaths.length !== 1) return;
-            const target = selectedPaths[0];
-            const parts = target.split('/');
-            const currentName = parts[parts.length-1];
+        function renderInspectModal(data) {
+            const el = document.getElementById('inspect-content');
+            el.innerHTML = '';
 
-            renameInput.value = currentName;
-            renameModal.style.display = 'block';
-        };
+            if (data.type === 'unknown') { el.innerHTML = '<p>No details available.</p>'; return; }
 
-        cancelRenameBtn.onclick = () => renameModal.style.display = 'none';
-
-        confirmRenameBtn.onclick = async () => {
-             const newName = renameInput.value;
-             if (!newName) return;
-
-             renameModal.style.display = 'none';
-             const target = selectedPaths[0];
-
-             try {
-                 const res = await fetch('/api/rename', {
-                     method: 'POST',
-                     headers: {'Content-Type': 'application/json'},
-                     body: JSON.stringify({
-                         path: target,
-                         new_name: newName
-                     })
-                 });
-                 const data = await res.json();
-                 if (data.status === 'renamed') {
-                     loadPath(currentPath);
-                 } else {
-                     showToast("Rename Failed: " + data.error, 'error');
-                 }
-             } catch(e) {
-                 showToast("Request failed", 'error');
-             }
-        };
-
-        // --- New Folder Logic ---
-        newFolderBtn.onclick = () => {
-            mkdirNameInput.value = '';
-            mkdirModal.style.display = 'block';
-        };
-
-        cancelMkdirBtn.onclick = () => mkdirModal.style.display = 'none';
-
-        confirmMkdirBtn.onclick = async () => {
-            const name = mkdirNameInput.value;
-            if (!name) return;
-
-            mkdirModal.style.display = 'none';
-            try {
-                const res = await fetch('/api/mkdir', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        path: currentPath,
-                        name: name
-                    })
+            if (data.details) {
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                table.style.borderCollapse = 'collapse';
+                table.style.marginBottom = '20px';
+                data.details.forEach(([key, val]) => {
+                    table.innerHTML += `<tr><td style="color:#737aa2;padding:5px;border-bottom:1px solid #2f3549;width:120px;">${key}</td><td style="color:#c0caf5;padding:5px;border-bottom:1px solid #2f3549;">${val}</td></tr>`;
                 });
-                const data = await res.json();
-                if (data.status === 'created') {
-                    loadPath(currentPath);
-                } else {
-                    showToast('Error: ' + data.error, 'error');
-                }
-            } catch (e) {
-                showToast('Request failed', 'error');
+                el.appendChild(table);
             }
-        };
+            if (data.contents) {
+                el.innerHTML += '<h4 style="color:#7aa2f7;margin-top:0;">Archive Contents:</h4>';
+                const ul = document.createElement('ul'); ul.style.listStyle='none'; ul.style.padding='0';
+                data.contents.forEach(item => {
+                    ul.innerHTML += `<li style="padding:4px 0;border-bottom:1px solid #2f3549;display:flex;justify-content:space-between;"><span>${item.name}</span> <span style="color:#565f89;">${item.size}</span></li>`;
+                });
+                el.appendChild(ul);
+            }
+        }
 
-        // --- Extract Logic ---
-        extractBtn.onclick = () => {
-            if (selectedPaths.length !== 1) return;
-            extModal.style.display = "block";
-        };
+        // --- Cloud Wiring ---
+        cloudMoveBtn.onclick = () => openMcModal('move');
+        cloudCopyBtn.onclick = () => openMcModal('copy');
 
-        cancelExtBtn.onclick = () => extModal.style.display = "none";
+        // Rename uses shared modal
+        cloudRenameBtn.onclick = () => { renameInput.value=selectedPaths[0].split('/').pop(); renameModal.style.display='block'; };
 
-        confirmExtBtn.onclick = async () => {
-             const method = extMethod.value;
-             const password = extPass.value;
-
-             extModal.style.display = "none";
-             const target = selectedPaths[0];
-
-             extractBtn.disabled = true;
-             extractBtn.textContent = "Extracting...";
-
-             try {
-                 const res = await fetch('/api/extract', {
-                     method: 'POST',
-                     headers: {'Content-Type': 'application/json'},
-                     body: JSON.stringify({
-                         path: target,
-                         method: method,
-                         password: password
-                     })
-                 });
-                 const data = await res.json();
-
-                 if (data.status === 'queued' || data.status === 'started') {
-                     showToast("Extract job queued", "success");
-                 } else {
-                     showToast("Extraction Request Failed: " + data.error, 'error');
-                     extractBtn.disabled = false;
-                     extractBtn.textContent = "Extract";
-                 }
-
-                 // Reset button after short delay
-                 setTimeout(() => {
-                     extractBtn.disabled = selectedPaths.length !== 1;
-                     extractBtn.textContent = "Extract";
-                 }, 3000);
-
-             } catch(e) {
-                 showToast("Request failed", 'error');
-                 extractBtn.disabled = false;
-                 extractBtn.textContent = "Extract";
+        cloudDeleteBtn.onclick = async () => {
+             if(confirm('Delete Cloud Items?')) {
+                 await fetch('/api/rclone/delete', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({remote:currentRemote, paths:selectedPaths})});
+                 showToast('Delete Queued', 'success');
              }
-        };
-
-        // Close Modals on click outside
-        window.onclick = (event) => {
-            if (event.target == modal) modal.style.display = "none";
-            if (event.target == upModal) upModal.style.display = "none";
-            if (event.target == setModal) setModal.style.display = "none";
-            if (event.target == mcModal) mcModal.style.display = "none";
-            if (event.target == mkdirModal) mkdirModal.style.display = "none";
-            if (event.target == extModal) extModal.style.display = "none";
         };
 
     </script>

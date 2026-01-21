@@ -34,6 +34,8 @@ Transform your VPS into a Cloud Manager. No FUSE required.
 - **Multi-Select:** Check multiple files/folders to perform batch actions (Upload, Move, Delete, etc.).
 
 ### 🛡️ Stability & UX
+- **System Dashboard:** Live monitoring of **Disk Space**, **RAM**, and **CPU** usage prevents server overload.
+- **Deep Inspector:** Inspect video files (Resolution, Codec) and Archives (Content List) instantly without extracting.
 - **Smart Job Queue:** All heavy tasks (Repair, Pack, Upload) are queued and processed sequentially in the background. This prevents server crashes (Out of Memory).
 - **Job Management UI:**
     - **Visual Queue:** See exactly what is running and what is waiting in the "Job Queue" tab.
@@ -41,6 +43,13 @@ Transform your VPS into a Cloud Manager. No FUSE required.
     - **Detailed Progress:** Click on any running job to see granular details (e.g., *Current File being uploaded*, *Current Archive Action*).
 - **Toast Notifications:** Modern, non-blocking status popups (Success/Error/Info) replace annoying browser alerts.
 - **Health Monitoring:** Includes a Docker `HEALTHCHECK` to ensure the service is always running correctly.
+
+### 🔮 Future Roadmap (Coming Soon)
+We are adopting a "Dual-Image" strategy (`:lite` vs `:full`) to support powerful new modules:
+- **Subtitle Manager:** Auto-download subs.
+- **FFmpeg Optimizer:** Convert AVI to MP4, strip audio tracks.
+- **Checksum Verifier:** SFV/MD5 checks.
+- **Modular Architecture:** The core is already refactored to plug these apps in easily.
 
 ## 🚀 Deployment Guide (Detailed)
 
