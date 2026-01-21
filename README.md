@@ -17,17 +17,19 @@ Easily create multi-part archives from large files or folders.
 - **Store Mode:** Uses zero compression (`-m0`) for maximum speed.
 - **Password Protection:** Optional encryption for your archives.
 
-### ☁️ Cloud & Alerts
-- **Rclone Integration:** Manually or Automatically upload your files to the cloud (Google Drive, OneDrive, etc.).
-- **Parallel Uploads:** Support for concurrent file transfers (default: 4) for faster uploads.
-- **Smart Uploads:** Automatically organizes uploads into `ParFix_Uploads/` to keep your cloud clean.
-- **Notifications:** Get alerts on Discord or Telegram when jobs complete or fail.
+### ☁️ Cloud File Manager (Professional)
+Transform your VPS into a Cloud Manager. No FUSE required.
+- **Remote Browser:** Browse your Rclone Remotes (Google Drive, OneDrive, etc.) just like local folders.
+- **Cloud-to-Cloud Transfer:** Move or Copy files between different cloud providers directly (e.g., GDrive -> OneDrive) without consuming local storage.
+- **Cloud Operations:** Rename, Delete, and Create Folders directly in the cloud.
+- **Download to VPS:** Select files in the cloud and download them to a specific folder on your server.
+- **Config Upload:** Upload your `rclone.conf` directly from the Settings menu.
 
-### 📂 File Management
+### 📂 Local File Management
 - **Full File Browser:** Navigate your mapped directories easily.
 - **Move & Copy:** Organize files with a built-in **Folder Browser** to select destinations easily.
 - **Rename:** Quickly rename files or folders directly from the UI.
-- **Create Folder:** Create new directories for better organization.
+- **Create Folder:** Create new directories for better organization (now available inside the Move/Copy selector too).
 - **Delete:** Manually delete files/folders to clean up space.
 - **Multi-Select:** Check multiple files/folders to perform batch actions (Upload, Move, Delete, etc.).
 
