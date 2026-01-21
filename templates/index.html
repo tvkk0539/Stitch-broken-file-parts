@@ -926,6 +926,11 @@
         }
 
         async function loadLocalPath(path) {
+            // Reset selection on nav
+            selectedPaths = [];
+            selectAllCheck.checked = false;
+            updateButtonState();
+
             try {
                 fileList.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Loading...</div>';
                 const res = await fetch(`/api/list?path=${encodeURIComponent(path)}`);
@@ -939,6 +944,11 @@
         }
 
         async function loadRemotesList() {
+            // Reset selection on nav
+            selectedPaths = [];
+            selectAllCheck.checked = false;
+            updateButtonState();
+
             try {
                 fileList.innerHTML = '<div style="padding:20px;text-align:center;">Loading Remotes...</div>';
                 const res = await fetch('/api/remotes');
@@ -960,6 +970,11 @@
         }
 
         async function loadCloudPath(path, remoteOverride=null) {
+            // Reset selection on nav
+            selectedPaths = [];
+            selectAllCheck.checked = false;
+            updateButtonState();
+
             if(remoteOverride) currentRemote = remoteOverride;
             if(!currentRemote) { loadRemotesList(); return; }
 
