@@ -522,6 +522,24 @@ def github_download():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/apps/github/download/batch', methods=['POST'])
+def github_download_batch():
+    data = request.json
+    assets = data.get('assets') # List of {url, filename}
+    path = data.get('path', '')
+    account_id = data.get('account_id')
+
+    if not assets: return jsonify({'error': 'Assets required'}), 400
+
+    abs_dest = os.path.join(DOWNLOAD_ROOT, path)
+
+    job_id = job_manager.add_job(
+        f"GitHub Batch Download ({len(assets)} items)",
+        GitHubManager.run_batch_download_job,
+        args=(assets, abs_dest, account_id)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
 @bp.route('/api/apps/github/publish', methods=['POST'])
 def github_publish():
     data = request.json

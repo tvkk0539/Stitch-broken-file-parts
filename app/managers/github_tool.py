@@ -590,3 +590,72 @@ class GitHubManager:
         finally:
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
+
+    @staticmethod
+    def run_batch_download_job(assets, dest_root, account_id):
+        """
+        Downloads multiple assets in parallel.
+        assets: list of dicts {'url': ..., 'filename': ...}
+        """
+        import concurrent.futures
+
+        total = len(assets)
+        log(f"Starting Batch Download: {total} files")
+        job_manager.update_job_details({'action': f'Starting Batch Download ({total} files)'})
+
+        if not os.path.exists(dest_root):
+            os.makedirs(dest_root, exist_ok=True)
+
+        token = GitHubManager._get_token_for_account(account_id)
+        headers = {}
+        if token:
+            headers['Authorization'] = f'token {token}'
+            headers['Accept'] = 'application/octet-stream'
+
+        completed = 0
+        errors = 0
+
+        def download_one(asset):
+            url = asset['url']
+            name = asset['filename']
+            path = os.path.join(dest_root, name)
+
+            try:
+                # Basic download without progress tracking per file to simplify batch logic
+                # We trust requests.get handling redirects
+                with requests.get(url, headers=headers, stream=True) as r:
+                    r.raise_for_status()
+                    with open(path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if job_manager.is_cancelled(): return False
+                            f.write(chunk)
+                return True
+            except Exception as e:
+                log(f"Error downloading {name}: {e}")
+                return False
+
+        # Use ThreadPoolExecutor
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            # Map futures to assets
+            future_to_asset = {executor.submit(download_one, asset): asset for asset in assets}
+
+            for future in concurrent.futures.as_completed(future_to_asset):
+                if job_manager.is_cancelled():
+                    log("Batch Download Cancelled")
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    return
+
+                res = future.result()
+                if res:
+                    completed += 1
+                else:
+                    errors += 1
+
+                percent = int((completed + errors) / total * 100)
+                job_manager.update_job_details({
+                    'progress': f"{percent}%",
+                    'action': f"Downloaded {completed}/{total} (Errors: {errors})"
+                })
+
+        log(f"Batch Download Finished. Success: {completed}, Errors: {errors}")
+        NotificationManager.send_notification(f"✅ ParFix: Batch Downloaded {completed} files")

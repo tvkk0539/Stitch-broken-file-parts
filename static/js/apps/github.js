@@ -355,17 +355,35 @@ async function fetchGhReleases() {
             headerDiv.style.alignItems = 'center';
             headerDiv.style.background = 'rgba(255,255,255,0.02)';
 
+            // Generate Download All Button (Only if assets exist)
+            const hasAssets = release.assets && release.assets.length > 0;
+            const downloadAllBtn = hasAssets ? `<button class="purple-btn gh-dl-all-btn" style="padding:2px 8px; font-size:0.7em; margin-left:10px;">Download All</button>` : '';
+
             headerDiv.innerHTML = `
                 <div style="display:flex; align-items:center;">
                     <div style="font-weight:bold; color:#c0caf5; font-size:1.1em;" class="gh-tag-text">${release.tag}</div>
                     ${badge}
                     ${preBadge}
+                    ${downloadAllBtn}
                 </div>
                 <div style="font-size:0.8em; color:var(--text-muted); display:flex; align-items:center; gap:10px;">
                     <span>${dateStr}</span>
                     <span style="transform: rotate(${isLatest?0:-90}deg); transition: transform 0.2s;" class="arrow-icon">▼</span>
                 </div>
             `;
+
+            // Wire Download All
+            if(hasAssets) {
+                headerDiv.querySelector('.gh-dl-all-btn').onclick = (e) => {
+                    e.stopPropagation();
+                    // Map assets to payload structure
+                    const assetPayload = release.assets.map(a => ({
+                        url: a.download_url,
+                        filename: a.name
+                    }));
+                    downloadGhBatch(assetPayload, release.tag);
+                };
+            }
 
             // Assets Container
             const assetsDiv = document.createElement('div');
@@ -640,6 +658,21 @@ async function downloadGhAsset(url, filename) {
         body:JSON.stringify(body)
     });
     showToast('Download Queued', 'success');
+}
+
+async function downloadGhBatch(assets, releaseTag) {
+    const sub = prompt(`Batch Download (${assets.length} items) for ${releaseTag} to folder:`, `Downloads/${releaseTag}/`);
+    if(sub === null) return;
+
+    const body = { assets, path: sub };
+    if(ghActiveAccount) body.account_id = ghActiveAccount.id;
+
+    await fetch('/api/apps/github/download/batch', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body)
+    });
+    showToast('Batch Download Queued', 'success');
 }
 
 // Publisher
