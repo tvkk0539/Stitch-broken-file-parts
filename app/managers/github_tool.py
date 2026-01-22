@@ -198,7 +198,7 @@ class GitHubManager:
                     # SAFE BET: Don't use auth for public release asset downloads unless specifically private.
                     # For now, let's omit auth for downloads unless it fails.
                     # The user prompt implies context for "operations", but mostly publishing needs it.
-                    headers = {}
+                    pass # Trust requests to handle redirect auth stripping
 
             # Stream download
             with requests.get(asset_url, stream=True, headers=headers) as r:
