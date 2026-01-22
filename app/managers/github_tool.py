@@ -7,21 +7,112 @@ import shutil
 
 class GitHubManager:
     @staticmethod
-    def get_releases(repo_url):
+    def get_accounts():
         """
-        Fetches the latest releases for a given repo (e.g., 'radarr/radarr').
-        Returns a list of assets from the latest release.
+        Returns a list of stored accounts (sanitized).
+        Also handles legacy migration if 'github_token' exists.
+        """
+        conf = config.load_config()
+
+        # Legacy Migration
+        legacy_token = conf.get('github_token')
+        if legacy_token:
+            log("Migrating legacy GitHub token to account store...")
+            GitHubManager.validate_and_add_account(legacy_token)
+            # Remove legacy key to prevent re-migration
+            conf = config.load_config() # Reload
+            if 'github_token' in conf:
+                del conf['github_token']
+                config.save_config(conf)
+
+        accounts = conf.get('github_accounts', [])
+        # Return sanitized list (no tokens)
+        sanitized = []
+        for acc in accounts:
+            sanitized.append({
+                'id': acc['id'],
+                'username': acc['username'],
+                'avatar_url': acc['avatar_url']
+            })
+        return sanitized
+
+    @staticmethod
+    def validate_and_add_account(token):
+        """
+        Validates a token with GitHub, fetches profile, and saves it.
         """
         try:
-            # Clean repo string (remove https://github.com/ if present)
+            headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+            r = requests.get('https://api.github.com/user', headers=headers, timeout=10)
+
+            if r.status_code != 200:
+                raise Exception(f"GitHub Auth Failed: {r.status_code}")
+
+            data = r.json()
+            account = {
+                'id': str(data.get('id')),
+                'username': data.get('login'),
+                'avatar_url': data.get('avatar_url'),
+                'token': token
+            }
+
+            conf = config.load_config()
+            accounts = conf.get('github_accounts', [])
+
+            # Remove existing if same ID (update)
+            accounts = [a for a in accounts if a['id'] != account['id']]
+            accounts.append(account)
+
+            conf['github_accounts'] = accounts
+            config.save_config(conf)
+
+            log(f"Added GitHub Account: {account['username']}")
+            return account
+        except Exception as e:
+            log(f"Error adding account: {e}")
+            raise e
+
+    @staticmethod
+    def remove_account(account_id):
+        conf = config.load_config()
+        accounts = conf.get('github_accounts', [])
+
+        new_list = [a for a in accounts if a['id'] != str(account_id)]
+
+        if len(new_list) < len(accounts):
+            conf['github_accounts'] = new_list
+            config.save_config(conf)
+            log(f"Removed GitHub Account ID: {account_id}")
+            return True
+        return False
+
+    @staticmethod
+    def get_token_by_id(account_id):
+        conf = config.load_config()
+        accounts = conf.get('github_accounts', [])
+        for acc in accounts:
+            if str(acc['id']) == str(account_id):
+                return acc['token']
+        return None
+
+    @staticmethod
+    def get_releases(repo_url):
+        """
+        Fetches the latest releases for a given repo.
+        Uses the *first* available account for rate limits, if any.
+        """
+        try:
+            # Clean repo string
             repo = repo_url.replace('https://github.com/', '').strip('/')
 
-            # Helper to get headers (auth optional for public, but good for rate limits)
+            # Helper to get headers
             conf = config.load_config()
-            token = conf.get('github_token')
+            accounts = conf.get('github_accounts', [])
             headers = {'Accept': 'application/vnd.github.v3+json'}
-            if token:
-                headers['Authorization'] = f'token {token}'
+
+            # Use first account for auth (higher rate limit)
+            if accounts:
+                headers['Authorization'] = f"token {accounts[0]['token']}"
 
             # Get Latest Release
             url = f"https://api.github.com/repos/{repo}/releases/latest"
@@ -89,8 +180,7 @@ class GitHubManager:
                         # Update progress occasionally
                         if total_size > 0:
                             percent = int((downloaded / total_size) * 100)
-                            # Only update job details periodically to avoid spamming locks
-                            if downloaded % (1024*1024) == 0: # Every 1MB
+                            if downloaded % (1024*1024) == 0:
                                 job_manager.update_job_details({'progress': f"{percent}%"})
 
             log(f"GitHub Download Complete: {filename}")
@@ -99,24 +189,26 @@ class GitHubManager:
         except Exception as e:
             log(f"Download Failed: {e}")
             job_manager.update_job_details({'error': str(e)})
-            # Cleanup partial file
             if os.path.exists(final_path):
                  try: os.remove(final_path)
                  except: pass
 
     @staticmethod
-    def run_publish_job(repo, tag_name, file_path, token):
+    def run_publish_job(repo, tag_name, file_path, account_id):
         """
         Background job to create a release and upload an asset.
         """
         repo = repo.replace('https://github.com/', '').strip('/')
         filename = os.path.basename(file_path)
 
+        # Lookup Token
+        token = GitHubManager.get_token_by_id(account_id)
+
         log(f"Starting GitHub Publish: {repo} @ {tag_name}")
         job_manager.update_job_details({'action': 'Creating Release...'})
 
         if not token:
-            job_manager.update_job_details({'error': 'No GitHub Token provided'})
+            job_manager.update_job_details({'error': 'Account not found or invalid token'})
             return
 
         headers = {
@@ -145,7 +237,7 @@ class GitHubManager:
                     raise Exception(f"Could not create or find release: {r.text}")
 
             release_data = r.json()
-            upload_url_template = release_data['upload_url'] # e.g. https://uploads.github.com/...{?name,label}
+            upload_url_template = release_data['upload_url']
             upload_url = upload_url_template.split('{')[0] + f"?name={filename}"
 
             # 2. Upload Asset
@@ -155,7 +247,6 @@ class GitHubManager:
             if job_manager.is_cancelled(): return
 
             with open(file_path, 'rb') as f:
-                # GitHub requires specific header for uploads
                 upload_headers = headers.copy()
                 upload_headers['Content-Type'] = 'application/octet-stream'
 
