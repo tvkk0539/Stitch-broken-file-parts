@@ -17,9 +17,6 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     curl \
     procps \
     mediainfo \
-    ffmpeg \
-    ca-certificates \
-    git \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
