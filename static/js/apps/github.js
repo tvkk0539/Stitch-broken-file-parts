@@ -176,7 +176,8 @@ async function fetchMyRepos() {
                 <div style="display:flex; gap:5px; flex-wrap:wrap; width:100%;">
                     <button class="secondary" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'down')">Get</button>
                     <button class="purple-btn" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'pub')">Pub</button>
-                    <button class="info-btn" style="flex:0; font-size:0.8em; padding:6px;" onclick="ghOpenActions('${repo.name}')">▶</button>
+                    <button class="info-btn" style="flex:0; font-size:0.8em; padding:6px;" onclick="ghOpenSecrets('${repo.name}')" title="Secrets">🔑</button>
+                    <button class="info-btn" style="flex:0; font-size:0.8em; padding:6px;" onclick="ghOpenActions('${repo.name}')" title="Actions">▶</button>
                 </div>
                 <div style="margin-top:5px; width:100%; display:flex; gap:5px;">
                     <button class="icon-btn" style="flex:1; font-size:0.7em; border:1px solid var(--border-color); color:var(--text-muted);" onclick="ghToggleVisibility('${repo.name}', ${repo.private})">
@@ -579,6 +580,87 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { showToast(e.message, 'error'); }
     };
 });
+
+// --- Secrets Logic ---
+let ghSecretsRepo = '';
+
+async function ghOpenSecrets(repo) {
+    ghSecretsRepo = repo;
+    document.getElementById('gh-secrets-title').textContent = `Secrets: ${repo}`;
+    document.getElementById('gh-secrets-modal').style.display = 'block';
+    document.getElementById('gh-secret-name').value = '';
+    document.getElementById('gh-secret-value').value = '';
+    loadGhSecrets();
+}
+
+async function loadGhSecrets() {
+    const el = document.getElementById('gh-secrets-list');
+    el.innerHTML = 'Loading...';
+
+    const [owner, repo] = ghSecretsRepo.split('/');
+    try {
+        const res = await fetch('/api/apps/github/secrets/list', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({owner, repo, account_id:ghActiveAccount.id})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        el.innerHTML = '';
+        if(data.secrets.length === 0) {
+            el.innerHTML = '<div style="color:var(--text-muted);">No secrets found.</div>';
+            return;
+        }
+
+        data.secrets.forEach(s => {
+            const div = document.createElement('div');
+            div.style.display='flex'; div.style.justifyContent='space-between'; div.style.padding='8px';
+            div.style.borderBottom='1px solid var(--border-color)';
+            div.innerHTML = `
+                <span style="font-family:monospace; color:#e0af68;">${s.name}</span>
+                <div style="font-size:0.8em; color:var(--text-muted);">Updated ${new Date(s.updated_at).toLocaleDateString()}</div>
+                <button class="icon-btn" style="color:var(--error-color);" onclick="deleteGhSecret('${s.name}')">🗑️</button>
+            `;
+            el.appendChild(div);
+        });
+    } catch(e) { el.innerHTML = `Error: ${e.message}`; }
+}
+
+async function saveGhSecret() {
+    const name = document.getElementById('gh-secret-name').value;
+    const value = document.getElementById('gh-secret-value').value;
+    if(!name || !value) return showToast('Name and Value required', 'error');
+
+    const [owner, repo] = ghSecretsRepo.split('/');
+    try {
+        const res = await fetch('/api/apps/github/secrets/put', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({owner, repo, name, value, account_id:ghActiveAccount.id})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        showToast('Secret Saved', 'success');
+        document.getElementById('gh-secret-name').value = '';
+        document.getElementById('gh-secret-value').value = '';
+        loadGhSecrets();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteGhSecret(name) {
+    if(!confirm(`Delete secret ${name}?`)) return;
+    const [owner, repo] = ghSecretsRepo.split('/');
+    try {
+        const res = await fetch('/api/apps/github/secrets/delete', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({owner, repo, name, account_id:ghActiveAccount.id})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+        showToast('Secret Deleted', 'success');
+        loadGhSecrets();
+    } catch(e) { showToast(e.message, 'error'); }
+}
 
 // --- Actions Logic ---
 let ghActionsRepo = '';

@@ -356,6 +356,37 @@
         </div>
     </div>
 
+    <!-- Secrets Modal -->
+    <div id="gh-secrets-modal" class="modal">
+        <div class="modal-content" style="width:600px;">
+            <div class="modal-header">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 id="gh-secrets-title">Repository Secrets</h3>
+                    <button onclick="document.getElementById('gh-secrets-modal').style.display='none'" class="icon-btn">✖</button>
+                </div>
+            </div>
+
+            <!-- List -->
+            <div id="gh-secrets-list" style="margin-bottom:20px; max-height:200px; overflow-y:auto;">Loading...</div>
+
+            <!-- Add/Update Form -->
+            <div style="border-top:1px solid var(--border-color); padding-top:20px;">
+                <h4 style="margin-top:0;">Add / Update Secret</h4>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="gh-secret-name" placeholder="MY_SECRET_KEY">
+                </div>
+                <div class="form-group">
+                    <label>Value</label>
+                    <textarea id="gh-secret-value" rows="3" style="width:100%; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; border-radius:4px; padding:10px;" placeholder="Secret value..."></textarea>
+                </div>
+                <div style="text-align:right;">
+                    <button class="secondary" onclick="saveGhSecret()">Save Secret</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Import Repo Modal -->
     <div id="gh-import-repo-modal" class="modal">
         <div class="modal-content">

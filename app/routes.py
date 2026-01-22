@@ -677,3 +677,32 @@ def github_trigger_run():
 def github_cancel_run():
     data = request.json
     return jsonify(GitHubManager.cancel_workflow_run(data.get('repo'), data.get('id'), data.get('account_id')))
+
+# --- Secrets ---
+@bp.route('/api/apps/github/secrets/list', methods=['POST'])
+def github_list_secrets():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    account_id = data.get('account_id')
+    return jsonify(GitHubManager.list_secrets(owner, repo, account_id))
+
+@bp.route('/api/apps/github/secrets/put', methods=['POST'])
+def github_put_secret():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    name = data.get('name')
+    value = data.get('value')
+    account_id = data.get('account_id')
+    if not name or not value: return jsonify({'error': 'Name and Value required'}), 400
+    return jsonify(GitHubManager.put_secret(owner, repo, name, value, account_id))
+
+@bp.route('/api/apps/github/secrets/delete', methods=['POST'])
+def github_delete_secret():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    name = data.get('name')
+    account_id = data.get('account_id')
+    return jsonify(GitHubManager.delete_secret(owner, repo, name, account_id))

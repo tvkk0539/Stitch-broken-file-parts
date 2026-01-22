@@ -5,6 +5,8 @@ import requests
 import os
 import shutil
 import subprocess
+import base64
+from nacl import encoding, public
 
 class GitHubManager:
 
@@ -317,6 +319,73 @@ class GitHubManager:
             url = f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/cancel"
             requests.post(url, headers=headers)
             return {'status': 'cancelled'}
+        except Exception as e: return {'error': str(e)}
+
+    # --- Secrets ---
+
+    @staticmethod
+    def list_secrets(owner, repo, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets"
+            r = requests.get(url, headers=headers)
+            if r.status_code != 200: return {'error': f"Failed to list secrets: {r.text}"}
+
+            data = r.json()
+            return {'total_count': data.get('total_count', 0), 'secrets': data.get('secrets', [])}
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def put_secret(owner, repo, name, value, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+        try:
+            # 1. Get Public Key
+            key_url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/public-key"
+            r = requests.get(key_url, headers=headers)
+            if r.status_code != 200: return {'error': f"Failed to get public key: {r.text}"}
+
+            key_data = r.json()
+            public_key_id = key_data['key_id']
+            public_key_val = key_data['key']
+
+            # 2. Encrypt Value
+            public_key = public.PublicKey(public_key_val.encode("utf-8"), encoding.Base64Encoder())
+            sealed_box = public.SealedBox(public_key)
+            encrypted = sealed_box.encrypt(value.encode("utf-8"))
+            encrypted_b64 = base64.b64encode(encrypted).decode("utf-8")
+
+            # 3. Put Secret
+            put_url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/{name}"
+            payload = {
+                'encrypted_value': encrypted_b64,
+                'key_id': public_key_id
+            }
+
+            r = requests.put(put_url, json=payload, headers=headers)
+            if r.status_code in [201, 204]:
+                return {'status': 'success'}
+            return {'error': f"Failed to set secret: {r.text}"}
+
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def delete_secret(owner, repo, name, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/{name}"
+            r = requests.delete(url, headers=headers)
+            if r.status_code == 204: return {'status': 'deleted'}
+            return {'error': f"Failed to delete: {r.text}"}
         except Exception as e: return {'error': str(e)}
 
     @staticmethod
