@@ -416,15 +416,15 @@
         </div>
     </div>
 
-    <!-- Fork Modal -->
-    <div id="gh-fork-modal" class="modal">
+    <!-- Rename Repo Modal -->
+    <div id="gh-rename-repo-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3>Fork to Account</h3></div>
-            <div style="margin-bottom:15px; color:var(--text-muted);">Forking <span id="gh-fork-source" style="color:var(--accent-color);"></span></div>
-            <div class="form-group"><label>Target Name (Optional Rename)</label><input type="text" id="gh-fork-name"></div>
+            <div class="modal-header"><h3>Rename Repository</h3></div>
+            <div style="margin-bottom:15px; color:var(--text-muted);">Renaming <span id="gh-rename-source" style="color:var(--accent-color);"></span></div>
+            <div class="form-group"><label>New Name</label><input type="text" id="gh-rename-input"></div>
             <div class="modal-actions">
-                <button onclick="document.getElementById('gh-fork-modal').style.display='none'" class="danger">Cancel</button>
-                <button id="confirm-gh-fork" class="secondary">Fork</button>
+                <button onclick="document.getElementById('gh-rename-repo-modal').style.display='none'" class="danger">Cancel</button>
+                <button id="confirm-gh-rename" class="secondary">Rename</button>
             </div>
         </div>
     </div>

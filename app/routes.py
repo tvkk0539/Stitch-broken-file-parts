@@ -560,17 +560,28 @@ def github_create_repo():
 
     return jsonify(GitHubManager.create_repository(name, private, description, account_id))
 
-@bp.route('/api/apps/github/repo/fork', methods=['POST'])
-def github_fork_repo():
+@bp.route('/api/apps/github/repo/rename', methods=['POST'])
+def github_rename_repo():
     data = request.json
     owner = data.get('owner')
     repo = data.get('repo')
     new_name = data.get('new_name')
     account_id = data.get('account_id')
 
+    if not owner or not repo or not new_name or not account_id: return jsonify({'error': 'Missing args'}), 400
+
+    return jsonify(GitHubManager.rename_repository(owner, repo, new_name, account_id))
+
+@bp.route('/api/apps/github/repo/delete', methods=['POST'])
+def github_delete_repo():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    account_id = data.get('account_id')
+
     if not owner or not repo or not account_id: return jsonify({'error': 'Missing args'}), 400
 
-    return jsonify(GitHubManager.fork_repository(owner, repo, new_name, account_id))
+    return jsonify(GitHubManager.delete_repository(owner, repo, account_id))
 
 @bp.route('/api/apps/github/repo/clone', methods=['POST'])
 def github_clone_repo():

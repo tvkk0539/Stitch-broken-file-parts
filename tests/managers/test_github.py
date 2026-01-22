@@ -110,24 +110,32 @@ class TestGitHubManager(unittest.TestCase):
         self.assertEqual(res['repo'], 'user/new-repo')
 
     @patch('app.managers.github_tool.config.load_config')
-    @patch('app.managers.github_tool.requests.post')
     @patch('app.managers.github_tool.requests.patch')
-    def test_fork_repository_rename(self, mock_patch, mock_post, mock_load):
+    def test_rename_repository(self, mock_patch, mock_load):
         mock_load.return_value = {
             'github_accounts': [{'id': '1', 'token': 'secret'}]
         }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_patch.return_value = mock_resp
 
-        # Fork Response
-        mock_fork = MagicMock()
-        mock_fork.status_code = 202
-        mock_fork.json.return_value = {'url': 'https://api.github.com/repos/user/repo'}
-        mock_post.return_value = mock_fork
-
-        res = GitHubManager.fork_repository('owner', 'repo', 'new-name', '1')
-
-        self.assertEqual(res['status'], 'forked')
-        # Ensure patch (rename) was called
+        res = GitHubManager.rename_repository('owner', 'repo', 'new-name', '1')
+        self.assertEqual(res['status'], 'renamed')
         mock_patch.assert_called_once()
+
+    @patch('app.managers.github_tool.config.load_config')
+    @patch('app.managers.github_tool.requests.delete')
+    def test_delete_repository(self, mock_delete, mock_load):
+        mock_load.return_value = {
+            'github_accounts': [{'id': '1', 'token': 'secret'}]
+        }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 204
+        mock_delete.return_value = mock_resp
+
+        res = GitHubManager.delete_repository('owner', 'repo', '1')
+        self.assertEqual(res['status'], 'deleted')
+        mock_delete.assert_called_once()
 
     @patch('app.managers.github_tool.config.load_config')
     @patch('app.managers.github_tool.requests.get')

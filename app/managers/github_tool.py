@@ -193,7 +193,7 @@ class GitHubManager:
             return {'error': str(e)}
 
     @staticmethod
-    def fork_repository(owner, repo, new_name, account_id):
+    def rename_repository(owner, repo, new_name, account_id):
         token = GitHubManager._get_token_for_account(account_id)
         if not token: return {'error': 'Auth failed'}
 
@@ -202,25 +202,31 @@ class GitHubManager:
             'Accept': 'application/vnd.github.v3+json'
         }
 
-        # If new_name is provided, we need to fork then rename?
-        # GitHub API Fork endpoint doesn't support rename directly usually.
-        # Actually it does not. We fork, then rename in a second step.
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}"
+            r = requests.patch(url, json={'name': new_name}, headers=headers)
+            if r.status_code == 200:
+                return {'status': 'renamed'}
+            return {'error': f"Rename failed: {r.text}"}
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def delete_repository(owner, repo, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
 
         try:
-            url = f"https://api.github.com/repos/{owner}/{repo}/forks"
-            r = requests.post(url, headers=headers) # Start fork
-            if r.status_code != 202:
-                return {'error': f"Fork failed: {r.text}"}
-
-            forked_repo = r.json()
-            # If rename requested and name differs
-            if new_name and new_name != repo:
-                # Rename is a separate PATCH operation
-                # We might need to wait for fork to be ready? Usually PATCH works on the new object.
-                patch_url = forked_repo['url']
-                requests.patch(patch_url, json={'name': new_name}, headers=headers)
-
-            return {'status': 'forked'} # Async operation
+            url = f"https://api.github.com/repos/{owner}/{repo}"
+            r = requests.delete(url, headers=headers)
+            if r.status_code == 204:
+                return {'status': 'deleted'}
+            return {'error': f"Delete failed: {r.text}"}
         except Exception as e:
             return {'error': str(e)}
 

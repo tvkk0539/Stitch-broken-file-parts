@@ -163,10 +163,12 @@ async function fetchMyRepos() {
                     <button class="purple-btn" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'pub')">Pub</button>
                     <button class="info-btn" style="flex:0; font-size:0.8em; padding:6px;" onclick="ghOpenActions('${repo.name}')">▶</button>
                 </div>
-                <div style="margin-top:5px; width:100%;">
-                    <button class="icon-btn" style="width:100%; font-size:0.7em; border:none; color:var(--text-muted);" onclick="ghToggleVisibility('${repo.name}', ${repo.private})">
+                <div style="margin-top:5px; width:100%; display:flex; gap:5px;">
+                    <button class="icon-btn" style="flex:1; font-size:0.7em; border:1px solid var(--border-color); color:var(--text-muted);" onclick="ghToggleVisibility('${repo.name}', ${repo.private})">
                         ${repo.private ? 'Make Public' : 'Make Private'}
                     </button>
+                    <button class="icon-btn" style="flex:0; font-size:0.7em; border:1px solid var(--border-color); color:var(--text-muted);" onclick="openGhRenameModal('${repo.name}')">✏️</button>
+                    <button class="icon-btn" style="flex:0; font-size:0.7em; border:1px solid var(--error-color); color:var(--error-color);" onclick="ghDeleteRepo('${repo.name}')">🗑️</button>
                 </div>
             `;
             grid.appendChild(card);
@@ -243,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 });
 
-// --- Clone & Fork Logic (In Downloader) ---
+// --- Clone Logic (In Downloader) ---
 async function fetchGhReleases() {
     const repo = document.getElementById('gh-repo-input').value;
     const ghResults = document.getElementById('gh-results');
@@ -261,7 +263,7 @@ async function fetchGhReleases() {
         const data = await res.json();
         if(data.error) throw new Error(data.error);
 
-        // Header with Fork/Clone Actions
+        // Header with Clone Actions
         const header = document.getElementById('gh-results-header');
         header.style.display = 'flex';
         header.style.justifyContent = 'space-between';
@@ -270,7 +272,6 @@ async function fetchGhReleases() {
         header.innerHTML = `
             <div>Latest: <span style="color:#c0caf5;">${data.name}</span> <span style="font-size:0.8em; color:var(--text-muted);">(${data.tag})</span></div>
             <div style="display:flex; gap:10px;">
-                <button class="secondary" style="padding:5px 10px; font-size:0.8em;" onclick="openGhForkModal('${repo}')">Fork</button>
                 <button class="purple-btn" style="padding:5px 10px; font-size:0.8em;" onclick="triggerGhClone('${repo}')">Clone Source</button>
             </div>
         `;
@@ -317,30 +318,53 @@ async function triggerGhClone(repoName) {
     showToast('Clone Queued', 'success');
 }
 
-// Fork Modal
-let ghForkTargetRepo = '';
-function openGhForkModal(repo) {
-    ghForkTargetRepo = repo;
-    document.getElementById('gh-fork-source').textContent = repo;
-    document.getElementById('gh-fork-name').value = repo.split('/')[1]; // Default to original name
-    document.getElementById('gh-fork-modal').style.display='block';
+// Rename Modal
+let ghRenameTargetRepo = '';
+function openGhRenameModal(repo) {
+    ghRenameTargetRepo = repo;
+    document.getElementById('gh-rename-source').textContent = repo;
+    document.getElementById('gh-rename-input').value = repo.split('/')[1];
+    document.getElementById('gh-rename-repo-modal').style.display='block';
+}
+
+async function ghDeleteRepo(repo) {
+    const confirmMsg = `⚠️ DANGER ZONE ⚠️\n\nThis will DELETE '${repo}' PERMANENTLY.\nThis cannot be undone.\n\nType the repo name to confirm:`;
+    const input = prompt(confirmMsg);
+    if(input !== repo) {
+        if(input) showToast('Mismatch, deletion cancelled', 'error');
+        return;
+    }
+
+    const [owner, name] = repo.split('/');
+    try {
+        const res = await fetch('/api/apps/github/repo/delete', {
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({owner, repo:name, account_id:ghActiveAccount.id})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        showToast('Repository Deleted', 'success');
+        fetchMyRepos();
+    } catch(e) { showToast(e.message, 'error'); }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('confirm-gh-fork').onclick = async () => {
-        const newName = document.getElementById('gh-fork-name').value;
-        const [owner, repo] = ghForkTargetRepo.split('/');
+    document.getElementById('confirm-gh-rename').onclick = async () => {
+        const newName = document.getElementById('gh-rename-input').value;
+        const [owner, repo] = ghRenameTargetRepo.split('/');
 
         try {
-            const res = await fetch('/api/apps/github/repo/fork', {
+            const res = await fetch('/api/apps/github/repo/rename', {
                 method:'POST',headers:{'Content-Type':'application/json'},
                 body:JSON.stringify({owner, repo, new_name:newName, account_id:ghActiveAccount.id})
             });
             const data = await res.json();
             if(data.error) throw new Error(data.error);
 
-            showToast('Fork Started', 'success');
-            document.getElementById('gh-fork-modal').style.display='none';
+            showToast('Repository Renamed', 'success');
+            document.getElementById('gh-rename-repo-modal').style.display='none';
+            fetchMyRepos();
         } catch(e) { showToast(e.message, 'error'); }
     };
 });
