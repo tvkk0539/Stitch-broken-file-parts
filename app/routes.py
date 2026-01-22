@@ -5,7 +5,6 @@ from app.managers.archive import ArchiveManager
 from app.managers.repair import RepairManager
 from app.managers.extract import ExtractManager
 from app.managers.inspector import InspectorManager
-from app.managers.github_tool import GitHubManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -453,76 +452,3 @@ def upload_config():
             return jsonify({'status': 'uploaded', 'path': conf_path})
         except Exception as e:
             return jsonify({'error': f"Failed to save config: {e}"}), 500
-
-# --- Apps: GitHub ---
-
-@bp.route('/api/apps/github/accounts', methods=['GET'])
-def github_list_accounts():
-    return jsonify(GitHubManager.get_accounts())
-
-@bp.route('/api/apps/github/accounts/add', methods=['POST'])
-def github_add_account():
-    data = request.json
-    token = data.get('token')
-    if not token: return jsonify({'error': 'Token required'}), 400
-    try:
-        account = GitHubManager.validate_and_add_account(token)
-        return jsonify({'status': 'added', 'account': account})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
-
-@bp.route('/api/apps/github/accounts/remove', methods=['POST'])
-def github_remove_account():
-    data = request.json
-    aid = data.get('id')
-    if not aid: return jsonify({'error': 'ID required'}), 400
-
-    if GitHubManager.remove_account(aid):
-        return jsonify({'status': 'removed'})
-    return jsonify({'error': 'Account not found'}), 404
-
-@bp.route('/api/apps/github/releases', methods=['POST'])
-def github_get_releases():
-    data = request.json
-    repo = data.get('repo')
-    if not repo: return jsonify({'error': 'Repo required'}), 400
-
-    return jsonify(GitHubManager.get_releases(repo))
-
-@bp.route('/api/apps/github/download', methods=['POST'])
-def github_download():
-    data = request.json
-    url = data.get('url')
-    filename = data.get('filename')
-    path = data.get('path', '') # Relative path
-
-    if not url or not filename: return jsonify({'error': 'Missing args'}), 400
-
-    abs_dest = os.path.join(DOWNLOAD_ROOT, path)
-
-    job_id = job_manager.add_job(
-        f"GitHub Download: {filename}",
-        GitHubManager.run_download_job,
-        args=(url, filename, abs_dest)
-    )
-    return jsonify({'status': 'queued', 'job_id': job_id})
-
-@bp.route('/api/apps/github/publish', methods=['POST'])
-def github_publish():
-    data = request.json
-    repo = data.get('repo')
-    tag = data.get('tag')
-    file_path = data.get('file_path') # Relative
-    account_id = data.get('account_id')
-
-    if not repo or not tag or not file_path or not account_id: return jsonify({'error': 'Missing args'}), 400
-
-    abs_file = os.path.join(DOWNLOAD_ROOT, file_path)
-    if not os.path.exists(abs_file): return jsonify({'error': 'File not found'}), 404
-
-    job_id = job_manager.add_job(
-        f"GitHub Publish: {tag}",
-        GitHubManager.run_publish_job,
-        args=(repo, tag, abs_file, account_id)
-    )
-    return jsonify({'status': 'queued', 'job_id': job_id})

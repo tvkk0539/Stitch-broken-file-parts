@@ -25,12 +25,6 @@ Transform your VPS into a Cloud Manager. No FUSE required.
 - **Download to VPS:** Select files in the cloud and download them to a specific folder on your server.
 - **Config Upload:** Upload your `rclone.conf` directly from the Settings menu.
 
-### 🧩 Apps & Utilities (New!)
-A new section for integrated tools and utilities.
-- **GitHub Release Manager:**
-    - **Downloader:** Fetch and download assets from any public GitHub repository directly to your server. Supports streaming for large files.
-    - **Publisher:** Create releases and upload assets to your own repositories directly from the app.
-
 ### 📂 Local File Management
 - **Full File Browser:** Navigate your mapped directories easily.
 - **Move & Copy:** Organize files with a built-in **Folder Browser** to select destinations easily.
@@ -42,13 +36,20 @@ A new section for integrated tools and utilities.
 ### 🛡️ Stability & UX
 - **System Dashboard:** Live monitoring of **Disk Space**, **RAM**, and **CPU** usage prevents server overload.
 - **Deep Inspector:** Inspect video files (Resolution, Codec) and Archives (Content List) instantly without extracting.
-- **Smart Job Queue:** All heavy tasks (Repair, Pack, Upload, Download) are queued and processed sequentially in the background. This prevents server crashes (Out of Memory).
+- **Smart Job Queue:** All heavy tasks (Repair, Pack, Upload) are queued and processed sequentially in the background. This prevents server crashes (Out of Memory).
 - **Job Management UI:**
     - **Visual Queue:** See exactly what is running and what is waiting in the "Job Queue" tab.
     - **Cancellation:** Stop any running job or remove pending jobs with a single click.
-    - **Detailed Progress:** Click on any running job to see granular details.
+    - **Detailed Progress:** Click on any running job to see granular details (e.g., *Current File being uploaded*, *Current Archive Action*).
 - **Toast Notifications:** Modern, non-blocking status popups (Success/Error/Info) replace annoying browser alerts.
 - **Health Monitoring:** Includes a Docker `HEALTHCHECK` to ensure the service is always running correctly.
+
+### 🔮 Future Roadmap (Coming Soon)
+We are adopting a "Dual-Image" strategy (`:lite` vs `:full`) to support powerful new modules:
+- **Subtitle Manager:** Auto-download subs.
+- **FFmpeg Optimizer:** Convert AVI to MP4, strip audio tracks.
+- **Checksum Verifier:** SFV/MD5 checks.
+- **Modular Architecture:** The core is already refactored to plug these apps in easily.
 
 ## 🚀 Deployment Guide (Detailed)
 
@@ -126,20 +127,6 @@ If you are using Nginx Proxy Manager (included in many Arr stacks):
    - Run `par2` on all files.
    - Fix the filenames.
    - Extract the video file.
-
-### Apps Section (New!)
-Click the **Apps** icon in the sidebar to access additional utilities.
-
-#### GitHub Release Manager
-1. **Download:**
-   - Enter a GitHub repository (e.g., `radarr/radarr`).
-   - Click "Fetch".
-   - Browse the assets and click the download button.
-2. **Publish:**
-   - Go to **Settings** and enter your "GitHub Personal Access Token".
-   - Switch to the "Publisher" tab in the app.
-   - Enter the repository, tag (e.g., `v1.0.0`), and select a file from your local storage.
-   - Click "Publish" to create a release and upload the file.
 
 ### Creating an Archive
 1. Navigate to the file or folder you want to pack.
