@@ -643,64 +643,88 @@
 
             <!-- VIEW: GITHUB APP -->
             <div id="view-gh-app" class="view-section">
-                <div style="display:flex; align-items:center; margin-bottom:20px;">
-                    <button class="icon-btn" onclick="switchView('apps')" style="margin-right:15px; color:var(--text-muted);" title="Back to Apps">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                    </button>
-                    <h2 style="margin:0; display:flex; align-items:center; gap:10px;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                        GitHub Manager
-                    </h2>
-                </div>
-
-                <div class="gh-tabs">
-                    <div id="gh-tab-down" class="gh-tab active" onclick="switchGhTab('down')">Downloader</div>
-                    <div id="gh-tab-pub" class="gh-tab" onclick="switchGhTab('pub')">Publisher</div>
-                </div>
-
-                <!-- DOWNLOADER -->
-                <div id="gh-view-down">
-                    <div style="background: var(--panel-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label>GitHub Repository (User/Name)</label>
-                            <div style="display:flex; gap:10px;">
-                                <input type="text" id="gh-repo-input" placeholder="e.g. radarr/radarr" style="font-family: monospace;">
-                                <button class="secondary" onclick="fetchGhReleases()" style="flex:0; display:flex; align-items:center; gap:5px;">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                    Fetch
-                                </button>
-                            </div>
-                        </div>
+                <!-- Header -->
+                <div style="display:flex; align-items:center; margin-bottom:20px; justify-content: space-between;">
+                    <div style="display:flex; align-items:center;">
+                        <button class="icon-btn" onclick="switchView('apps')" style="margin-right:15px; color:var(--text-muted);" title="Back to Apps">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                        </button>
+                        <h2 style="margin:0; display:flex; align-items:center; gap:10px;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                            GitHub Manager
+                        </h2>
                     </div>
-
-                    <div id="gh-results-container">
-                        <div id="gh-results-header" style="display:none; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); color: var(--accent-color); font-weight: bold;">
-                            <!-- Filled by JS -->
-                        </div>
-                        <div id="gh-results"></div>
+                    <!-- Account Context (Visible when tool is active) -->
+                    <div id="gh-active-user-display" style="display:none; align-items:center; gap:10px; background:var(--panel-bg); padding:5px 15px; border-radius:20px; font-size:0.9em;">
+                        <img id="gh-active-avatar" src="" style="width:24px; height:24px; border-radius:50%;">
+                        <span id="gh-active-username" style="color:#c0caf5; font-weight:bold;">User</span>
+                        <button onclick="ghSwitchAccount()" style="background:none; border:none; color:var(--accent-color); font-size:0.8em; padding:0; margin-left:5px;">(Switch)</button>
                     </div>
                 </div>
 
-                <!-- PUBLISHER -->
-                <div id="gh-view-pub" style="display:none;">
-                    <div style="background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color); max-width: 600px;">
-                        <div class="form-group">
-                            <label>Repository</label>
-                            <input type="text" id="gh-pub-repo" placeholder="e.g. myuser/myrepo">
-                        </div>
-                        <div class="form-group">
-                            <label>Tag / Version</label>
-                            <input type="text" id="gh-pub-tag" placeholder="v1.0.0">
-                        </div>
-                        <div class="form-group">
-                            <label>File to Upload</label>
-                            <div style="display:flex; gap:10px;">
-                                <input type="text" id="gh-pub-file" placeholder="Select a file from 'Files' tab first..." readonly style="color: var(--text-muted); cursor: not-allowed;">
-                                <button class="purple-btn" style="flex:0;" onclick="openFilePickerForGh()">Get Selected File</button>
+                <!-- STATE 1: ACCOUNT HUB -->
+                <div id="gh-state-accounts">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+                        <span style="color:var(--text-muted);">Select an account to proceed</span>
+                        <button class="secondary" onclick="openGhLoginModal()" style="font-size:0.9em; padding:8px 15px;">+ Add Account</button>
+                    </div>
+
+                    <div id="gh-accounts-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                        <!-- JS Injected -->
+                    </div>
+                </div>
+
+                <!-- STATE 2: TOOLS (Downloader/Publisher) -->
+                <div id="gh-state-tools" style="display:none;">
+                    <div class="gh-tabs">
+                        <div id="gh-tab-down" class="gh-tab active" onclick="switchGhTab('down')">Downloader</div>
+                        <div id="gh-tab-pub" class="gh-tab" onclick="switchGhTab('pub')">Publisher</div>
+                    </div>
+
+                    <!-- DOWNLOADER -->
+                    <div id="gh-view-down">
+                        <div style="background: var(--panel-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>GitHub Repository (User/Name)</label>
+                                <div style="display:flex; gap:10px;">
+                                    <input type="text" id="gh-repo-input" placeholder="e.g. radarr/radarr" style="font-family: monospace;">
+                                    <button class="secondary" onclick="fetchGhReleases()" style="flex:0; display:flex; align-items:center; gap:5px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                        Fetch
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        <div style="margin-top:30px; display:flex; justify-content: flex-end;">
-                            <button class="secondary" onclick="triggerGhPublish()" style="padding: 12px 25px; font-size: 1em;">🚀 Publish Release</button>
+
+                        <div id="gh-results-container">
+                            <div id="gh-results-header" style="display:none; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); color: var(--accent-color); font-weight: bold;">
+                                <!-- Filled by JS -->
+                            </div>
+                            <div id="gh-results"></div>
+                        </div>
+                    </div>
+
+                    <!-- PUBLISHER -->
+                    <div id="gh-view-pub" style="display:none;">
+                        <div style="background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color); max-width: 600px;">
+                            <div class="form-group">
+                                <label>Repository</label>
+                                <input type="text" id="gh-pub-repo" placeholder="e.g. myuser/myrepo">
+                            </div>
+                            <div class="form-group">
+                                <label>Tag / Version</label>
+                                <input type="text" id="gh-pub-tag" placeholder="v1.0.0">
+                            </div>
+                            <div class="form-group">
+                                <label>File to Upload</label>
+                                <div style="display:flex; gap:10px;">
+                                    <input type="text" id="gh-pub-file" placeholder="Select a file from 'Files' tab first..." readonly style="color: var(--text-muted); cursor: not-allowed;">
+                                    <button class="purple-btn" style="flex:0;" onclick="openFilePickerForGh()">Get Selected File</button>
+                                </div>
+                            </div>
+                            <div style="margin-top:30px; display:flex; justify-content: flex-end;">
+                                <button class="secondary" onclick="triggerGhPublish()" style="padding: 12px 25px; font-size: 1em;">🚀 Publish Release</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -819,6 +843,22 @@
     <div id="mkdir-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>New Folder</h3></div><input type="text" id="mkdir-name" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-mkdir" class="danger">Cancel</button><button id="confirm-mkdir" class="secondary">Create</button></div></div></div>
     <div id="inspect-modal" class="modal"><div class="modal-content" style="width:600px;"><div class="modal-header"><h3>File Info</h3></div><div id="inspect-content" style="max-height:400px; overflow-y:auto;"></div><div class="modal-actions"><button id="close-inspect" class="secondary">Close</button></div></div></div>
 
+    <!-- GitHub Login Modal -->
+    <div id="gh-login-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Add GitHub Account</h3></div>
+            <div class="form-group">
+                <label>Personal Access Token</label>
+                <input type="password" id="gh-login-token" placeholder="ghp_...">
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Scopes required: <code>repo</code> (for private/publishing)</div>
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-gh-login" class="danger">Cancel</button>
+                <button id="confirm-gh-login" class="secondary">Verify & Login</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast-container"></div>
 
     <script>
@@ -843,9 +883,112 @@
         }
 
         // --- Apps Logic ---
+        let ghActiveAccount = null;
+
         function openGitHubApp() {
             switchView('gh-app');
+            loadGhAccounts();
+            // Default to Account Hub state
+            ghSwitchAccount();
         }
+
+        async function loadGhAccounts() {
+            const grid = document.getElementById('gh-accounts-grid');
+            grid.innerHTML = '<div style="color:var(--text-muted);">Loading accounts...</div>';
+
+            try {
+                const res = await fetch('/api/apps/github/accounts');
+                const accounts = await res.json();
+
+                grid.innerHTML = '';
+                if(accounts.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:var(--text-muted); border:1px dashed var(--border-color); border-radius:8px;">No accounts connected. Add one to get started.</div>';
+                    return;
+                }
+
+                accounts.forEach(acc => {
+                    const card = document.createElement('div');
+                    card.className = 'app-card';
+                    card.style.flexDirection = 'row';
+                    card.style.height = 'auto';
+                    card.style.padding = '15px';
+                    card.style.justifyContent = 'space-between';
+
+                    card.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:15px; flex:1;">
+                            <img src="${acc.avatar_url || 'https://github.com/identicons/user.png'}" style="width:40px; height:40px; border-radius:50%; background:#000;">
+                            <div style="text-align:left;">
+                                <div style="font-weight:bold; color:#c0caf5;">${acc.username}</div>
+                                <div style="font-size:0.8em; color:var(--text-muted);">${acc.name || ''}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:5px;">
+                            <button class="secondary" style="padding:5px 10px; font-size:0.8em;" onclick="ghSelectAccount('${acc.id}', '${acc.username}', '${acc.avatar_url}')">Select</button>
+                            <button class="danger" style="padding:5px 10px; font-size:0.8em; background:none; border:1px solid var(--error-color); color:var(--error-color);" onclick="ghLogout('${acc.id}', event)">Remove</button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+            } catch(e) {
+                grid.innerHTML = 'Error loading accounts.';
+            }
+        }
+
+        function ghSelectAccount(id, username, avatar) {
+            ghActiveAccount = {id, username};
+            document.getElementById('gh-state-accounts').style.display = 'none';
+            document.getElementById('gh-state-tools').style.display = 'block';
+
+            // Update Header
+            const display = document.getElementById('gh-active-user-display');
+            display.style.display = 'flex';
+            document.getElementById('gh-active-username').textContent = username;
+            document.getElementById('gh-active-avatar').src = avatar || 'https://github.com/identicons/user.png';
+        }
+
+        function ghSwitchAccount() {
+            ghActiveAccount = null;
+            document.getElementById('gh-state-accounts').style.display = 'block';
+            document.getElementById('gh-state-tools').style.display = 'none';
+            document.getElementById('gh-active-user-display').style.display = 'none';
+        }
+
+        async function ghLogout(id, e) {
+            if(e) e.stopPropagation();
+            if(confirm("Remove this account?")) {
+                await fetch('/api/apps/github/logout', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
+                loadGhAccounts();
+            }
+        }
+
+        // Login Modal
+        const ghLoginModal = document.getElementById('gh-login-modal');
+        function openGhLoginModal() { ghLoginModal.style.display = 'block'; }
+
+        document.getElementById('cancel-gh-login').onclick = () => ghLoginModal.style.display='none';
+        document.getElementById('confirm-gh-login').onclick = async () => {
+            const token = document.getElementById('gh-login-token').value.trim();
+            if(!token) return showToast('Token required', 'error');
+
+            const btn = document.getElementById('confirm-gh-login');
+            btn.disabled = true; btn.textContent = 'Verifying...';
+
+            try {
+                const res = await fetch('/api/apps/github/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token})});
+                const data = await res.json();
+                if(data.error) throw new Error(data.error);
+
+                showToast(`Logged in as ${data.username}`, 'success');
+                document.getElementById('gh-login-token').value = '';
+                ghLoginModal.style.display = 'none';
+                loadGhAccounts();
+            } catch(e) {
+                showToast(e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Verify & Login';
+            }
+        };
 
         function switchGhTab(tab) {
             document.querySelectorAll('.gh-tab').forEach(e => e.classList.remove('active'));
@@ -862,7 +1005,11 @@
             document.getElementById('gh-results-header').style.display = 'none';
 
             try {
-                const res = await fetch('/api/apps/github/releases', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({repo})});
+                // Pass account_id if available
+                const body = { repo };
+                if(ghActiveAccount) body.account_id = ghActiveAccount.id;
+
+                const res = await fetch('/api/apps/github/releases', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
                 const data = await res.json();
                 if(data.error) throw new Error(data.error);
 
@@ -901,10 +1048,14 @@
             const sub = prompt(`Download ${filename} to folder:`, 'Downloads/');
             if(sub === null) return;
 
+            // Pass account_id
+            const body = { url, filename, path:sub };
+            if(ghActiveAccount) body.account_id = ghActiveAccount.id;
+
             await fetch('/api/apps/github/download', {
                 method:'POST',
                 headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({url, filename, path:sub})
+                body:JSON.stringify(body)
             });
             showToast('Download Queued', 'success');
         }
@@ -922,6 +1073,7 @@
 
         async function triggerGhPublish() {
             if(!ghPubFile.value) return showToast('Select a file first', 'error');
+            if(!ghActiveAccount) return showToast('No active account', 'error');
 
             await fetch('/api/apps/github/publish', {
                 method:'POST',
@@ -929,7 +1081,8 @@
                 body:JSON.stringify({
                     repo: ghPubRepo.value,
                     tag: ghPubTag.value,
-                    file_path: ghPubFile.value
+                    file_path: ghPubFile.value,
+                    account_id: ghActiveAccount.id
                 })
             });
             showToast('Publish Queued', 'success');
