@@ -28,8 +28,15 @@ Transform your VPS into a Cloud Manager. No FUSE required.
 ### 🧩 Apps & Utilities (New!)
 A new section for integrated tools and utilities.
 - **GitHub Release Manager:**
-    - **Downloader:** Fetch and download assets from any public GitHub repository directly to your server. Supports streaming for large files.
-    - **Publisher:** Create releases and upload assets to your own repositories directly from the app.
+    - **Multi-Account Support:** Login with multiple GitHub accounts and switch between them instantly using the **Account Hub**.
+    - **Repository Browser:** View all your repositories (Public/Private) in a convenient grid. No need to manually type repo names anymore.
+    - **Visibility Control:** Toggle repositories between **Public** and **Private** directly from the dashboard (with safety confirmations).
+    - **Create & Fork:** Create new empty repositories or **Fork** existing ones (with optional renaming) directly from the interface.
+    - **Clone Source:** Clone the source code of any repository to your VPS using `git clone` (authenticated).
+    - **Actions Manager:** Full CI/CD Dashboard. View workflows, trigger runs, and cancel active jobs.
+    - **Rich Publishing:** Create professional releases with Markdown release notes, **Draft** mode support, and **Pre-release** tagging.
+    - **Downloader:** Fetch and download assets from any public or private GitHub repository (using your account) directly to your server.
+    - **Auto-Migration:** Automatically upgrades your legacy `github_token` configuration to the new multi-account system.
 
 ### 📂 Local File Management
 - **Full File Browser:** Navigate your mapped directories easily.
@@ -131,14 +138,29 @@ If you are using Nginx Proxy Manager (included in many Arr stacks):
 Click the **Apps** icon in the sidebar to access additional utilities.
 
 #### GitHub Release Manager
-1. **Download:**
+1. **Manage Accounts:**
+   - Click the GitHub Manager card to enter the **Account Hub**.
+   - Click **"+ Add Account"** and paste your Personal Access Token (PAT).
+   - See your avatar and username instantly verified.
+2. **Download:**
+   - Select an account from the hub.
    - Enter a GitHub repository (e.g., `radarr/radarr`).
-   - Click "Fetch".
-   - Browse the assets and click the download button.
-2. **Publish:**
-   - Go to **Settings** and enter your "GitHub Personal Access Token".
-   - Switch to the "Publisher" tab in the app.
-   - Enter the repository, tag (e.g., `v1.0.0`), and select a file from your local storage.
+    - **My Repos:** Browse your personal and organizational repositories.
+    - **Select:** Click any repo to auto-fill it for Downloading or Publishing.
+    - **Toggle Visibility:** Use the lock/unlock icon to switch between Public and Private visibility.
+    - **Create Repo:** Click the big "+" card to create a new empty repository.
+    - **Actions:** Click the "▶" button on any card to open the Actions Dashboard (Run/Cancel workflows).
+3. **Download & Clone:**
+    - Enter a GitHub repository (e.g., `radarr/radarr`) or select one from "My Repos".
+   - Click "Fetch" to see releases.
+    - **Download:** Click the download icon next to an asset to save it.
+    - **Fork:** Click "Fork" to copy the repo to your account (supports renaming).
+    - **Clone Source:** Click "Clone Source" to `git clone` the entire repository to your VPS.
+4. **Publish:**
+   - Select an account (must have write access).
+   - Switch to the "Publisher" tab.
+   - Enter the repository, tag (e.g., `v1.0.0`), and select a file.
+    - (Optional) Add **Release Notes**, mark as **Draft**, or **Pre-release**.
    - Click "Publish" to create a release and upload the file.
 
 ### Creating an Archive
