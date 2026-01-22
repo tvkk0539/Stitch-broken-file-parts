@@ -66,6 +66,401 @@ function ghSelectAccount(id, username, avatar) {
     fetchMyRepos();
 }
 
+// --- Browser Logic ---
+let ghBrowserState = {
+    owner: '',
+    repo: '',
+    path: '',
+    branch: 'main'
+};
+
+function openGhBrowser(repoName) {
+    const [owner, repo] = repoName.split('/');
+    ghBrowserState = { owner, repo, path: '', branch: 'main' };
+
+    document.getElementById('gh-browser-modal').style.display = 'flex';
+    document.getElementById('gh-browser-title').innerText = `${repoName}`;
+
+    loadGhBranches(owner, repo);
+    loadGhContents();
+}
+
+async function loadGhBranches(owner, repo) {
+    const select = document.getElementById('gh-browser-branch');
+    select.innerHTML = '<option>Loading...</option>';
+    select.disabled = true;
+
+    try {
+        const res = await fetch('/api/apps/github/repo/branches', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({owner, repo, account_id: ghActiveAccount.id})
+        });
+        const branches = await res.json();
+
+        select.innerHTML = '';
+        branches.forEach(b => {
+            const opt = document.createElement('option');
+            opt.value = b;
+            opt.innerText = b;
+            if(b === 'main' || b === 'master') opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        ghBrowserState.branch = select.value;
+        select.disabled = false;
+        select.onchange = () => {
+            ghBrowserState.branch = select.value;
+            loadGhContents();
+        };
+    } catch(e) {
+        select.innerHTML = '<option>Error</option>';
+    }
+}
+
+async function loadGhContents() {
+    const list = document.getElementById('gh-browser-list');
+    const crumbs = document.getElementById('gh-browser-breadcrumbs');
+
+    list.innerHTML = 'Loading...';
+
+    // Update breadcrumbs
+    const parts = ghBrowserState.path.split('/').filter(p => p);
+    let html = `<span style="cursor:pointer; color:var(--accent-color);" onclick="ghNavigate('')">ROOT</span>`;
+    let current = '';
+    parts.forEach((p, i) => {
+        current += (i > 0 ? '/' : '') + p;
+        const target = current; // capture for closure
+        html += ` / <span style="cursor:pointer; color:var(--accent-color);" onclick="ghNavigate('${target}')">${p}</span>`;
+    });
+    crumbs.innerHTML = html;
+
+    try {
+        const res = await fetch('/api/apps/github/repo/contents', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                owner: ghBrowserState.owner,
+                repo: ghBrowserState.repo,
+                path: ghBrowserState.path,
+                branch: ghBrowserState.branch,
+                account_id: ghActiveAccount.id
+            })
+        });
+        const data = await res.json();
+
+        if(data.error) throw new Error(data.error);
+
+        list.innerHTML = '';
+
+        // Go Back Item
+        if(ghBrowserState.path) {
+            const parent = ghBrowserState.path.substring(0, ghBrowserState.path.lastIndexOf('/'));
+            const row = document.createElement('div');
+            row.className = 'gh-browser-item';
+            row.style.padding = '10px';
+            row.style.borderBottom = '1px solid var(--border-color)';
+            row.style.cursor = 'pointer';
+            row.innerHTML = `📁 ..`;
+            row.onclick = () => ghNavigate(parent);
+            list.appendChild(row);
+        }
+
+        if(data.type === 'file') {
+            // Should not happen usually as we click to open
+            openGhEditor(data);
+            return;
+        }
+
+        if(data.items.length === 0) {
+            list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">Empty Directory</div>';
+            return;
+        }
+
+        data.items.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'gh-browser-item';
+            row.style.padding = '10px';
+            row.style.borderBottom = '1px solid var(--border-color)';
+            row.style.cursor = 'pointer';
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.alignItems = 'center';
+
+            const icon = item.type === 'dir' ? '📁' : '📄';
+            const color = item.type === 'dir' ? 'var(--accent-color)' : '#c0caf5';
+
+            row.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span>${icon}</span>
+                    <span style="color:${color};">${item.name}</span>
+                </div>
+                <div style="font-size:0.8em; color:var(--text-muted); display:flex; gap:10px; align-items:center;">
+                    <span>${item.size ? formatBytes(item.size) : ''}</span>
+                    <button class="danger icon-btn" onclick="deleteGhFile(event, '${item.path}', '${item.sha}')">🗑️</button>
+                </div>
+            `;
+
+            row.onclick = (e) => {
+                // Ignore button clicks
+                if(e.target.tagName === 'BUTTON') return;
+
+                if(item.type === 'dir') {
+                    ghNavigate(item.path);
+                } else {
+                    // Fetch file details (content)
+                    openGhFile(item.path);
+                }
+            };
+
+            list.appendChild(row);
+        });
+
+    } catch(e) {
+        list.innerHTML = `<div style="color:var(--error-color);">Error: ${e.message}</div>`;
+    }
+}
+
+function ghNavigate(path) {
+    ghBrowserState.path = path;
+    loadGhContents();
+}
+
+async function deleteGhFile(e, path, sha) {
+    e.stopPropagation();
+    if(!confirm(`Delete ${path}?`)) return;
+
+    try {
+        const res = await fetch('/api/apps/github/repo/file/delete', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                owner: ghBrowserState.owner,
+                repo: ghBrowserState.repo,
+                path: path,
+                sha: sha,
+                message: `Delete ${path}`,
+                branch: ghBrowserState.branch,
+                account_id: ghActiveAccount.id
+            })
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        showToast('File Deleted', 'success');
+        loadGhContents();
+    } catch(e) {
+        showToast(e.message, 'error');
+    }
+}
+
+// --- Editor Logic ---
+let ghEditorState = {
+    path: '',
+    sha: null
+};
+
+async function openGhFile(path) {
+    // Check size first? We do it in loadContents logic usually, but here we just fetch
+    // If it's huge, backend might choke or API limit.
+    // We already have size in listing, but let's just try fetching.
+
+    showToast('Opening file...', 'info');
+
+    try {
+        const res = await fetch('/api/apps/github/repo/contents', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                owner: ghBrowserState.owner,
+                repo: ghBrowserState.repo,
+                path: path,
+                branch: ghBrowserState.branch,
+                account_id: ghActiveAccount.id
+            })
+        });
+        const data = await res.json();
+
+        if(data.error) throw new Error(data.error);
+        if(data.size > 1000000) { // 1MB Safety Limit
+            alert(`File is too large (${formatBytes(data.size)}) to edit in browser.`);
+            return;
+        }
+
+        ghEditorState = { path: data.path, sha: data.sha };
+
+        document.getElementById('gh-editor-modal').style.display = 'flex';
+        document.getElementById('gh-editor-filename').innerText = data.path;
+
+        const content = atob(data.content); // Decode Base64
+        document.getElementById('gh-editor-content').value = content;
+        document.getElementById('gh-editor-message').value = ''; // Reset message
+
+    } catch(e) {
+        showToast(e.message, 'error');
+    }
+}
+
+async function saveGhFile() {
+    const content = document.getElementById('gh-editor-content').value;
+    const message = document.getElementById('gh-editor-message').value || `Update ${ghEditorState.path}`;
+    const contentB64 = btoa(content);
+
+    try {
+        const res = await fetch('/api/apps/github/repo/file/put', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                owner: ghBrowserState.owner,
+                repo: ghBrowserState.repo,
+                path: ghEditorState.path,
+                content: contentB64,
+                message: message,
+                sha: ghEditorState.sha,
+                branch: ghBrowserState.branch,
+                account_id: ghActiveAccount.id
+            })
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        showToast('File Saved', 'success');
+        document.getElementById('gh-editor-modal').style.display = 'none';
+        loadGhContents(); // Refresh list
+    } catch(e) {
+        showToast(e.message, 'error');
+    }
+}
+
+// --- Upload Logic ---
+
+function openGhUploadModal() {
+    document.getElementById('gh-upload-modal').style.display = 'block';
+}
+
+function handleGhPcUpload(input) {
+    const file = input.files[0];
+    if(!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const contentB64 = e.target.result.split(',')[1]; // Remove data URL prefix
+        const path = ghBrowserState.path ? `${ghBrowserState.path}/${file.name}` : file.name;
+
+        showToast('Uploading...', 'info');
+
+        try {
+            const res = await fetch('/api/apps/github/repo/file/put', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    owner: ghBrowserState.owner,
+                    repo: ghBrowserState.repo,
+                    path: path,
+                    content: contentB64,
+                    message: `Upload ${file.name}`,
+                    branch: ghBrowserState.branch,
+                    account_id: ghActiveAccount.id
+                })
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+
+            showToast('Upload Successful', 'success');
+            document.getElementById('gh-upload-modal').style.display = 'none';
+            loadGhContents();
+        } catch(err) {
+            showToast(err.message, 'error');
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function openGhServerPicker() {
+    document.getElementById('gh-upload-modal').style.display = 'none';
+    // Reuse Move/Copy Modal but hijack its Confirm action?
+    // Or build a custom picker. Let's hijack the MC modal for simplicity if possible,
+    // but the MC modal is wired to specific buttons.
+    // Better: Open MC modal with a special "mode".
+
+    // We can simulate clicking "Copy" but that's messy.
+    // Let's create a minimal picker or reuse the logic.
+    // I'll reuse the `openMcModal` but pass a callback context? No, `openMcModal` is in main.js/files.js
+    // I will call `openMcModal('gh-upload')`.
+    // I need to modify `files.js` or `main.js` to handle this 'gh-upload' mode or just add a listener.
+    // WAIT: `openMcModal` is designed for Destination selection (Folders).
+    // For Upload from Server, we want to select a SOURCE FILE.
+    // The main file browser is for source selection.
+
+    // Alternative:
+    // Ask user to "Select a file in the Files tab first".
+    // Just like the Publisher.
+
+    if(selectedPaths.length === 1 && browserMode === 'local') {
+        // We have a file selected
+        startGhServerUpload(selectedPaths[0]);
+    } else {
+        alert("Please go to the 'Files' tab, select ONE local file, then come back here.");
+    }
+}
+
+async function startGhServerUpload(localPath) {
+    const filename = localPath.split('/').pop();
+    const remotePath = ghBrowserState.path ? `${ghBrowserState.path}/${filename}` : filename;
+
+    if(!confirm(`Upload '${filename}' to GitHub folder '${ghBrowserState.path || 'root'}'?`)) return;
+
+    try {
+        const res = await fetch('/api/apps/github/repo/upload-server', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                owner: ghBrowserState.owner,
+                repo: ghBrowserState.repo,
+                local_path: localPath,
+                remote_path: remotePath,
+                message: `Upload ${filename} from server`,
+                branch: ghBrowserState.branch,
+                account_id: ghActiveAccount.id
+            })
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        showToast('Server Upload Queued', 'success');
+        document.getElementById('gh-upload-modal').style.display = 'none';
+        // Note: It's async, so list won't update immediately.
+    } catch(e) {
+        showToast(e.message, 'error');
+    }
+}
+
+// --- New Folder Logic ---
+function openGhNewFolderModal() {
+    const name = prompt("New Folder Name:");
+    if(!name) return;
+
+    // Create .gitkeep
+    const path = ghBrowserState.path ? `${ghBrowserState.path}/${name}/.gitkeep` : `${name}/.gitkeep`;
+
+    // We reuse create file logic
+    // Content empty base64 = ""
+    fetch('/api/apps/github/repo/file/put', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            owner: ghBrowserState.owner,
+            repo: ghBrowserState.repo,
+            path: path,
+            content: "", // Empty file
+            message: `Create folder ${name}`,
+            branch: ghBrowserState.branch,
+            account_id: ghActiveAccount.id
+        })
+    }).then(r=>r.json()).then(data => {
+        if(data.error) showToast(data.error, 'error');
+        else {
+            showToast('Folder Created', 'success');
+            loadGhContents();
+        }
+    });
+}
+
 function ghSwitchAccount() {
     ghActiveAccount = null;
     document.getElementById('gh-state-accounts').style.display = 'block';
@@ -176,6 +571,7 @@ async function fetchMyRepos() {
                 <div style="display:flex; gap:5px; flex-wrap:wrap; width:100%;">
                     <button class="secondary" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'down')">Get</button>
                     <button class="purple-btn" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'pub')">Pub</button>
+                    <button class="info-btn" style="flex:0; font-size:0.8em; padding:6px; background:var(--accent-color); color:#000;" onclick="openGhBrowser('${repo.name}')" title="Browse Code">📂</button>
                     <button class="info-btn" style="flex:0; font-size:0.8em; padding:6px;" onclick="ghOpenSecrets('${repo.name}')" title="Secrets">🔑</button>
                     <button class="info-btn" style="flex:0; font-size:0.8em; padding:6px;" onclick="ghOpenActions('${repo.name}')" title="Actions">▶</button>
                 </div>

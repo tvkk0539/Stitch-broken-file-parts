@@ -321,6 +321,174 @@ class GitHubManager:
             return {'status': 'cancelled'}
         except Exception as e: return {'error': str(e)}
 
+    # --- Contents & File Browser ---
+
+    @staticmethod
+    def get_branches(owner, repo, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/branches?per_page=100"
+            r = requests.get(url, headers=headers)
+            if r.status_code != 200: return {'error': f"Failed to list branches: {r.text}"}
+
+            return [b['name'] for b in r.json()]
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def get_contents(owner, repo, path, account_id, branch='main'):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            # Clean path
+            path = path.strip('/')
+            url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={branch}"
+            r = requests.get(url, headers=headers)
+
+            if r.status_code != 200:
+                 return {'error': f"Failed to fetch contents: {r.status_code}"}
+
+            data = r.json()
+
+            # If it's a list, it's a directory
+            if isinstance(data, list):
+                items = []
+                for item in data:
+                    items.append({
+                        'name': item['name'],
+                        'path': item['path'],
+                        'type': item['type'], # 'file' or 'dir'
+                        'size': item['size'],
+                        'sha': item['sha'],
+                        'url': item['html_url']
+                    })
+                # Sort: dirs first
+                items.sort(key=lambda x: (x['type'] != 'dir', x['name'].lower()))
+                return {'type': 'dir', 'items': items}
+
+            # If it's a dict, it's a file
+            elif isinstance(data, dict):
+                 return {
+                     'type': 'file',
+                     'name': data['name'],
+                     'path': data['path'],
+                     'size': data['size'],
+                     'sha': data['sha'],
+                     'content': data.get('content'), # Base64 encoded
+                     'encoding': data.get('encoding')
+                 }
+
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def create_update_file(owner, repo, path, content_b64, message, account_id, sha=None, branch='main'):
+        """
+        Creates or updates a file.
+        content_b64: Base64 encoded string of the file content.
+        sha: Required if updating an existing file.
+        """
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+
+            payload = {
+                'message': message,
+                'content': content_b64,
+                'branch': branch
+            }
+            if sha:
+                payload['sha'] = sha
+
+            r = requests.put(url, json=payload, headers=headers)
+
+            if r.status_code in [200, 201]:
+                action = "Updated" if sha else "Created"
+                return {'status': 'success', 'action': action, 'commit': r.json()['commit']['sha']}
+            else:
+                return {'error': f"Operation failed: {r.text}"}
+
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def delete_repo_file(owner, repo, path, sha, message, account_id, branch='main'):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+            payload = {
+                'message': message,
+                'sha': sha,
+                'branch': branch
+            }
+
+            r = requests.delete(url, json=payload, headers=headers)
+
+            if r.status_code == 200:
+                return {'status': 'deleted', 'commit': r.json()['commit']['sha']}
+            else:
+                return {'error': f"Delete failed: {r.text}"}
+
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def upload_server_file_job(owner, repo, local_path, remote_path, message, branch, account_id):
+        """
+        Reads a local file and pushes it to GitHub.
+        """
+        log(f"Starting Upload to GitHub: {local_path} -> {remote_path}")
+        job_manager.update_job_details({'action': f"Reading {os.path.basename(local_path)}..."})
+
+        try:
+            if not os.path.exists(local_path):
+                raise Exception("Local file not found")
+
+            # Check file size (GitHub API limit ~100MB)
+            size_mb = os.path.getsize(local_path) / (1024 * 1024)
+            if size_mb > 95:
+                 raise Exception("File too large for GitHub API (>95MB)")
+
+            # Read file
+            with open(local_path, 'rb') as f:
+                content = f.read()
+
+            content_b64 = base64.b64encode(content).decode('utf-8')
+
+            # Check if file exists to get SHA (for update)
+            # Use get_contents to check
+            existing = GitHubManager.get_contents(owner, repo, remote_path, account_id, branch)
+            sha = None
+            if not isinstance(existing, dict) or 'error' not in existing:
+                 # It might exist
+                 if isinstance(existing, dict) and existing.get('type') == 'file':
+                     sha = existing.get('sha')
+
+            job_manager.update_job_details({'action': "Pushing to GitHub..."})
+
+            res = GitHubManager.create_update_file(
+                owner, repo, remote_path, content_b64, message, account_id, sha, branch
+            )
+
+            if 'error' in res:
+                raise Exception(res['error'])
+
+            log(f"Upload Successful: {res['action']}")
+            NotificationManager.send_notification(f"✅ ParFix: Uploaded {os.path.basename(local_path)} to {repo}")
+
+        except Exception as e:
+            log(f"GitHub Upload Failed: {e}")
+            job_manager.update_job_details({'error': str(e)})
+
     # --- Secrets ---
 
     @staticmethod

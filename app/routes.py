@@ -657,6 +657,81 @@ def github_import_repo():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/apps/github/repo/branches', methods=['POST'])
+def github_repo_branches():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    account_id = data.get('account_id')
+    return jsonify(GitHubManager.get_branches(owner, repo, account_id))
+
+@bp.route('/api/apps/github/repo/contents', methods=['POST'])
+def github_repo_contents():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    path = data.get('path', '')
+    branch = data.get('branch', 'main')
+    account_id = data.get('account_id')
+    return jsonify(GitHubManager.get_contents(owner, repo, path, account_id, branch))
+
+@bp.route('/api/apps/github/repo/file/put', methods=['POST'])
+def github_repo_file_put():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    path = data.get('path')
+    content = data.get('content') # Base64
+    message = data.get('message')
+    sha = data.get('sha') # Optional (for update)
+    branch = data.get('branch', 'main')
+    account_id = data.get('account_id')
+
+    if not path or content is None: return jsonify({'error': 'Missing path or content'}), 400
+
+    return jsonify(GitHubManager.create_update_file(
+        owner, repo, path, content, message, account_id, sha, branch
+    ))
+
+@bp.route('/api/apps/github/repo/file/delete', methods=['POST'])
+def github_repo_file_delete():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    path = data.get('path')
+    sha = data.get('sha')
+    message = data.get('message')
+    branch = data.get('branch', 'main')
+    account_id = data.get('account_id')
+
+    if not path or not sha: return jsonify({'error': 'Missing path or sha'}), 400
+
+    return jsonify(GitHubManager.delete_repo_file(
+        owner, repo, path, sha, message, account_id, branch
+    ))
+
+@bp.route('/api/apps/github/repo/upload-server', methods=['POST'])
+def github_upload_server():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    local_path = data.get('local_path')
+    remote_path = data.get('remote_path')
+    message = data.get('message')
+    branch = data.get('branch', 'main')
+    account_id = data.get('account_id')
+
+    if not local_path or not remote_path: return jsonify({'error': 'Missing paths'}), 400
+
+    abs_local = os.path.join(DOWNLOAD_ROOT, local_path)
+
+    job_id = job_manager.add_job(
+        f"Push {os.path.basename(local_path)} to GitHub",
+        GitHubManager.upload_server_file_job,
+        args=(owner, repo, abs_local, remote_path, message, branch, account_id)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
 # --- Actions ---
 @bp.route('/api/apps/github/actions/workflows', methods=['POST'])
 def github_list_workflows():

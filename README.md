@@ -29,7 +29,11 @@ Transform your VPS into a Cloud Manager. No FUSE required.
 A new section for integrated tools and utilities.
 - **GitHub Release Manager:**
     - **Multi-Account Support:** Login with multiple GitHub accounts and switch between them instantly using the **Account Hub**.
-    - **Repository Browser:** View all your repositories (Public/Private) in a convenient grid with **Live Search** to quickly find specific repos.
+    - **Repository Browser (New!):** View all your repositories (Public/Private) in a convenient grid with **Live Search** to quickly find specific repos.
+    - **Direct Code Browser (New!):** Browse repository files and folders directly in the UI without cloning.
+        - **View & Edit:** Open text files in a built-in editor and commit changes directly to GitHub.
+        - **Upload:** Upload files from your **PC** or **Server (VPS)** directly to any folder in the repository.
+        - **Manage:** Create new folders, delete files, and switch branches (`main`, `dev`, etc.).
     - **Visibility Control:** Toggle repositories between **Public** and **Private** directly from the dashboard (with safety confirmations).
     - **Create & Import:** Create new empty repositories or **Import** existing ones from other URLs (supports mirroring public/private repos).
     - **Clone Source:** Clone the source code of any repository to your VPS using `git clone` (authenticated).
@@ -158,6 +162,7 @@ Click the **Apps** icon in the sidebar to access additional utilities.
     - **Import Repo:** Click the "Import" card to mirror an existing repository (Public or Private) to your account.
     - **Search:** Use the search bar to filter your repository list instantly.
     - **Actions:** Click the "▶" button on any card to open the Actions Dashboard (Run/Cancel workflows).
+    - **Code Browser:** Click the "📂" folder icon to browse code, edit files, and upload content (PC or Server).
 3. **Download & Manage Releases:**
     - Enter a GitHub repository (e.g., `radarr/radarr`) or select one from "My Repos".
     - Click "Fetch" to see releases.
