@@ -28,8 +28,10 @@ Transform your VPS into a Cloud Manager. No FUSE required.
 ### 🧩 Apps & Utilities (New!)
 A new section for integrated tools and utilities.
 - **GitHub Release Manager:**
-    - **Downloader:** Fetch and download assets from any public GitHub repository directly to your server. Supports streaming for large files.
-    - **Publisher:** Create releases and upload assets to your own repositories directly from the app.
+    - **Multi-Account Support:** Login with multiple GitHub accounts and switch between them instantly using the **Account Hub**.
+    - **Downloader:** Fetch and download assets from any public or private GitHub repository (using your account) directly to your server.
+    - **Publisher:** Create releases and upload assets to your own repositories. Actions are securely tied to the currently selected identity.
+    - **Auto-Migration:** Automatically upgrades your legacy `github_token` configuration to the new multi-account system.
 
 ### 📂 Local File Management
 - **Full File Browser:** Navigate your mapped directories easily.
@@ -131,14 +133,19 @@ If you are using Nginx Proxy Manager (included in many Arr stacks):
 Click the **Apps** icon in the sidebar to access additional utilities.
 
 #### GitHub Release Manager
-1. **Download:**
+1. **Manage Accounts:**
+   - Click the GitHub Manager card to enter the **Account Hub**.
+   - Click **"+ Add Account"** and paste your Personal Access Token (PAT).
+   - See your avatar and username instantly verified.
+2. **Download:**
+   - Select an account from the hub.
    - Enter a GitHub repository (e.g., `radarr/radarr`).
-   - Click "Fetch".
-   - Browse the assets and click the download button.
-2. **Publish:**
-   - Go to **Settings** and enter your "GitHub Personal Access Token".
-   - Switch to the "Publisher" tab in the app.
-   - Enter the repository, tag (e.g., `v1.0.0`), and select a file from your local storage.
+   - Click "Fetch" to see releases.
+   - Download assets directly to your server.
+3. **Publish:**
+   - Select an account (must have write access).
+   - Switch to the "Publisher" tab.
+   - Enter the repository, tag (e.g., `v1.0.0`), and select a file.
    - Click "Publish" to create a release and upload the file.
 
 ### Creating an Archive
