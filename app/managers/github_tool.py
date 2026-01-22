@@ -114,6 +114,60 @@ class GitHubManager:
     # --- Operations ---
 
     @staticmethod
+    def list_user_repos(account_id, type_filter='all'):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token:
+            return {'error': 'Account token not found'}
+
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        try:
+            # We need to paginate or just get first 100
+            url = f"https://api.github.com/user/repos?type={type_filter}&sort=updated&per_page=100"
+            r = requests.get(url, headers=headers, timeout=10)
+            if r.status_code != 200:
+                return {'error': f"Failed to list repos: {r.status_code}"}
+
+            repos = []
+            for item in r.json():
+                repos.append({
+                    'name': item['full_name'],
+                    'private': item['private'],
+                    'stars': item.get('stargazers_count', 0),
+                    'updated_at': item.get('updated_at'),
+                    'html_url': item.get('html_url')
+                })
+            return repos
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def update_repo_visibility(repo_name, private, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token:
+            return {'error': 'Account token not found'}
+
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        try:
+            url = f"https://api.github.com/repos/{repo_name}"
+            payload = {'private': private}
+            r = requests.patch(url, json=payload, headers=headers, timeout=10)
+
+            if r.status_code == 200:
+                return {'status': 'success', 'private': r.json()['private']}
+            else:
+                return {'error': f"Failed to update visibility: {r.text}"}
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
     def get_releases(repo_url, account_id=None):
         """
         Fetches the latest releases for a given repo.
@@ -232,7 +286,7 @@ class GitHubManager:
                  except: pass
 
     @staticmethod
-    def run_publish_job(repo, tag_name, file_path, account_id):
+    def run_publish_job(repo, tag_name, file_path, account_id, body=None, prerelease=False, draft=False):
         """
         Background job to create a release and upload an asset.
         """
@@ -258,9 +312,9 @@ class GitHubManager:
             payload = {
                 "tag_name": tag_name,
                 "name": f"Release {tag_name}",
-                "body": "Uploaded via ParFix Utility",
-                "draft": False,
-                "prerelease": False
+                "body": body or "Uploaded via ParFix Utility",
+                "draft": draft,
+                "prerelease": prerelease
             }
 
             r = requests.post(create_url, json=payload, headers=headers)

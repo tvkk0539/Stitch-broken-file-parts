@@ -476,6 +476,24 @@ def github_logout():
 
     return jsonify(GitHubManager.remove_account(account_id))
 
+@bp.route('/api/apps/github/user/repos', methods=['GET'])
+def github_list_user_repos():
+    account_id = request.args.get('account_id')
+    if not account_id: return jsonify({'error': 'Account ID required'}), 400
+
+    return jsonify(GitHubManager.list_user_repos(account_id))
+
+@bp.route('/api/apps/github/repo/visibility', methods=['POST'])
+def github_set_visibility():
+    data = request.json
+    repo = data.get('repo')
+    private = data.get('private')
+    account_id = data.get('account_id')
+
+    if not repo or not account_id: return jsonify({'error': 'Missing args'}), 400
+
+    return jsonify(GitHubManager.update_repo_visibility(repo, private, account_id))
+
 @bp.route('/api/apps/github/releases', methods=['POST'])
 def github_get_releases():
     data = request.json
@@ -512,6 +530,11 @@ def github_publish():
     file_path = data.get('file_path') # Relative
     account_id = data.get('account_id')
 
+    # Rich Options
+    body = data.get('body')
+    draft = data.get('draft', False)
+    prerelease = data.get('prerelease', False)
+
     if not repo or not tag or not file_path: return jsonify({'error': 'Missing args'}), 400
     if not account_id: return jsonify({'error': 'Account ID required'}), 400
 
@@ -521,6 +544,6 @@ def github_publish():
     job_id = job_manager.add_job(
         f"GitHub Publish: {tag}",
         GitHubManager.run_publish_job,
-        args=(repo, tag, abs_file, account_id)
+        args=(repo, tag, abs_file, account_id, body, prerelease, draft)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})

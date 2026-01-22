@@ -64,5 +64,35 @@ class TestGitHubManager(unittest.TestCase):
         self.assertNotIn('token', accounts[0])
         self.assertEqual(accounts[0]['username'], 'u')
 
+    @patch('app.managers.github_tool.config.load_config')
+    @patch('app.managers.github_tool.requests.get')
+    def test_list_user_repos(self, mock_get, mock_load):
+        mock_load.return_value = {
+            'github_accounts': [{'id': '1', 'token': 'secret'}]
+        }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = [{'full_name': 'user/repo', 'private': False}]
+        mock_get.return_value = mock_resp
+
+        repos = GitHubManager.list_user_repos('1')
+        self.assertEqual(len(repos), 1)
+        self.assertEqual(repos[0]['name'], 'user/repo')
+
+    @patch('app.managers.github_tool.config.load_config')
+    @patch('app.managers.github_tool.requests.patch')
+    def test_update_repo_visibility(self, mock_patch, mock_load):
+        mock_load.return_value = {
+            'github_accounts': [{'id': '1', 'token': 'secret'}]
+        }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {'private': True}
+        mock_patch.return_value = mock_resp
+
+        res = GitHubManager.update_repo_visibility('user/repo', True, '1')
+        self.assertEqual(res['status'], 'success')
+        self.assertTrue(res['private'])
+
 if __name__ == '__main__':
     unittest.main()

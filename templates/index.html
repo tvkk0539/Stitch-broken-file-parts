@@ -190,12 +190,23 @@
                 <!-- STATE 2: TOOLS (Downloader/Publisher) -->
                 <div id="gh-state-tools" style="display:none;">
                     <div class="gh-tabs">
-                        <div id="gh-tab-down" class="gh-tab active" onclick="switchGhTab('down')">Downloader</div>
+                        <div id="gh-tab-repos" class="gh-tab active" onclick="switchGhTab('repos')">My Repos</div>
+                        <div id="gh-tab-down" class="gh-tab" onclick="switchGhTab('down')">Downloader</div>
                         <div id="gh-tab-pub" class="gh-tab" onclick="switchGhTab('pub')">Publisher</div>
                     </div>
 
+                    <!-- MY REPOS -->
+                    <div id="gh-view-repos">
+                        <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
+                            <button class="icon-btn" onclick="fetchMyRepos()" title="Refresh Repos">🔄</button>
+                        </div>
+                        <div id="gh-repos-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:15px;">
+                            <!-- Injected -->
+                        </div>
+                    </div>
+
                     <!-- DOWNLOADER -->
-                    <div id="gh-view-down">
+                    <div id="gh-view-down" style="display:none;">
                         <div style="background: var(--panel-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label>GitHub Repository (User/Name)</label>
@@ -228,6 +239,21 @@
                                 <label>Tag / Version</label>
                                 <input type="text" id="gh-pub-tag" placeholder="v1.0.0">
                             </div>
+
+                            <!-- Rich Options -->
+                            <div class="form-group">
+                                <label>Release Notes (Body)</label>
+                                <textarea id="gh-pub-body" rows="4" style="width:100%; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; border-radius:4px; padding:10px; box-sizing:border-box; font-family:inherit;" placeholder="Describe this release..."></textarea>
+                            </div>
+                            <div style="display:flex; gap:20px; margin-bottom:20px;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" id="gh-pub-prerelease"> Pre-release
+                                </label>
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" id="gh-pub-draft"> Draft
+                                </label>
+                            </div>
+
                             <div class="form-group">
                                 <label>File to Upload</label>
                                 <div style="display:flex; gap:10px;">

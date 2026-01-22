@@ -60,6 +60,10 @@ function ghSelectAccount(id, username, avatar) {
     display.style.display = 'flex';
     document.getElementById('gh-active-username').textContent = username;
     document.getElementById('gh-active-avatar').src = avatar || 'https://github.com/identicons/user.png';
+
+    // Auto-fetch repos
+    switchGhTab('repos');
+    fetchMyRepos();
 }
 
 function ghSwitchAccount() {
@@ -110,8 +114,100 @@ document.addEventListener('DOMContentLoaded', () => {
 function switchGhTab(tab) {
     document.querySelectorAll('.gh-tab').forEach(e => e.classList.remove('active'));
     document.getElementById(`gh-tab-${tab}`).classList.add('active');
+    document.getElementById('gh-view-repos').style.display = tab==='repos' ? 'block' : 'none';
     document.getElementById('gh-view-down').style.display = tab==='down' ? 'block' : 'none';
     document.getElementById('gh-view-pub').style.display = tab==='pub' ? 'block' : 'none';
+}
+
+async function fetchMyRepos() {
+    const grid = document.getElementById('gh-repos-grid');
+    grid.innerHTML = '<div style="color:var(--text-muted); grid-column:1/-1; text-align:center;">Loading repositories...</div>';
+
+    try {
+        const res = await fetch(`/api/apps/github/user/repos?account_id=${ghActiveAccount.id}`);
+        const repos = await res.json();
+
+        if(repos.error) throw new Error(repos.error);
+
+        grid.innerHTML = '';
+        if(repos.length === 0) {
+            grid.innerHTML = '<div style="color:var(--text-muted); grid-column:1/-1;">No repositories found.</div>';
+            return;
+        }
+
+        repos.forEach(repo => {
+            const card = document.createElement('div');
+            card.className = 'app-card';
+            card.style.height = 'auto';
+            card.style.textAlign = 'left';
+            card.style.alignItems = 'flex-start';
+            card.style.padding = '15px';
+
+            const visibilityIcon = repo.private ? '🔒' : '🌍';
+            const visibilityColor = repo.private ? '#e0af68' : '#9ece6a'; // Gold vs Green
+
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:10px;">
+                    <div style="font-weight:bold; color:#c0caf5; word-break:break-all;">${repo.name}</div>
+                    <div style="font-size:0.9em; color:${visibilityColor};" title="${repo.private ? 'Private' : 'Public'}">${visibilityIcon}</div>
+                </div>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-bottom:15px;">
+                    ⭐ ${repo.stars} &nbsp;•&nbsp; Updated ${new Date(repo.updated_at).toLocaleDateString()}
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; width:100%;">
+                    <button class="secondary" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'down')">Download</button>
+                    <button class="purple-btn" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'pub')">Publish</button>
+                </div>
+                <div style="margin-top:10px; width:100%;">
+                    <button class="icon-btn" style="width:100%; font-size:0.8em; border:1px solid var(--border-color); color:var(--text-muted);" onclick="ghToggleVisibility('${repo.name}', ${repo.private})">
+                        ${repo.private ? 'Make Public' : 'Make Private'}
+                    </button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+
+    } catch(e) {
+        grid.innerHTML = `<div style="color:var(--error-color); grid-column:1/-1;">Error: ${e.message}</div>`;
+    }
+}
+
+function ghSelectRepo(name, tab) {
+    switchGhTab(tab);
+    if(tab === 'down') {
+        document.getElementById('gh-repo-input').value = name;
+        fetchGhReleases(); // Auto fetch
+    } else {
+        document.getElementById('gh-pub-repo').value = name;
+    }
+}
+
+async function ghToggleVisibility(name, isPrivate) {
+    const action = isPrivate ? "PUBLIC" : "PRIVATE";
+    const confirmMsg = isPrivate
+        ? `⚠️ WARNING ⚠️\n\nThis will make '${name}' PUBLIC to the entire internet.\nAnyone can see your code.\n\nAre you sure?`
+        : `Make '${name}' Private?`;
+
+    if(!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch('/api/apps/github/repo/visibility', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+                repo: name,
+                private: !isPrivate,
+                account_id: ghActiveAccount.id
+            })
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        showToast(`Repo is now ${data.private ? 'Private' : 'Public'}`, 'success');
+        fetchMyRepos(); // Refresh list
+    } catch(e) {
+        showToast(e.message, 'error');
+    }
 }
 
 async function fetchGhReleases() {
@@ -194,6 +290,9 @@ async function triggerGhPublish() {
     const ghPubFile = document.getElementById('gh-pub-file');
     const ghPubRepo = document.getElementById('gh-pub-repo');
     const ghPubTag = document.getElementById('gh-pub-tag');
+    const ghPubBody = document.getElementById('gh-pub-body');
+    const ghPubPrerelease = document.getElementById('gh-pub-prerelease');
+    const ghPubDraft = document.getElementById('gh-pub-draft');
 
     if(!ghPubFile.value) return showToast('Select a file first', 'error');
     if(!ghActiveAccount) return showToast('No active account', 'error');
@@ -205,7 +304,10 @@ async function triggerGhPublish() {
             repo: ghPubRepo.value,
             tag: ghPubTag.value,
             file_path: ghPubFile.value,
-            account_id: ghActiveAccount.id
+            account_id: ghActiveAccount.id,
+            body: ghPubBody.value,
+            prerelease: ghPubPrerelease.checked,
+            draft: ghPubDraft.checked
         })
     });
     showToast('Publish Queued', 'success');
