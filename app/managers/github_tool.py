@@ -355,6 +355,7 @@ class GitHubManager:
             results = []
             for data in releases_data:
                 release_info = {
+                    'id': data.get('id'),
                     'tag': data.get('tag_name'),
                     'name': data.get('name'),
                     'published_at': data.get('published_at'),
@@ -365,6 +366,7 @@ class GitHubManager:
 
                 for asset in data.get('assets', []):
                     release_info['assets'].append({
+                        'id': asset['id'],
                         'name': asset['name'],
                         'size': asset['size'],
                         'download_url': asset['browser_download_url']
@@ -590,6 +592,32 @@ class GitHubManager:
         finally:
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
+
+    @staticmethod
+    def delete_release(owner, repo, release_id, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/releases/{release_id}"
+            r = requests.delete(url, headers=headers)
+            if r.status_code == 204: return {'status': 'deleted'}
+            return {'error': f"Failed: {r.text}"}
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def delete_release_asset(owner, repo, asset_id, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/releases/assets/{asset_id}"
+            r = requests.delete(url, headers=headers)
+            if r.status_code == 204: return {'status': 'deleted'}
+            return {'error': f"Failed: {r.text}"}
+        except Exception as e: return {'error': str(e)}
 
     @staticmethod
     def run_batch_download_job(assets, dest_root, account_id):

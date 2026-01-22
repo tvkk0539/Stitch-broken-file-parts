@@ -540,6 +540,26 @@ def github_download_batch():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/apps/github/release/delete', methods=['POST'])
+def github_delete_release():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    release_id = data.get('release_id')
+    account_id = data.get('account_id')
+    if not release_id: return jsonify({'error': 'ID required'}), 400
+    return jsonify(GitHubManager.delete_release(owner, repo, release_id, account_id))
+
+@bp.route('/api/apps/github/release/asset/delete', methods=['POST'])
+def github_delete_asset():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    asset_id = data.get('asset_id')
+    account_id = data.get('account_id')
+    if not asset_id: return jsonify({'error': 'ID required'}), 400
+    return jsonify(GitHubManager.delete_release_asset(owner, repo, asset_id, account_id))
+
 @bp.route('/api/apps/github/publish', methods=['POST'])
 def github_publish():
     data = request.json

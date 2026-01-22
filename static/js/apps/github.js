@@ -373,14 +373,20 @@ async function fetchGhReleases() {
 
             // Generate Download All Button (Only if assets exist)
             const hasAssets = release.assets && release.assets.length > 0;
-            const downloadAllBtn = hasAssets ? `<button class="purple-btn gh-dl-all-btn" style="padding:2px 8px; font-size:0.7em; margin-left:10px;">Download All</button>` : '';
+
+            // Buttons
+            const dlAllBtn = hasAssets ? `<button class="purple-btn gh-btn-action" data-action="dl-all" style="padding:2px 8px; font-size:0.7em; margin-left:10px;">Download All</button>` : '';
+            const delAllBtn = hasAssets ? `<button class="danger gh-btn-action" data-action="del-all" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color);">Trash All</button>` : '';
+            const delRelBtn = `<button class="danger gh-btn-action" data-action="del-rel" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color);">Del Release</button>`;
 
             headerDiv.innerHTML = `
                 <div style="display:flex; align-items:center;">
                     <div style="font-weight:bold; color:#c0caf5; font-size:1.1em;" class="gh-tag-text">${release.tag}</div>
                     ${badge}
                     ${preBadge}
-                    ${downloadAllBtn}
+                    ${dlAllBtn}
+                    ${delAllBtn}
+                    ${delRelBtn}
                 </div>
                 <div style="font-size:0.8em; color:var(--text-muted); display:flex; align-items:center; gap:10px;">
                     <span>${dateStr}</span>
@@ -388,18 +394,21 @@ async function fetchGhReleases() {
                 </div>
             `;
 
-            // Wire Download All
-            if(hasAssets) {
-                headerDiv.querySelector('.gh-dl-all-btn').onclick = (e) => {
+            // Wire Header Buttons
+            headerDiv.querySelectorAll('.gh-btn-action').forEach(btn => {
+                btn.onclick = (e) => {
                     e.stopPropagation();
-                    // Map assets to payload structure
-                    const assetPayload = release.assets.map(a => ({
-                        url: a.download_url,
-                        filename: a.name
-                    }));
-                    downloadGhBatch(assetPayload, release.tag);
+                    const action = btn.dataset.action;
+                    if(action === 'dl-all') {
+                        const assetPayload = release.assets.map(a => ({url: a.download_url, filename: a.name}));
+                        downloadGhBatch(assetPayload, release.tag);
+                    } else if(action === 'del-all') {
+                        deleteGhAssets(release.assets, repo);
+                    } else if(action === 'del-rel') {
+                        deleteGhRelease(release.id, repo);
+                    }
                 };
-            }
+            });
 
             // Assets Container
             const assetsDiv = document.createElement('div');
@@ -431,13 +440,18 @@ async function fetchGhReleases() {
                                 <div style="font-size:0.75em; color:var(--text-muted);">${formatBytes(asset.size)}</div>
                             </div>
                         </div>
-                        <button class="icon-btn" style="color:var(--success-color); border:1px solid #2f3549; padding:4px 8px; border-radius:4px;" title="Download">
-                            ⬇️
-                        </button>
+                        <div style="display:flex; gap:5px;">
+                            <button class="icon-btn dl-btn" style="color:var(--success-color); border:1px solid #2f3549; padding:4px 8px; border-radius:4px;" title="Download">⬇️</button>
+                            <button class="icon-btn del-btn" style="color:var(--error-color); border:1px solid #2f3549; padding:4px 8px; border-radius:4px;" title="Delete">🗑️</button>
+                        </div>
                     `;
-                    row.querySelector('button').onclick = (e) => {
+                    row.querySelector('.dl-btn').onclick = (e) => {
                          e.stopPropagation();
                          downloadGhAsset(asset.download_url, asset.name);
+                    };
+                    row.querySelector('.del-btn').onclick = (e) => {
+                         e.stopPropagation();
+                         deleteGhAsset(asset.id, asset.name, repo);
                     };
                     assetsDiv.appendChild(row);
                 });
@@ -689,6 +703,61 @@ async function downloadGhBatch(assets, releaseTag) {
         body:JSON.stringify(body)
     });
     showToast('Batch Download Queued', 'success');
+}
+
+async function deleteGhRelease(id, repoFullName) {
+    if(!confirm('⚠️ Are you sure you want to DELETE this release?')) return;
+    const [owner, repo] = repoFullName.split('/');
+
+    try {
+        const res = await fetch('/api/apps/github/release/delete', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({owner, repo, release_id:id, account_id:ghActiveAccount.id})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+        showToast('Release Deleted', 'success');
+        fetchGhReleases(ghCurrentPage);
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteGhAsset(id, name, repoFullName) {
+    if(!confirm(`Delete asset '${name}'?`)) return;
+    const [owner, repo] = repoFullName.split('/');
+
+    try {
+        const res = await fetch('/api/apps/github/release/asset/delete', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({owner, repo, asset_id:id, account_id:ghActiveAccount.id})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+        showToast('Asset Deleted', 'success');
+        fetchGhReleases(ghCurrentPage);
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteGhAssets(assets, repoFullName) {
+    if(!confirm(`Delete ALL ${assets.length} assets from this release?`)) return;
+    // Sequential deletion or batch endpoint?
+    // User requested "delete all assets", we don't have a batch API for deletion yet in backend plan.
+    // I will loop here for now, or add batch endpoint.
+    // Adding loop here is safer for immediate feedback.
+
+    const [owner, repo] = repoFullName.split('/');
+    let count = 0;
+
+    for(const asset of assets) {
+        try {
+            await fetch('/api/apps/github/release/asset/delete', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({owner, repo, asset_id:asset.id, account_id:ghActiveAccount.id})
+            });
+            count++;
+        } catch(e) {}
+    }
+    showToast(`Deleted ${count} assets`, 'success');
+    fetchGhReleases(ghCurrentPage);
 }
 
 // Publisher
