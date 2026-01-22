@@ -601,6 +601,24 @@ def github_clone_repo():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/apps/github/repo/import', methods=['POST'])
+def github_import_repo():
+    data = request.json
+    source_url = data.get('source_url')
+    target_name = data.get('target_name')
+    private = data.get('private', False)
+    account_id = data.get('account_id')
+
+    if not source_url or not target_name or not account_id:
+        return jsonify({'error': 'Missing args'}), 400
+
+    job_id = job_manager.add_job(
+        f"Import Repo: {target_name}",
+        GitHubManager.run_import_job,
+        args=(source_url, target_name, private, account_id)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
 # --- Actions ---
 @bp.route('/api/apps/github/actions/workflows', methods=['POST'])
 def github_list_workflows():

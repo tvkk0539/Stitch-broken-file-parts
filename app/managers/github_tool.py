@@ -504,3 +504,80 @@ class GitHubManager:
         except Exception as e:
             log(f"Publish Failed: {e}")
             job_manager.update_job_details({'error': str(e)})
+
+    @staticmethod
+    def run_import_job(source_url, target_name, private, account_id):
+        log(f"Starting Import: {source_url} -> {target_name}")
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token:
+            job_manager.update_job_details({'error': 'Account token not found'})
+            return
+
+        # Prepare URLs with Auth
+        # Source Auth: Try to use the same token (assuming user owns it or has access)
+        # If public, token doesn't hurt.
+        clean_source = source_url.replace('https://', '').replace('http://', '')
+        source_auth_url = f"https://oauth2:{token}@{clean_source}"
+
+        temp_dir = f"/tmp/import_{target_name}_{os.getpid()}"
+
+        try:
+            # 1. Create Empty Repo
+            log(f"Creating repository: {target_name}")
+            job_manager.update_job_details({'action': 'Creating new repository...'})
+
+            res = GitHubManager.create_repository(target_name, private, "Imported via ParFix", account_id)
+            if 'error' in res:
+                raise Exception(f"Failed to create repo: {res['error']}")
+
+            new_repo_full = res['repo'] # owner/name
+            new_repo_url = f"https://oauth2:{token}@github.com/{new_repo_full}.git"
+
+            # 2. Clone Mirror
+            log("Cloning source (Mirror)...")
+            job_manager.update_job_details({'action': 'Cloning source repository...'})
+
+            if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+            os.makedirs(temp_dir)
+
+            cmd_clone = ['git', 'clone', '--mirror', source_auth_url, '.']
+            proc_clone = subprocess.Popen(
+                cmd_clone, cwd=temp_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True
+            )
+            job_manager.set_current_process(proc_clone)
+
+            for line in proc_clone.stdout:
+                if "Receiving objects" in line: log(f"[GIT CLONE] {line.strip()}")
+
+            proc_clone.wait()
+            if proc_clone.returncode != 0:
+                raise Exception("Git Clone Failed. Check source URL or permissions.")
+
+            # 3. Push Mirror
+            if job_manager.is_cancelled(): return
+
+            log("Pushing to new repository...")
+            job_manager.update_job_details({'action': 'Pushing to new repository...'})
+
+            cmd_push = ['git', 'push', '--mirror', new_repo_url]
+            proc_push = subprocess.Popen(
+                cmd_push, cwd=temp_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True
+            )
+            job_manager.set_current_process(proc_push)
+
+            for line in proc_push.stdout:
+                log(f"[GIT PUSH] {line.strip()}")
+
+            proc_push.wait()
+            if proc_push.returncode != 0:
+                raise Exception("Git Push Failed.")
+
+            log("Import Successful")
+            NotificationManager.send_notification(f"✅ ParFix: Imported {target_name} from {source_url}")
+
+        except Exception as e:
+            log(f"Import Failed: {e}")
+            job_manager.update_job_details({'error': str(e)})
+        finally:
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)

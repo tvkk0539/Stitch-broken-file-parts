@@ -131,13 +131,21 @@ async function fetchMyRepos() {
         </div>
     `;
 
+    // Add "Import Repo" card
+    const importRepoBtn = `
+        <div class="app-card" style="height:auto; justify-content:center; border-style:dashed; opacity:0.8;" onclick="openGhImportModal()">
+            <div style="font-size:2em; color:#bb9af7;">⬇️</div>
+            <div>Import Repo</div>
+        </div>
+    `;
+
     try {
         const res = await fetch(`/api/apps/github/user/repos?account_id=${ghActiveAccount.id}`);
         const repos = await res.json();
 
         if(repos.error) throw new Error(repos.error);
 
-        grid.innerHTML = newRepoBtn; // Start with button
+        grid.innerHTML = newRepoBtn + importRepoBtn; // Start with buttons
 
         repos.forEach(repo => {
             const card = document.createElement('div');
@@ -241,6 +249,39 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Repository Created', 'success');
             document.getElementById('gh-new-repo-modal').style.display='none';
             fetchMyRepos();
+        } catch(e) { showToast(e.message, 'error'); }
+    };
+});
+
+// --- Import Repo Logic ---
+function openGhImportModal() {
+    document.getElementById('gh-import-repo-modal').style.display = 'block';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('confirm-gh-import').onclick = async () => {
+        const sourceUrl = document.getElementById('gh-import-source').value;
+        const targetName = document.getElementById('gh-import-target').value;
+        const priv = document.getElementById('gh-import-private').checked;
+
+        if(!sourceUrl || !targetName) return showToast('Source URL and Target Name required', 'error');
+
+        try {
+            const res = await fetch('/api/apps/github/repo/import', {
+                method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    source_url: sourceUrl,
+                    target_name: targetName,
+                    private: priv,
+                    account_id: ghActiveAccount.id
+                })
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+
+            showToast('Import Job Queued', 'success');
+            document.getElementById('gh-import-repo-modal').style.display='none';
+            // Note: We don't fetchRepos immediately because it's a background job
         } catch(e) { showToast(e.message, 'error'); }
     };
 });
