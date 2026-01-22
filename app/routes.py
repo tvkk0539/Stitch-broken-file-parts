@@ -456,6 +456,31 @@ def upload_config():
 
 # --- Apps: GitHub ---
 
+@bp.route('/api/apps/github/accounts', methods=['GET'])
+def github_list_accounts():
+    return jsonify(GitHubManager.get_accounts())
+
+@bp.route('/api/apps/github/accounts/add', methods=['POST'])
+def github_add_account():
+    data = request.json
+    token = data.get('token')
+    if not token: return jsonify({'error': 'Token required'}), 400
+    try:
+        account = GitHubManager.validate_and_add_account(token)
+        return jsonify({'status': 'added', 'account': account})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/api/apps/github/accounts/remove', methods=['POST'])
+def github_remove_account():
+    data = request.json
+    aid = data.get('id')
+    if not aid: return jsonify({'error': 'ID required'}), 400
+
+    if GitHubManager.remove_account(aid):
+        return jsonify({'status': 'removed'})
+    return jsonify({'error': 'Account not found'}), 404
+
 @bp.route('/api/apps/github/releases', methods=['POST'])
 def github_get_releases():
     data = request.json
@@ -488,19 +513,16 @@ def github_publish():
     repo = data.get('repo')
     tag = data.get('tag')
     file_path = data.get('file_path') # Relative
+    account_id = data.get('account_id')
 
-    if not repo or not tag or not file_path: return jsonify({'error': 'Missing args'}), 400
+    if not repo or not tag or not file_path or not account_id: return jsonify({'error': 'Missing args'}), 400
 
     abs_file = os.path.join(DOWNLOAD_ROOT, file_path)
     if not os.path.exists(abs_file): return jsonify({'error': 'File not found'}), 404
 
-    conf = load_config()
-    token = conf.get('github_token')
-    if not token: return jsonify({'error': 'No GitHub Token configured'}), 400
-
     job_id = job_manager.add_job(
         f"GitHub Publish: {tag}",
         GitHubManager.run_publish_job,
-        args=(repo, tag, abs_file, token)
+        args=(repo, tag, abs_file, account_id)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
