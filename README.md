@@ -29,8 +29,10 @@ Transform your VPS into a Cloud Manager. No FUSE required.
 A new section for integrated tools and utilities.
 - **GitHub Release Manager:**
     - **Multi-Account Support:** Login with multiple GitHub accounts and switch between them instantly using the **Account Hub**.
+    - **Repository Browser:** View all your repositories (Public/Private) in a convenient grid. No need to manually type repo names anymore.
+    - **Visibility Control:** Toggle repositories between **Public** and **Private** directly from the dashboard (with safety confirmations).
+    - **Rich Publishing:** Create professional releases with Markdown release notes, **Draft** mode support, and **Pre-release** tagging.
     - **Downloader:** Fetch and download assets from any public or private GitHub repository (using your account) directly to your server.
-    - **Publisher:** Create releases and upload assets to your own repositories. Actions are securely tied to the currently selected identity.
     - **Auto-Migration:** Automatically upgrades your legacy `github_token` configuration to the new multi-account system.
 
 ### 📂 Local File Management
@@ -140,12 +142,18 @@ Click the **Apps** icon in the sidebar to access additional utilities.
 2. **Download:**
    - Select an account from the hub.
    - Enter a GitHub repository (e.g., `radarr/radarr`).
+    - **My Repos:** Browse your personal and organizational repositories.
+    - **Select:** Click any repo to auto-fill it for Downloading or Publishing.
+    - **Toggle Visibility:** Use the lock/unlock icon to switch between Public and Private visibility.
+3. **Download:**
+    - Enter a GitHub repository (e.g., `radarr/radarr`) or select one from "My Repos".
    - Click "Fetch" to see releases.
    - Download assets directly to your server.
-3. **Publish:**
+4. **Publish:**
    - Select an account (must have write access).
    - Switch to the "Publisher" tab.
    - Enter the repository, tag (e.g., `v1.0.0`), and select a file.
+    - (Optional) Add **Release Notes**, mark as **Draft**, or **Pre-release**.
    - Click "Publish" to create a release and upload the file.
 
 ### Creating an Archive
