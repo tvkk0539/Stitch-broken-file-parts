@@ -1450,6 +1450,7 @@
                 method:'POST',
                 headers:{'Content-Type':'application/json'},
                 body:JSON.stringify({
+                    github_token: setGhTokenInput.value,
                     discord_webhook: setDiscordInput.value,
                     telegram_token: setTgTokenInput.value,
                     telegram_chat_id: setTgChatInput.value
@@ -1461,6 +1462,7 @@
         async function loadSettings() {
              const res = await fetch('/api/settings');
              const data = await res.json();
+             setGhTokenInput.value = data.github_token||'';
              setDiscordInput.value = data.discord_webhook||'';
              setTgTokenInput.value = data.telegram_token||'';
              setTgChatInput.value = data.telegram_chat_id||'';
