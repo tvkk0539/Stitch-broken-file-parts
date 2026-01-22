@@ -5,6 +5,7 @@ from app.managers.archive import ArchiveManager
 from app.managers.repair import RepairManager
 from app.managers.extract import ExtractManager
 from app.managers.inspector import InspectorManager
+from app.managers.github_tool import GitHubManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -452,3 +453,54 @@ def upload_config():
             return jsonify({'status': 'uploaded', 'path': conf_path})
         except Exception as e:
             return jsonify({'error': f"Failed to save config: {e}"}), 500
+
+# --- Apps: GitHub ---
+
+@bp.route('/api/apps/github/releases', methods=['POST'])
+def github_get_releases():
+    data = request.json
+    repo = data.get('repo')
+    if not repo: return jsonify({'error': 'Repo required'}), 400
+
+    return jsonify(GitHubManager.get_releases(repo))
+
+@bp.route('/api/apps/github/download', methods=['POST'])
+def github_download():
+    data = request.json
+    url = data.get('url')
+    filename = data.get('filename')
+    path = data.get('path', '') # Relative path
+
+    if not url or not filename: return jsonify({'error': 'Missing args'}), 400
+
+    abs_dest = os.path.join(DOWNLOAD_ROOT, path)
+
+    job_id = job_manager.add_job(
+        f"GitHub Download: {filename}",
+        GitHubManager.run_download_job,
+        args=(url, filename, abs_dest)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/apps/github/publish', methods=['POST'])
+def github_publish():
+    data = request.json
+    repo = data.get('repo')
+    tag = data.get('tag')
+    file_path = data.get('file_path') # Relative
+
+    if not repo or not tag or not file_path: return jsonify({'error': 'Missing args'}), 400
+
+    abs_file = os.path.join(DOWNLOAD_ROOT, file_path)
+    if not os.path.exists(abs_file): return jsonify({'error': 'File not found'}), 404
+
+    conf = load_config()
+    token = conf.get('github_token')
+    if not token: return jsonify({'error': 'No GitHub Token configured'}), 400
+
+    job_id = job_manager.add_job(
+        f"GitHub Publish: {tag}",
+        GitHubManager.run_publish_job,
+        args=(repo, tag, abs_file, token)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
