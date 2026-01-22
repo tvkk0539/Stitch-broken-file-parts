@@ -304,42 +304,102 @@ async function fetchGhReleases() {
         const data = await res.json();
         if(data.error) throw new Error(data.error);
 
-        // Header with Clone Actions
+        // Header with Clone Actions (Top Level)
         const header = document.getElementById('gh-results-header');
         header.style.display = 'flex';
         header.style.justifyContent = 'space-between';
         header.style.alignItems = 'center';
-
         header.innerHTML = `
-            <div>Latest: <span style="color:#c0caf5;">${data.name}</span> <span style="font-size:0.8em; color:var(--text-muted);">(${data.tag})</span></div>
-            <div style="display:flex; gap:10px;">
-                <button class="purple-btn" style="padding:5px 10px; font-size:0.8em;" onclick="triggerGhClone('${repo}')">Clone Source</button>
-            </div>
+            <div>Found ${data.length} Releases</div>
+            <button class="purple-btn" style="padding:5px 10px; font-size:0.8em;" onclick="triggerGhClone('${repo}')">Clone Source</button>
         `;
 
         ghResults.innerHTML = '';
-        if(!data.assets || data.assets.length === 0) {
-                ghResults.innerHTML = '<div style="padding:10px;">No assets found in this release.</div>';
-                return;
+        if(!data || data.length === 0) {
+            ghResults.innerHTML = '<div style="padding:10px;">No releases found.</div>';
+            return;
         }
 
-        data.assets.forEach(asset => {
-            const div = document.createElement('div'); div.className = 'gh-result-item';
-            div.innerHTML = `
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#565f89"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                    <div>
-                        <div style="font-weight:bold; color:#c0caf5;">${asset.name}</div>
-                        <div style="font-size:0.8em; color:var(--text-muted);">${formatBytes(asset.size)}</div>
-                    </div>
+        // Render Release Cards
+        data.forEach((release, index) => {
+            const releaseCard = document.createElement('div');
+            releaseCard.style.background = 'var(--panel-bg)';
+            releaseCard.style.border = '1px solid var(--border-color)';
+            releaseCard.style.marginBottom = '10px';
+            releaseCard.style.borderRadius = '6px';
+            releaseCard.style.overflow = 'hidden';
+
+            const isLatest = index === 0;
+            const badge = isLatest ? '<span style="background:var(--success-color); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:8px; font-weight:bold;">LATEST</span>' : '';
+            const preBadge = release.prerelease ? '<span style="background:var(--warning-color); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:8px; font-weight:bold;">PRE</span>' : '';
+            const dateStr = new Date(release.published_at).toLocaleDateString();
+
+            // Card Header (Clickable)
+            const headerDiv = document.createElement('div');
+            headerDiv.style.padding = '12px 15px';
+            headerDiv.style.cursor = 'pointer';
+            headerDiv.style.display = 'flex';
+            headerDiv.style.justifyContent = 'space-between';
+            headerDiv.style.alignItems = 'center';
+            headerDiv.style.background = 'rgba(255,255,255,0.02)';
+
+            headerDiv.innerHTML = `
+                <div style="display:flex; align-items:center;">
+                    <div style="font-weight:bold; color:#c0caf5; font-size:1.1em;">${release.tag}</div>
+                    ${badge}
+                    ${preBadge}
                 </div>
-                <button class="icon-btn" style="color:var(--success-color); border:1px solid #2f3549; padding:5px 10px; border-radius:4px;" title="Download to VPS">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                </button>
+                <div style="font-size:0.8em; color:var(--text-muted); display:flex; align-items:center; gap:10px;">
+                    <span>${dateStr}</span>
+                    <span style="transform: rotate(${isLatest?0:-90}deg); transition: transform 0.2s;" class="arrow-icon">▼</span>
+                </div>
             `;
-            div.querySelector('button').onclick = () => downloadGhAsset(asset.download_url, asset.name);
-            ghResults.appendChild(div);
+
+            // Assets Container
+            const assetsDiv = document.createElement('div');
+            assetsDiv.style.display = isLatest ? 'block' : 'none';
+            assetsDiv.style.borderTop = '1px solid var(--border-color)';
+            assetsDiv.style.padding = '10px';
+            assetsDiv.style.background = '#13141c';
+
+            headerDiv.onclick = () => {
+                const isOpen = assetsDiv.style.display === 'block';
+                assetsDiv.style.display = isOpen ? 'none' : 'block';
+                headerDiv.querySelector('.arrow-icon').style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+            };
+
+            if(!release.assets || release.assets.length === 0) {
+                assetsDiv.innerHTML = '<div style="padding:5px; color:var(--text-muted); font-size:0.9em;">No assets (Source code only).</div>';
+            } else {
+                release.assets.forEach(asset => {
+                    const row = document.createElement('div');
+                    row.className = 'gh-result-item'; // Reuse style
+                    row.style.marginBottom = '5px';
+                    row.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#565f89"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                            <div>
+                                <div style="color:#a9b1d6; font-size:0.95em;">${asset.name}</div>
+                                <div style="font-size:0.75em; color:var(--text-muted);">${formatBytes(asset.size)}</div>
+                            </div>
+                        </div>
+                        <button class="icon-btn" style="color:var(--success-color); border:1px solid #2f3549; padding:4px 8px; border-radius:4px;" title="Download">
+                            ⬇️
+                        </button>
+                    `;
+                    row.querySelector('button').onclick = (e) => {
+                         e.stopPropagation();
+                         downloadGhAsset(asset.download_url, asset.name);
+                    };
+                    assetsDiv.appendChild(row);
+                });
+            }
+
+            releaseCard.appendChild(headerDiv);
+            releaseCard.appendChild(assetsDiv);
+            ghResults.appendChild(releaseCard);
         });
+
     } catch(e) {
         ghResults.innerHTML = `<div style="color:var(--error-color); padding:10px; border:1px solid var(--error-color); border-radius:4px;">Error: ${e.message}</div>`;
     }

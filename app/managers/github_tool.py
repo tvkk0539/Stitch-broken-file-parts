@@ -322,7 +322,7 @@ class GitHubManager:
     @staticmethod
     def get_releases(repo_url, account_id=None):
         """
-        Fetches the latest releases for a given repo.
+        Fetches list of releases for a given repo.
         Optionally uses an account token for higher rate limits.
         """
         try:
@@ -339,31 +339,40 @@ class GitHubManager:
             if token:
                 headers['Authorization'] = f'token {token}'
 
-            # Get Latest Release
-            url = f"https://api.github.com/repos/{repo}/releases/latest"
-            log(f"Fetching GitHub Release: {url}")
+            # Get List of Releases (First 30)
+            url = f"https://api.github.com/repos/{repo}/releases?per_page=30"
+            log(f"Fetching GitHub Releases: {url}")
 
             resp = requests.get(url, headers=headers, timeout=10)
             if resp.status_code != 200:
                 return {'error': f"GitHub API Error: {resp.status_code} {resp.reason}"}
 
-            data = resp.json()
+            releases_data = resp.json()
+            if not isinstance(releases_data, list):
+                # Fallback if endpoint behaves unexpectedly or empty
+                return []
 
-            release_info = {
-                'tag': data.get('tag_name'),
-                'name': data.get('name'),
-                'published_at': data.get('published_at'),
-                'assets': []
-            }
+            results = []
+            for data in releases_data:
+                release_info = {
+                    'tag': data.get('tag_name'),
+                    'name': data.get('name'),
+                    'published_at': data.get('published_at'),
+                    'prerelease': data.get('prerelease', False),
+                    'draft': data.get('draft', False),
+                    'assets': []
+                }
 
-            for asset in data.get('assets', []):
-                release_info['assets'].append({
-                    'name': asset['name'],
-                    'size': asset['size'],
-                    'download_url': asset['browser_download_url']
-                })
+                for asset in data.get('assets', []):
+                    release_info['assets'].append({
+                        'name': asset['name'],
+                        'size': asset['size'],
+                        'download_url': asset['browser_download_url']
+                    })
 
-            return release_info
+                results.append(release_info)
+
+            return results
 
         except Exception as e:
             log(f"GitHub Error: {e}")
