@@ -761,6 +761,8 @@ async function deleteGhAssets(assets, repoFullName) {
 }
 
 // Publisher
+let ghPubCurrentPage = 1;
+
 function openFilePickerForGh() {
     // Check if user selected a file in the main view
     const ghPubFile = document.getElementById('gh-pub-file');
@@ -769,6 +771,105 @@ function openFilePickerForGh() {
         showToast('File selected from browser', 'success');
     } else {
         alert("Please go to the 'Files' tab, select ONE local file, then come back here and click this button.");
+    }
+}
+
+async function fetchGhPubReleases(page=1) {
+    const repo = document.getElementById('gh-pub-repo-fetch').value;
+    const container = document.getElementById('gh-pub-fetch-container');
+    const results = document.getElementById('gh-pub-results');
+
+    if(!repo) return showToast('Enter Repo to fetch', 'error');
+    ghPubCurrentPage = page;
+
+    container.style.display = 'block';
+    results.innerHTML = `<div style="padding:10px; color:var(--text-muted);">Fetching page ${page}...</div>`;
+
+    try {
+        const body = { repo, page };
+        if(ghActiveAccount) body.account_id = ghActiveAccount.id;
+
+        const res = await fetch('/api/apps/github/releases', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        const data = await res.json();
+
+        if(data.error) throw new Error(data.error);
+
+        results.innerHTML = '';
+        if(!data || data.length === 0) {
+            results.innerHTML = '<div style="padding:10px;">No releases found.</div>';
+            return;
+        }
+
+        // Render compact list for selection
+        data.forEach(rel => {
+            const row = document.createElement('div');
+            row.className = 'gh-pub-release-row'; // Hook for search
+            row.dataset.tag = (rel.tag || '').toLowerCase();
+            row.style.padding = '8px';
+            row.style.borderBottom = '1px solid var(--border-color)';
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.alignItems = 'center';
+
+            row.innerHTML = `
+                <div>
+                    <span style="font-weight:bold; color:#c0caf5;">${rel.tag}</span>
+                    <span style="font-size:0.8em; color:var(--text-muted); margin-left:10px;">${new Date(rel.published_at).toLocaleDateString()}</span>
+                </div>
+                <button class="secondary" style="padding:2px 8px; font-size:0.7em;">Select</button>
+            `;
+
+            row.querySelector('button').onclick = () => {
+                document.getElementById('gh-pub-tag').value = rel.tag;
+                document.getElementById('gh-pub-repo').value = repo; // Auto-fill target repo same as source
+                // Update Button Text to indicate mode change
+                const pubBtn = document.querySelector('#gh-view-pub button[onclick="triggerGhPublish()"]');
+                if(pubBtn) {
+                    pubBtn.innerText = 'Upload to Existing Release';
+                    pubBtn.classList.remove('secondary');
+                    pubBtn.classList.add('purple-btn');
+                }
+                showToast(`Selected ${rel.tag}`, 'success');
+            };
+            results.appendChild(row);
+        });
+
+        // Pagination for Publisher
+        const nav = document.createElement('div');
+        nav.style.display = 'flex';
+        nav.style.justifyContent = 'center';
+        nav.style.gap = '10px';
+        nav.style.padding = '5px';
+        nav.style.background = '#15161e';
+
+        if (page > 1) {
+            const prev = document.createElement('button');
+            prev.className = 'secondary';
+            prev.innerText = '⬅️';
+            prev.onclick = () => fetchGhPubReleases(page - 1);
+            nav.appendChild(prev);
+        }
+        if (data.length === 30) {
+            const next = document.createElement('button');
+            next.className = 'secondary';
+            next.innerText = '➡️';
+            next.onclick = () => fetchGhPubReleases(page + 1);
+            nav.appendChild(next);
+        }
+        if(nav.children.length > 0) results.appendChild(nav);
+
+        // Search Filter Logic for Publisher
+        const filterInput = document.getElementById('gh-pub-filter');
+        filterInput.oninput = (e) => {
+            const q = e.target.value.toLowerCase();
+            document.querySelectorAll('.gh-pub-release-row').forEach(r => {
+                const t = r.dataset.tag;
+                r.style.display = t.includes(q) ? 'flex' : 'none';
+            });
+        };
+
+    } catch(e) {
+        results.innerHTML = `<div style="color:var(--error-color); padding:10px;">Error: ${e.message}</div>`;
     }
 }
 

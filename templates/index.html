@@ -232,9 +232,24 @@
 
                     <!-- PUBLISHER -->
                     <div id="gh-view-pub" style="display:none;">
-                        <div style="background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color); max-width: 600px;">
+                        <div style="background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color); max-width: 800px;">
+
+                            <!-- Fetch Existing Release Section -->
+                            <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+                                <label style="display:block; margin-bottom:10px; color:var(--accent-color);">Option A: Select Existing Release</label>
+                                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                                    <input type="text" id="gh-pub-repo-fetch" placeholder="e.g. myuser/myrepo" style="flex:1;">
+                                    <button class="secondary" onclick="fetchGhPubReleases()">Fetch Releases</button>
+                                </div>
+                                <div id="gh-pub-fetch-container" style="display:none;">
+                                    <input type="text" id="gh-pub-filter" placeholder="🔍 Filter releases..."
+                                           style="width:100%; background:#13141c; border:1px solid var(--border-color); color:var(--text-color); margin-bottom:10px; padding:5px;">
+                                    <div id="gh-pub-results" style="max-height:300px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px; margin-bottom:10px;"></div>
+                                </div>
+                            </div>
+
                             <div class="form-group">
-                                <label>Repository</label>
+                                <label>Repository (Target)</label>
                                 <input type="text" id="gh-pub-repo" placeholder="e.g. myuser/myrepo">
                             </div>
                             <div class="form-group">
