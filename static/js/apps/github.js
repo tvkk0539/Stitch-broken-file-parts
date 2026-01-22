@@ -310,9 +310,16 @@ async function fetchGhReleases() {
         header.style.justifyContent = 'space-between';
         header.style.alignItems = 'center';
         header.innerHTML = `
-            <div>Found ${data.length} Releases</div>
+            <div style="display:flex; gap:15px; align-items:center; flex:1;">
+                <div>Found ${data.length} Releases</div>
+                <input type="text" id="gh-release-filter" placeholder="🔍 Filter versions or files..."
+                       style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:5px 10px; border-radius:4px; font-size:0.9em; flex:1; max-width:300px;">
+            </div>
             <button class="purple-btn" style="padding:5px 10px; font-size:0.8em;" onclick="triggerGhClone('${repo}')">Clone Source</button>
         `;
+
+        // Wire Filter Logic
+        document.getElementById('gh-release-filter').oninput = (e) => filterGhReleases(e.target.value);
 
         ghResults.innerHTML = '';
         if(!data || data.length === 0) {
@@ -323,6 +330,7 @@ async function fetchGhReleases() {
         // Render Release Cards
         data.forEach((release, index) => {
             const releaseCard = document.createElement('div');
+            releaseCard.className = 'gh-release-card'; // Hook for filter
             releaseCard.style.background = 'var(--panel-bg)';
             releaseCard.style.border = '1px solid var(--border-color)';
             releaseCard.style.marginBottom = '10px';
@@ -333,6 +341,10 @@ async function fetchGhReleases() {
             const badge = isLatest ? '<span style="background:var(--success-color); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:8px; font-weight:bold;">LATEST</span>' : '';
             const preBadge = release.prerelease ? '<span style="background:var(--warning-color); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7em; margin-left:8px; font-weight:bold;">PRE</span>' : '';
             const dateStr = new Date(release.published_at).toLocaleDateString();
+
+            // Store data for search
+            releaseCard.dataset.tag = (release.tag || '').toLowerCase();
+            releaseCard.dataset.name = (release.name||'').toLowerCase();
 
             // Card Header (Clickable)
             const headerDiv = document.createElement('div');
@@ -345,7 +357,7 @@ async function fetchGhReleases() {
 
             headerDiv.innerHTML = `
                 <div style="display:flex; align-items:center;">
-                    <div style="font-weight:bold; color:#c0caf5; font-size:1.1em;">${release.tag}</div>
+                    <div style="font-weight:bold; color:#c0caf5; font-size:1.1em;" class="gh-tag-text">${release.tag}</div>
                     ${badge}
                     ${preBadge}
                 </div>
@@ -357,6 +369,7 @@ async function fetchGhReleases() {
 
             // Assets Container
             const assetsDiv = document.createElement('div');
+            assetsDiv.className = 'gh-assets-container';
             assetsDiv.style.display = isLatest ? 'block' : 'none';
             assetsDiv.style.borderTop = '1px solid var(--border-color)';
             assetsDiv.style.padding = '10px';
@@ -373,7 +386,8 @@ async function fetchGhReleases() {
             } else {
                 release.assets.forEach(asset => {
                     const row = document.createElement('div');
-                    row.className = 'gh-result-item'; // Reuse style
+                    row.className = 'gh-result-item gh-asset-row'; // Reuse style + hook
+                    row.dataset.filename = asset.name.toLowerCase();
                     row.style.marginBottom = '5px';
                     row.innerHTML = `
                         <div style="display:flex; align-items:center; gap:10px;">
@@ -403,6 +417,54 @@ async function fetchGhReleases() {
     } catch(e) {
         ghResults.innerHTML = `<div style="color:var(--error-color); padding:10px; border:1px solid var(--error-color); border-radius:4px;">Error: ${e.message}</div>`;
     }
+}
+
+function filterGhReleases(query) {
+    const q = query.toLowerCase().trim();
+    const cards = document.querySelectorAll('.gh-release-card');
+
+    cards.forEach(card => {
+        const tag = card.dataset.tag || '';
+        const name = card.dataset.name || '';
+        const header = card.querySelector('.gh-tag-text');
+
+        let matchRelease = tag.includes(q) || name.includes(q);
+        let matchAsset = false;
+
+        const assetRows = card.querySelectorAll('.gh-asset-row');
+        assetRows.forEach(row => {
+            const filename = row.dataset.filename || '';
+            if (filename.includes(q)) {
+                matchAsset = true;
+                row.style.display = 'flex'; // Show asset
+                // Highlight logic could go here
+                row.style.background = q ? 'rgba(187, 154, 247, 0.1)' : 'none';
+            } else {
+                row.style.display = q ? 'none' : 'flex';
+            }
+        });
+
+        if (q === '') {
+            // Reset visibility
+            card.style.display = 'block';
+            assetRows.forEach(r => { r.style.display = 'flex'; r.style.background = 'none'; });
+            // Don't auto-close, leave as is or reset? Let's leave as is for UX.
+            return;
+        }
+
+        if (matchRelease || matchAsset) {
+            card.style.display = 'block';
+            if (matchAsset) {
+                // Expand if asset matched
+                const assetsDiv = card.querySelector('.gh-assets-container');
+                const arrow = card.querySelector('.arrow-icon');
+                if (assetsDiv) assetsDiv.style.display = 'block';
+                if (arrow) arrow.style.transform = 'rotate(-90deg)';
+            }
+        } else {
+            card.style.display = 'none';
+        }
+    });
 }
 
 async function triggerGhClone(repoName) {
