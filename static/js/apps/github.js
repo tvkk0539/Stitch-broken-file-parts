@@ -83,6 +83,12 @@ async function ghLogout(id, e) {
 
 // Login Modal Handlers
 document.addEventListener('DOMContentLoaded', () => {
+    // Repo Search Filter
+    const repoFilter = document.getElementById('gh-repos-filter');
+    if(repoFilter) {
+        repoFilter.oninput = (e) => filterMyRepos(e.target.value);
+    }
+
     const ghLoginModal = document.getElementById('gh-login-modal');
     window.openGhLoginModal = function() { ghLoginModal.style.display = 'block'; }
 
@@ -149,7 +155,8 @@ async function fetchMyRepos() {
 
         repos.forEach(repo => {
             const card = document.createElement('div');
-            card.className = 'app-card';
+            card.className = 'app-card gh-repo-card'; // Hook for search
+            card.dataset.name = repo.name.toLowerCase(); // Search data
             card.style.height = 'auto';
             card.style.textAlign = 'left';
             card.style.alignItems = 'flex-start';
@@ -185,6 +192,15 @@ async function fetchMyRepos() {
     } catch(e) {
         grid.innerHTML = `<div style="color:var(--error-color); grid-column:1/-1;">Error: ${e.message}</div>`;
     }
+}
+
+function filterMyRepos(query) {
+    const q = query.toLowerCase().trim();
+    document.querySelectorAll('.gh-repo-card').forEach(card => {
+        const name = card.dataset.name || '';
+        if(name.includes(q)) card.style.display = 'flex';
+        else card.style.display = 'none';
+    });
 }
 
 function ghSelectRepo(name, tab) {

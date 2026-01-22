@@ -197,7 +197,9 @@
 
                     <!-- MY REPOS -->
                     <div id="gh-view-repos">
-                        <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center;">
+                            <input type="text" id="gh-repos-filter" placeholder="🔍 Search repositories..."
+                                   style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:300px;">
                             <button class="icon-btn" onclick="fetchMyRepos()" title="Refresh Repos">🔄</button>
                         </div>
                         <div id="gh-repos-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:15px;">
