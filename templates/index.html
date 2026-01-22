@@ -353,6 +353,64 @@
             border: 1px solid var(--border-color);
         }
 
+        /* --- Apps View --- */
+        #apps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .app-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 180px;
+        }
+
+        .app-card:hover {
+            transform: translateY(-5px);
+            background-color: #2f3549;
+            border-color: var(--accent-color);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .app-icon-svg {
+            color: var(--accent-color);
+            margin-bottom: 15px;
+            width: 48px;
+            height: 48px;
+        }
+
+        .app-name { font-weight: bold; color: #c0caf5; font-size: 1.2em; margin-bottom: 5px; }
+        .app-desc { color: var(--text-muted); font-size: 0.9em; line-height: 1.4; }
+
+        /* GitHub App Styles */
+        .gh-tabs { display: flex; gap: 20px; margin-bottom: 25px; border-bottom: 1px solid var(--border-color); }
+        .gh-tab { padding: 10px 0; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; font-weight: bold; margin-bottom: -1px; }
+        .gh-tab:hover { color: #c0caf5; }
+        .gh-tab.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+
+        .gh-result-item {
+            background: #15161e;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .gh-result-item:hover { border-color: var(--border-color); }
+
         /* --- Settings View --- */
         .settings-container {
             max-width: 600px;
@@ -446,6 +504,12 @@
         <div class="nav-item" onclick="switchView('queue')">
             <div class="nav-icon">⏳</div>
             <div class="nav-label">Queue</div>
+        </div>
+        <div class="nav-item" onclick="switchView('apps')">
+            <div class="nav-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            </div>
+            <div class="nav-label">Apps</div>
         </div>
         <div class="nav-item" onclick="switchView('logs')">
             <div class="nav-icon">📜</div>
@@ -558,6 +622,90 @@
                 </div>
             </div>
 
+            <!-- VIEW: APPS GRID -->
+            <div id="view-apps" class="view-section">
+                <h2 style="margin-top:0; margin-bottom: 20px; font-weight:300; border-bottom:1px solid var(--border-color); padding-bottom:15px;">Installed Applications</h2>
+                <div id="apps-grid">
+                    <!-- GitHub Card -->
+                    <div class="app-card" onclick="openGitHubApp()">
+                        <svg class="app-icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                        <div class="app-name">GitHub Manager</div>
+                        <div class="app-desc">Download releases or publish assets to GitHub.</div>
+                    </div>
+                    <!-- Future Apps Placeholders -->
+                    <div class="app-card" style="opacity:0.3; cursor:default; border-style:dashed;">
+                        <svg class="app-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                        <div class="app-name">Add App</div>
+                        <div class="app-desc">More tools coming soon...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: GITHUB APP -->
+            <div id="view-gh-app" class="view-section">
+                <div style="display:flex; align-items:center; margin-bottom:20px;">
+                    <button class="icon-btn" onclick="switchView('apps')" style="margin-right:15px; color:var(--text-muted);" title="Back to Apps">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    </button>
+                    <h2 style="margin:0; display:flex; align-items:center; gap:10px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                        GitHub Manager
+                    </h2>
+                </div>
+
+                <div class="gh-tabs">
+                    <div id="gh-tab-down" class="gh-tab active" onclick="switchGhTab('down')">Downloader</div>
+                    <div id="gh-tab-pub" class="gh-tab" onclick="switchGhTab('pub')">Publisher</div>
+                </div>
+
+                <!-- DOWNLOADER -->
+                <div id="gh-view-down">
+                    <div style="background: var(--panel-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>GitHub Repository (User/Name)</label>
+                            <div style="display:flex; gap:10px;">
+                                <input type="text" id="gh-repo-input" placeholder="e.g. radarr/radarr" style="font-family: monospace;">
+                                <button class="secondary" onclick="fetchGhReleases()" style="flex:0; display:flex; align-items:center; gap:5px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    Fetch
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="gh-results-container">
+                        <div id="gh-results-header" style="display:none; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); color: var(--accent-color); font-weight: bold;">
+                            <!-- Filled by JS -->
+                        </div>
+                        <div id="gh-results"></div>
+                    </div>
+                </div>
+
+                <!-- PUBLISHER -->
+                <div id="gh-view-pub" style="display:none;">
+                    <div style="background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color); max-width: 600px;">
+                        <div class="form-group">
+                            <label>Repository</label>
+                            <input type="text" id="gh-pub-repo" placeholder="e.g. myuser/myrepo">
+                        </div>
+                        <div class="form-group">
+                            <label>Tag / Version</label>
+                            <input type="text" id="gh-pub-tag" placeholder="v1.0.0">
+                        </div>
+                        <div class="form-group">
+                            <label>File to Upload</label>
+                            <div style="display:flex; gap:10px;">
+                                <input type="text" id="gh-pub-file" placeholder="Select a file from 'Files' tab first..." readonly style="color: var(--text-muted); cursor: not-allowed;">
+                                <button class="purple-btn" style="flex:0;" onclick="openFilePickerForGh()">Get Selected File</button>
+                            </div>
+                        </div>
+                        <div style="margin-top:30px; display:flex; justify-content: flex-end;">
+                            <button class="secondary" onclick="triggerGhPublish()" style="padding: 12px 25px; font-size: 1em;">🚀 Publish Release</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- VIEW: LOGS -->
             <div id="view-logs" class="view-section">
                 <h2 style="margin-top:0; border:none; margin-bottom:10px;">System Logs</h2>
@@ -570,6 +718,11 @@
                     <h2 class="settings-header">Configuration</h2>
 
                     <div class="form-group">
+                        <label>GitHub Personal Access Token (for Publishing)</label>
+                        <input type="password" id="set-gh-token" placeholder="ghp_...">
+                    </div>
+
+                    <div class="form-group" style="border-top:1px solid var(--border-color); padding-top:20px;">
                         <label>Discord Webhook URL</label>
                         <input type="text" id="set-discord" placeholder="https://discord.com/api/webhooks/...">
                     </div>
@@ -681,11 +834,105 @@
             const navItems = document.querySelectorAll('.nav-item');
             if(viewName === 'files') navItems[0].classList.add('active');
             if(viewName === 'queue') navItems[1].classList.add('active');
-            if(viewName === 'logs') navItems[2].classList.add('active');
+            if(viewName === 'apps' || viewName === 'gh-app') navItems[2].classList.add('active');
+            if(viewName === 'logs') navItems[3].classList.add('active');
             if(viewName === 'settings') {
-                navItems[3].classList.add('active');
+                navItems[4].classList.add('active');
                 loadSettings(); // Auto-load
             }
+        }
+
+        // --- Apps Logic ---
+        function openGitHubApp() {
+            switchView('gh-app');
+        }
+
+        function switchGhTab(tab) {
+            document.querySelectorAll('.gh-tab').forEach(e => e.classList.remove('active'));
+            document.getElementById(`gh-tab-${tab}`).classList.add('active');
+            document.getElementById('gh-view-down').style.display = tab==='down' ? 'block' : 'none';
+            document.getElementById('gh-view-pub').style.display = tab==='pub' ? 'block' : 'none';
+        }
+
+        async function fetchGhReleases() {
+            const repo = ghRepoInput.value;
+            if(!repo) return showToast('Enter Repo', 'error');
+
+            ghResults.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Fetching releases...</div>';
+            document.getElementById('gh-results-header').style.display = 'none';
+
+            try {
+                const res = await fetch('/api/apps/github/releases', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({repo})});
+                const data = await res.json();
+                if(data.error) throw new Error(data.error);
+
+                document.getElementById('gh-results-header').style.display = 'block';
+                document.getElementById('gh-results-header').innerHTML = `Latest Release: <span style="color:#c0caf5;">${data.name}</span> <span style="font-size:0.8em; color:var(--text-muted);">(${data.tag})</span>`;
+
+                ghResults.innerHTML = '';
+                if(!data.assets || data.assets.length === 0) {
+                     ghResults.innerHTML = '<div style="padding:10px;">No assets found in this release.</div>';
+                     return;
+                }
+
+                data.assets.forEach(asset => {
+                    const div = document.createElement('div'); div.className = 'gh-result-item';
+                    div.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#565f89"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                            <div>
+                                <div style="font-weight:bold; color:#c0caf5;">${asset.name}</div>
+                                <div style="font-size:0.8em; color:var(--text-muted);">${formatBytes(asset.size)}</div>
+                            </div>
+                        </div>
+                        <button class="icon-btn" style="color:var(--success-color); border:1px solid #2f3549; padding:5px 10px; border-radius:4px;" title="Download to VPS">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        </button>
+                    `;
+                    div.querySelector('button').onclick = () => downloadGhAsset(asset.download_url, asset.name);
+                    ghResults.appendChild(div);
+                });
+            } catch(e) {
+                ghResults.innerHTML = `<div style="color:var(--error-color); padding:10px; border:1px solid var(--error-color); border-radius:4px;">Error: ${e.message}</div>`;
+            }
+        }
+
+        async function downloadGhAsset(url, filename) {
+            const sub = prompt(`Download ${filename} to folder:`, 'Downloads/');
+            if(sub === null) return;
+
+            await fetch('/api/apps/github/download', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({url, filename, path:sub})
+            });
+            showToast('Download Queued', 'success');
+        }
+
+        // Publisher
+        function openFilePickerForGh() {
+            // Check if user selected a file in the main view
+            if(selectedPaths.length === 1 && browserMode === 'local') {
+                ghPubFile.value = selectedPaths[0];
+                showToast('File selected from browser', 'success');
+            } else {
+                alert("Please go to the 'Files' tab, select ONE local file, then come back here and click this button.");
+            }
+        }
+
+        async function triggerGhPublish() {
+            if(!ghPubFile.value) return showToast('Select a file first', 'error');
+
+            await fetch('/api/apps/github/publish', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    repo: ghPubRepo.value,
+                    tag: ghPubTag.value,
+                    file_path: ghPubFile.value
+                })
+            });
+            showToast('Publish Queued', 'success');
         }
 
         // --- Globals ---
@@ -704,6 +951,13 @@
         const selectAllCheck = document.getElementById('select-all-check');
         const localControls = document.getElementById('local-controls');
         const cloudControls = document.getElementById('cloud-controls');
+
+        // GitHub Elements
+        const ghRepoInput = document.getElementById('gh-repo-input');
+        const ghResults = document.getElementById('gh-results');
+        const ghPubRepo = document.getElementById('gh-pub-repo');
+        const ghPubTag = document.getElementById('gh-pub-tag');
+        const ghPubFile = document.getElementById('gh-pub-file');
 
         // Buttons
         const tabLocal = document.getElementById('tab-local');
@@ -729,6 +983,7 @@
         const downloadBtn = document.getElementById('download-btn');
 
         // Settings Elements
+        const setGhTokenInput = document.getElementById('set-gh-token');
         const setDiscordInput = document.getElementById('set-discord');
         const setTgTokenInput = document.getElementById('set-tg-token');
         const setTgChatInput = document.getElementById('set-tg-chat');
