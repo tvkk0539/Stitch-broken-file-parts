@@ -94,5 +94,55 @@ class TestGitHubManager(unittest.TestCase):
         self.assertEqual(res['status'], 'success')
         self.assertTrue(res['private'])
 
+    @patch('app.managers.github_tool.config.load_config')
+    @patch('app.managers.github_tool.requests.post')
+    def test_create_repository(self, mock_post, mock_load):
+        mock_load.return_value = {
+            'github_accounts': [{'id': '1', 'token': 'secret'}]
+        }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 201
+        mock_resp.json.return_value = {'full_name': 'user/new-repo'}
+        mock_post.return_value = mock_resp
+
+        res = GitHubManager.create_repository('new-repo', False, 'desc', '1')
+        self.assertEqual(res['status'], 'created')
+        self.assertEqual(res['repo'], 'user/new-repo')
+
+    @patch('app.managers.github_tool.config.load_config')
+    @patch('app.managers.github_tool.requests.post')
+    @patch('app.managers.github_tool.requests.patch')
+    def test_fork_repository_rename(self, mock_patch, mock_post, mock_load):
+        mock_load.return_value = {
+            'github_accounts': [{'id': '1', 'token': 'secret'}]
+        }
+
+        # Fork Response
+        mock_fork = MagicMock()
+        mock_fork.status_code = 202
+        mock_fork.json.return_value = {'url': 'https://api.github.com/repos/user/repo'}
+        mock_post.return_value = mock_fork
+
+        res = GitHubManager.fork_repository('owner', 'repo', 'new-name', '1')
+
+        self.assertEqual(res['status'], 'forked')
+        # Ensure patch (rename) was called
+        mock_patch.assert_called_once()
+
+    @patch('app.managers.github_tool.config.load_config')
+    @patch('app.managers.github_tool.requests.get')
+    def test_list_workflows(self, mock_get, mock_load):
+        mock_load.return_value = {
+            'github_accounts': [{'id': '1', 'token': 'secret'}]
+        }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {'workflows': [{'id': 1, 'name': 'Build'}]}
+        mock_get.return_value = mock_resp
+
+        wfs = GitHubManager.list_workflows('user/repo', '1')
+        self.assertEqual(len(wfs), 1)
+        self.assertEqual(wfs[0]['name'], 'Build')
+
 if __name__ == '__main__':
     unittest.main()

@@ -547,3 +547,66 @@ def github_publish():
         args=(repo, tag, abs_file, account_id, body, prerelease, draft)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/apps/github/repo/create', methods=['POST'])
+def github_create_repo():
+    data = request.json
+    name = data.get('name')
+    private = data.get('private', False)
+    description = data.get('description', '')
+    account_id = data.get('account_id')
+
+    if not name or not account_id: return jsonify({'error': 'Missing args'}), 400
+
+    return jsonify(GitHubManager.create_repository(name, private, description, account_id))
+
+@bp.route('/api/apps/github/repo/fork', methods=['POST'])
+def github_fork_repo():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    new_name = data.get('new_name')
+    account_id = data.get('account_id')
+
+    if not owner or not repo or not account_id: return jsonify({'error': 'Missing args'}), 400
+
+    return jsonify(GitHubManager.fork_repository(owner, repo, new_name, account_id))
+
+@bp.route('/api/apps/github/repo/clone', methods=['POST'])
+def github_clone_repo():
+    data = request.json
+    url = data.get('url')
+    path = data.get('path', '')
+    account_id = data.get('account_id')
+
+    if not url: return jsonify({'error': 'URL required'}), 400
+
+    abs_dest = os.path.join(DOWNLOAD_ROOT, path)
+
+    job_id = job_manager.add_job(
+        f"Git Clone: {os.path.basename(url)}",
+        GitHubManager.clone_repository_job,
+        args=(url, abs_dest, account_id)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+# --- Actions ---
+@bp.route('/api/apps/github/actions/workflows', methods=['POST'])
+def github_list_workflows():
+    data = request.json
+    return jsonify(GitHubManager.list_workflows(data.get('repo'), data.get('account_id')))
+
+@bp.route('/api/apps/github/actions/runs', methods=['POST'])
+def github_list_runs():
+    data = request.json
+    return jsonify(GitHubManager.list_workflow_runs(data.get('repo'), data.get('account_id')))
+
+@bp.route('/api/apps/github/actions/run', methods=['POST'])
+def github_trigger_run():
+    data = request.json
+    return jsonify(GitHubManager.trigger_workflow(data.get('repo'), data.get('id'), data.get('ref', 'main'), data.get('account_id')))
+
+@bp.route('/api/apps/github/actions/cancel', methods=['POST'])
+def github_cancel_run():
+    data = request.json
+    return jsonify(GitHubManager.cancel_workflow_run(data.get('repo'), data.get('id'), data.get('account_id')))

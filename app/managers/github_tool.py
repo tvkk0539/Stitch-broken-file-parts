@@ -4,6 +4,7 @@ from app.core import config
 import requests
 import os
 import shutil
+import subprocess
 
 class GitHubManager:
 
@@ -166,6 +167,151 @@ class GitHubManager:
                 return {'error': f"Failed to update visibility: {r.text}"}
         except Exception as e:
             return {'error': str(e)}
+
+    @staticmethod
+    def create_repository(name, private, description, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+        payload = {
+            'name': name,
+            'private': private,
+            'description': description or '',
+            'auto_init': True # Useful to have README
+        }
+
+        try:
+            r = requests.post('https://api.github.com/user/repos', json=payload, headers=headers)
+            if r.status_code == 201:
+                return {'status': 'created', 'repo': r.json()['full_name']}
+            return {'error': f"Create failed: {r.text}"}
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def fork_repository(owner, repo, new_name, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        # If new_name is provided, we need to fork then rename?
+        # GitHub API Fork endpoint doesn't support rename directly usually.
+        # Actually it does not. We fork, then rename in a second step.
+
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/forks"
+            r = requests.post(url, headers=headers) # Start fork
+            if r.status_code != 202:
+                return {'error': f"Fork failed: {r.text}"}
+
+            forked_repo = r.json()
+            # If rename requested and name differs
+            if new_name and new_name != repo:
+                # Rename is a separate PATCH operation
+                # We might need to wait for fork to be ready? Usually PATCH works on the new object.
+                patch_url = forked_repo['url']
+                requests.patch(patch_url, json={'name': new_name}, headers=headers)
+
+            return {'status': 'forked'} # Async operation
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def clone_repository_job(repo_url, dest_path, account_id):
+        # We need token to clone private repos
+        token = GitHubManager._get_token_for_account(account_id)
+
+        # Inject token into URL for auth: https://oauth2:TOKEN@github.com/...
+        if token and 'github.com' in repo_url:
+            clean_url = repo_url.replace('https://', '').replace('http://', '')
+            auth_url = f"https://oauth2:{token}@{clean_url}"
+        else:
+            auth_url = repo_url
+
+        log(f"Cloning {repo_url} to {dest_path}")
+        job_manager.update_job_details({'action': 'Cloning repository...'})
+
+        try:
+            if os.path.exists(dest_path):
+                raise Exception("Destination already exists")
+
+            cmd = ['git', 'clone', '--progress', auth_url, dest_path]
+
+            process = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True
+            )
+            job_manager.set_current_process(process)
+
+            for line in process.stdout:
+                if "Receiving objects" in line or "Resolving deltas" in line:
+                    log(f"[GIT] {line.strip()}")
+
+            process.wait()
+
+            if process.returncode == 0:
+                log("Clone successful")
+                NotificationManager.send_notification(f"✅ ParFix: Cloned {repo_url}")
+            else:
+                raise Exception(f"Git clone failed (Code {process.returncode})")
+
+        except Exception as e:
+            log(f"Clone error: {e}")
+            job_manager.update_job_details({'error': str(e)})
+
+    # --- Actions ---
+
+    @staticmethod
+    def list_workflows(repo, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            r = requests.get(f"https://api.github.com/repos/{repo}/actions/workflows", headers=headers)
+            if r.status_code != 200: return {'error': 'Failed to list workflows'}
+            return r.json()['workflows']
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def list_workflow_runs(repo, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            r = requests.get(f"https://api.github.com/repos/{repo}/actions/runs?per_page=20", headers=headers)
+            if r.status_code != 200: return {'error': 'Failed to list runs'}
+            return r.json()['workflow_runs']
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def trigger_workflow(repo, workflow_id, ref, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow_id}/dispatches"
+            r = requests.post(url, json={'ref': ref}, headers=headers)
+            if r.status_code == 204: return {'status': 'triggered'}
+            return {'error': f"Failed: {r.text}"}
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def cancel_workflow_run(repo, run_id, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/cancel"
+            requests.post(url, headers=headers)
+            return {'status': 'cancelled'}
+        except Exception as e: return {'error': str(e)}
 
     @staticmethod
     def get_releases(repo_url, account_id=None):

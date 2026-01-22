@@ -123,17 +123,21 @@ async function fetchMyRepos() {
     const grid = document.getElementById('gh-repos-grid');
     grid.innerHTML = '<div style="color:var(--text-muted); grid-column:1/-1; text-align:center;">Loading repositories...</div>';
 
+    // Add "New Repo" card first
+    const newRepoBtn = `
+        <div class="app-card" style="height:auto; justify-content:center; border-style:dashed; opacity:0.8;" onclick="openGhNewRepoModal()">
+            <div style="font-size:2em; color:var(--accent-color);">+</div>
+            <div>New Repository</div>
+        </div>
+    `;
+
     try {
         const res = await fetch(`/api/apps/github/user/repos?account_id=${ghActiveAccount.id}`);
         const repos = await res.json();
 
         if(repos.error) throw new Error(repos.error);
 
-        grid.innerHTML = '';
-        if(repos.length === 0) {
-            grid.innerHTML = '<div style="color:var(--text-muted); grid-column:1/-1;">No repositories found.</div>';
-            return;
-        }
+        grid.innerHTML = newRepoBtn; // Start with button
 
         repos.forEach(repo => {
             const card = document.createElement('div');
@@ -144,22 +148,23 @@ async function fetchMyRepos() {
             card.style.padding = '15px';
 
             const visibilityIcon = repo.private ? '🔒' : '🌍';
-            const visibilityColor = repo.private ? '#e0af68' : '#9ece6a'; // Gold vs Green
+            const visibilityColor = repo.private ? '#e0af68' : '#9ece6a';
 
             card.innerHTML = `
-                <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:5px;">
                     <div style="font-weight:bold; color:#c0caf5; word-break:break-all;">${repo.name}</div>
                     <div style="font-size:0.9em; color:${visibilityColor};" title="${repo.private ? 'Private' : 'Public'}">${visibilityIcon}</div>
                 </div>
-                <div style="font-size:0.8em; color:var(--text-muted); margin-bottom:15px;">
-                    ⭐ ${repo.stars} &nbsp;•&nbsp; Updated ${new Date(repo.updated_at).toLocaleDateString()}
+                <div style="font-size:0.8em; color:var(--text-muted); margin-bottom:10px;">
+                    ⭐ ${repo.stars} &nbsp;•&nbsp; ${new Date(repo.updated_at).toLocaleDateString()}
                 </div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap; width:100%;">
-                    <button class="secondary" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'down')">Download</button>
-                    <button class="purple-btn" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'pub')">Publish</button>
+                <div style="display:flex; gap:5px; flex-wrap:wrap; width:100%;">
+                    <button class="secondary" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'down')">Get</button>
+                    <button class="purple-btn" style="flex:1; font-size:0.8em; padding:6px;" onclick="ghSelectRepo('${repo.name}', 'pub')">Pub</button>
+                    <button class="info-btn" style="flex:0; font-size:0.8em; padding:6px;" onclick="ghOpenActions('${repo.name}')">▶</button>
                 </div>
-                <div style="margin-top:10px; width:100%;">
-                    <button class="icon-btn" style="width:100%; font-size:0.8em; border:1px solid var(--border-color); color:var(--text-muted);" onclick="ghToggleVisibility('${repo.name}', ${repo.private})">
+                <div style="margin-top:5px; width:100%;">
+                    <button class="icon-btn" style="width:100%; font-size:0.7em; border:none; color:var(--text-muted);" onclick="ghToggleVisibility('${repo.name}', ${repo.private})">
                         ${repo.private ? 'Make Public' : 'Make Private'}
                     </button>
                 </div>
@@ -210,6 +215,35 @@ async function ghToggleVisibility(name, isPrivate) {
     }
 }
 
+// --- Create Repo Logic ---
+function openGhNewRepoModal() {
+    document.getElementById('gh-new-repo-modal').style.display = 'block';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('confirm-gh-create').onclick = async () => {
+        const name = document.getElementById('gh-new-name').value;
+        const desc = document.getElementById('gh-new-desc').value;
+        const priv = document.getElementById('gh-new-private').checked;
+
+        if(!name) return showToast('Name required', 'error');
+
+        try {
+            const res = await fetch('/api/apps/github/repo/create', {
+                method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({name, description:desc, private:priv, account_id:ghActiveAccount.id})
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+
+            showToast('Repository Created', 'success');
+            document.getElementById('gh-new-repo-modal').style.display='none';
+            fetchMyRepos();
+        } catch(e) { showToast(e.message, 'error'); }
+    };
+});
+
+// --- Clone & Fork Logic (In Downloader) ---
 async function fetchGhReleases() {
     const repo = document.getElementById('gh-repo-input').value;
     const ghResults = document.getElementById('gh-results');
@@ -227,8 +261,19 @@ async function fetchGhReleases() {
         const data = await res.json();
         if(data.error) throw new Error(data.error);
 
-        document.getElementById('gh-results-header').style.display = 'block';
-        document.getElementById('gh-results-header').innerHTML = `Latest Release: <span style="color:#c0caf5;">${data.name}</span> <span style="font-size:0.8em; color:var(--text-muted);">(${data.tag})</span>`;
+        // Header with Fork/Clone Actions
+        const header = document.getElementById('gh-results-header');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+
+        header.innerHTML = `
+            <div>Latest: <span style="color:#c0caf5;">${data.name}</span> <span style="font-size:0.8em; color:var(--text-muted);">(${data.tag})</span></div>
+            <div style="display:flex; gap:10px;">
+                <button class="secondary" style="padding:5px 10px; font-size:0.8em;" onclick="openGhForkModal('${repo}')">Fork</button>
+                <button class="purple-btn" style="padding:5px 10px; font-size:0.8em;" onclick="triggerGhClone('${repo}')">Clone Source</button>
+            </div>
+        `;
 
         ghResults.innerHTML = '';
         if(!data.assets || data.assets.length === 0) {
@@ -256,6 +301,142 @@ async function fetchGhReleases() {
     } catch(e) {
         ghResults.innerHTML = `<div style="color:var(--error-color); padding:10px; border:1px solid var(--error-color); border-radius:4px;">Error: ${e.message}</div>`;
     }
+}
+
+async function triggerGhClone(repoName) {
+    const sub = prompt(`Clone ${repoName} source code to folder:`, `Cloned/${repoName.split('/')[1]}`);
+    if(!sub) return;
+
+    // Construct full URL
+    const url = `https://github.com/${repoName}.git`;
+
+    await fetch('/api/apps/github/repo/clone', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({url, path:sub, account_id:ghActiveAccount.id})
+    });
+    showToast('Clone Queued', 'success');
+}
+
+// Fork Modal
+let ghForkTargetRepo = '';
+function openGhForkModal(repo) {
+    ghForkTargetRepo = repo;
+    document.getElementById('gh-fork-source').textContent = repo;
+    document.getElementById('gh-fork-name').value = repo.split('/')[1]; // Default to original name
+    document.getElementById('gh-fork-modal').style.display='block';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('confirm-gh-fork').onclick = async () => {
+        const newName = document.getElementById('gh-fork-name').value;
+        const [owner, repo] = ghForkTargetRepo.split('/');
+
+        try {
+            const res = await fetch('/api/apps/github/repo/fork', {
+                method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({owner, repo, new_name:newName, account_id:ghActiveAccount.id})
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+
+            showToast('Fork Started', 'success');
+            document.getElementById('gh-fork-modal').style.display='none';
+        } catch(e) { showToast(e.message, 'error'); }
+    };
+});
+
+// --- Actions Logic ---
+let ghActionsRepo = '';
+
+async function ghOpenActions(repo) {
+    ghActionsRepo = repo;
+    document.getElementById('gh-actions-title').textContent = `Actions: ${repo}`;
+    document.getElementById('gh-actions-modal').style.display = 'block';
+    loadGhWorkflows();
+    loadGhRuns();
+}
+
+async function loadGhWorkflows() {
+    const el = document.getElementById('gh-workflows-list');
+    el.innerHTML = 'Loading...';
+    try {
+        const res = await fetch('/api/apps/github/actions/workflows', {
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({repo:ghActionsRepo, account_id:ghActiveAccount.id})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        el.innerHTML = '';
+        data.forEach(wf => {
+            const div = document.createElement('div');
+            div.style.padding = '8px';
+            div.style.borderBottom = '1px solid var(--border-color)';
+            div.style.display = 'flex';
+            div.style.justifyContent = 'space-between';
+            div.style.alignItems = 'center';
+            div.innerHTML = `
+                <span>${wf.name}</span>
+                <button class="secondary" style="padding:2px 8px; font-size:0.8em;" onclick="ghTriggerRun(${wf.id})">Run ▷</button>
+            `;
+            el.appendChild(div);
+        });
+    } catch(e) { el.innerHTML = `Error: ${e.message}`; }
+}
+
+async function loadGhRuns() {
+    const el = document.getElementById('gh-runs-list');
+    el.innerHTML = 'Loading...';
+    try {
+        const res = await fetch('/api/apps/github/actions/runs', {
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({repo:ghActionsRepo, account_id:ghActiveAccount.id})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+
+        el.innerHTML = '';
+        data.forEach(run => {
+            const div = document.createElement('div');
+            div.className = 'gh-result-item'; // Reuse style
+
+            let statusColor = '#c0caf5';
+            if(run.status === 'completed') {
+                statusColor = run.conclusion === 'success' ? 'var(--success-color)' : 'var(--error-color)';
+            } else {
+                statusColor = 'var(--warning-color)'; // In progress/Queued
+            }
+
+            div.innerHTML = `
+                <div>
+                    <div style="font-weight:bold; color:${statusColor};">${run.name} #${run.run_number}</div>
+                    <div style="font-size:0.8em; color:var(--text-muted);">${run.status} (${run.conclusion || 'running'}) • ${run.event}</div>
+                </div>
+                ${run.status !== 'completed' ? `<button class="danger" style="padding:4px 8px; font-size:0.8em;" onclick="ghCancelRun(${run.id})">Stop</button>` : ''}
+            `;
+            el.appendChild(div);
+        });
+    } catch(e) { el.innerHTML = `Error: ${e.message}`; }
+}
+
+async function ghTriggerRun(id) {
+    if(!confirm("Run this workflow on 'main'?")) return;
+    await fetch('/api/apps/github/actions/run', {
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({repo:ghActionsRepo, id:id, account_id:ghActiveAccount.id})
+    });
+    showToast('Workflow Triggered', 'success');
+    setTimeout(loadGhRuns, 2000);
+}
+
+async function ghCancelRun(id) {
+    if(!confirm("Cancel this run?")) return;
+    await fetch('/api/apps/github/actions/cancel', {
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({repo:ghActionsRepo, id:id, account_id:ghActiveAccount.id})
+    });
+    showToast('Cancellation Sent', 'success');
+    setTimeout(loadGhRuns, 2000);
 }
 
 async function downloadGhAsset(url, filename) {

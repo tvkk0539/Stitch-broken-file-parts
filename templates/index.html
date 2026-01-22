@@ -389,11 +389,64 @@
             <div class="form-group">
                 <label>Personal Access Token</label>
                 <input type="password" id="gh-login-token" placeholder="ghp_...">
-                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Scopes required: <code>repo</code> (for private/publishing)</div>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Scopes required: <code>repo</code> (for private/publishing), <code>workflow</code> (for Actions)</div>
             </div>
             <div class="modal-actions">
                 <button id="cancel-gh-login" class="danger">Cancel</button>
                 <button id="confirm-gh-login" class="secondary">Verify & Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Repo Modal -->
+    <div id="gh-new-repo-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>New Repository</h3></div>
+            <div class="form-group"><label>Name</label><input type="text" id="gh-new-name"></div>
+            <div class="form-group"><label>Description</label><input type="text" id="gh-new-desc"></div>
+            <div class="form-group">
+                <label style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="gh-new-private" checked> Private Repository
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button onclick="document.getElementById('gh-new-repo-modal').style.display='none'" class="danger">Cancel</button>
+                <button id="confirm-gh-create" class="secondary">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fork Modal -->
+    <div id="gh-fork-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Fork to Account</h3></div>
+            <div style="margin-bottom:15px; color:var(--text-muted);">Forking <span id="gh-fork-source" style="color:var(--accent-color);"></span></div>
+            <div class="form-group"><label>Target Name (Optional Rename)</label><input type="text" id="gh-fork-name"></div>
+            <div class="modal-actions">
+                <button onclick="document.getElementById('gh-fork-modal').style.display='none'" class="danger">Cancel</button>
+                <button id="confirm-gh-fork" class="secondary">Fork</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Modal -->
+    <div id="gh-actions-modal" class="modal">
+        <div class="modal-content" style="width:800px; max-height:80vh; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 id="gh-actions-title">Actions</h3>
+                    <button onclick="document.getElementById('gh-actions-modal').style.display='none'" class="icon-btn">✖</button>
+                </div>
+            </div>
+            <div style="display:flex; flex:1; overflow:hidden; gap:20px;">
+                <div style="width:30%; border-right:1px solid var(--border-color); overflow-y:auto;">
+                    <h4 style="margin-top:0;">Workflows</h4>
+                    <div id="gh-workflows-list"></div>
+                </div>
+                <div style="flex:1; overflow-y:auto;">
+                    <h4 style="margin-top:0;">Recent Runs</h4>
+                    <div id="gh-runs-list"></div>
+                </div>
             </div>
         </div>
     </div>
