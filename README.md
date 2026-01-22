@@ -29,14 +29,19 @@ Transform your VPS into a Cloud Manager. No FUSE required.
 A new section for integrated tools and utilities.
 - **GitHub Release Manager:**
     - **Multi-Account Support:** Login with multiple GitHub accounts and switch between them instantly using the **Account Hub**.
-    - **Repository Browser:** View all your repositories (Public/Private) in a convenient grid. No need to manually type repo names anymore.
+    - **Repository Browser:** View all your repositories (Public/Private) in a convenient grid with **Live Search** to quickly find specific repos.
     - **Visibility Control:** Toggle repositories between **Public** and **Private** directly from the dashboard (with safety confirmations).
     - **Create & Import:** Create new empty repositories or **Import** existing ones from other URLs (supports mirroring public/private repos).
     - **Clone Source:** Clone the source code of any repository to your VPS using `git clone` (authenticated).
     - **Actions Manager:** Full CI/CD Dashboard. View workflows, trigger runs, and cancel active jobs.
-    - **Rich Publishing:** Create professional releases with Markdown release notes, **Draft** mode support, and **Pre-release** tagging.
-    - **Downloader:** Fetch and download assets from any public or private GitHub repository directly to your server.
-        - **Multi-Version Support:** Fetches and displays the last 30 releases, allowing you to download assets from older versions, not just the latest.
+    - **Rich Publishing:**
+        - Create professional releases with Markdown release notes, **Draft** mode, and **Pre-release** tags.
+        - **Release Selector:** Fetch and select an existing release to upload assets to, instead of manually typing the tag.
+    - **Downloader & Release Manager:**
+        - **Multi-Version Support:** Browse the full history of releases with **Pagination** (Next/Prev) support.
+        - **Live Filter:** Instantly search through releases by tag or filename.
+        - **Batch Download:** "Download All" button to grab every asset in a release simultaneously with parallel processing.
+        - **Release Management:** Delete individual assets, batch delete all assets, or delete the entire release (requires write access).
     - **Auto-Migration:** Automatically upgrades your legacy `github_token` configuration to the new multi-account system.
 
 ### 📂 Local File Management
@@ -151,19 +156,24 @@ Click the **Apps** icon in the sidebar to access additional utilities.
     - **Toggle Visibility:** Use the lock/unlock icon to switch between Public and Private visibility.
     - **Create Repo:** Click the big "+" card to create a new empty repository.
     - **Import Repo:** Click the "Import" card to mirror an existing repository (Public or Private) to your account.
+    - **Search:** Use the search bar to filter your repository list instantly.
     - **Actions:** Click the "▶" button on any card to open the Actions Dashboard (Run/Cancel workflows).
-3. **Download & Clone:**
+3. **Download & Manage Releases:**
     - Enter a GitHub repository (e.g., `radarr/radarr`) or select one from "My Repos".
-   - Click "Fetch" to see releases.
-    - **Browse Versions:** View a list of recent releases (latest, pre-releases, etc.). Click a version to expand it.
-    - **Download:** Click the download icon next to an asset to save it.
+    - Click "Fetch" to see releases.
+    - **Browse:** Navigate through release history using the Pagination controls.
+    - **Filter:** Type in the search bar to find specific versions or filenames (e.g., "beta" or ".zip").
+    - **Download:** Click the download icon next to an asset, or "Download All" to grab everything.
+    - **Manage:** Use the Trash icons to delete assets or releases (if you own the repo).
     - **Clone Source:** Click "Clone Source" to `git clone` the entire repository to your VPS.
 4. **Publish:**
    - Select an account (must have write access).
    - Switch to the "Publisher" tab.
-   - Enter the repository, tag (e.g., `v1.0.0`), and select a file.
-    - (Optional) Add **Release Notes**, mark as **Draft**, or **Pre-release**.
-   - Click "Publish" to create a release and upload the file.
+   - **Option A (New):** Click "Fetch Releases" to select an existing tag.
+   - **Option B (Create):** Manually enter a new Tag (e.g., `v1.0.0`).
+   - Select a file to upload.
+   - (Optional) Add **Release Notes**, mark as **Draft**, or **Pre-release**.
+   - Click "Publish" / "Upload" to finish.
 
 ### Creating an Archive
 1. Navigate to the file or folder you want to pack.
