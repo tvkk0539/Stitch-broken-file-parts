@@ -188,7 +188,7 @@ def trigger_archive():
         args=(abs_path, name, data.get('split_size', '1024M'), data.get('password'),
               data.get('format', 'rar'), data.get('create_par2', True),
               data.get('upload', False), data.get('remote'), data.get('upload_path', ''),
-              data.get('naming_scheme', 'part1'))
+              data.get('naming_scheme', 'part1'), data.get('rar_recovery_record', True))
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 

@@ -192,8 +192,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('arc-fmt').onchange = (e) => {
         const isRar = e.target.value === 'rar';
-        const grp = document.getElementById('arc-naming-group');
-        if(grp) grp.style.display = isRar ? 'block' : 'none';
+        const nameGrp = document.getElementById('arc-naming-group');
+        const rrGrp = document.getElementById('arc-rr-group');
+        if(nameGrp) nameGrp.style.display = isRar ? 'block' : 'none';
+        if(rrGrp) rrGrp.style.display = isRar ? 'block' : 'none';
     };
 
     document.getElementById('start-arc').onclick = async () => {
@@ -211,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  password: document.getElementById('arc-pass').value,
                  format: document.getElementById('arc-fmt').value,
                  naming_scheme: naming,
+                 rar_recovery_record: document.getElementById('arc-rr').checked,
                  create_par2: document.getElementById('arc-par2').checked,
                  upload: document.getElementById('arc-upload').checked,
                  remote: document.getElementById('arc-remote').value,

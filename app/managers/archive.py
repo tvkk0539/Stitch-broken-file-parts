@@ -8,7 +8,7 @@ import re
 
 class ArchiveManager:
     @staticmethod
-    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path='', naming_scheme='part1'):
+    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path='', naming_scheme='part1', rar_recovery_record=True):
         parent_dir = os.path.dirname(source_path)
         base_name = os.path.basename(source_path)
 
@@ -39,6 +39,8 @@ class ArchiveManager:
         if fmt == 'rar':
             # -y: Assume Yes on questions (overwrite, etc)
             cmd = ['rar', 'a', '-m0', '-y', f'-v{split_size}', '-ep1']
+            if rar_recovery_record:
+                cmd.append('-rr5p')
             if password:
                 cmd.append(f'-hp{password}')
             cmd.append(archive_name)
