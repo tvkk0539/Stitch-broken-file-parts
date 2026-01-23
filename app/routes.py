@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, jsonify, request, Response
-from app.core.job_manager import system_log_queue, job_log_queues, job_manager, log
+from app.core.job_manager import job_manager, log
 from app.managers.rclone import RcloneManager
 from app.managers.archive import ArchiveManager
 from app.managers.repair import RepairManager
@@ -11,6 +11,7 @@ import os
 import shutil
 import subprocess
 import psutil
+import queue
 
 bp = Blueprint('main', __name__)
 
@@ -78,31 +79,54 @@ def system_stats():
 @bp.route('/api/logs')
 def stream_logs():
     """Streams global system logs."""
+    history, q = job_manager.register_system_listener()
+
     def generate():
-        while True:
-            try:
-                message = system_log_queue.get(timeout=20)
-                yield f"data: {message}\n\n"
-            except: # queue.Empty
-                yield ": keep-alive\n\n"
+        try:
+            # 1. Yield History
+            for msg in history:
+                yield f"data: {msg}\n\n"
+
+            # 2. Yield new messages
+            while True:
+                try:
+                    message = q.get(timeout=20)
+                    yield f"data: {message}\n\n"
+                except queue.Empty:
+                    yield ": keep-alive\n\n"
+                except GeneratorExit:
+                    break
+        finally:
+            job_manager.unregister_system_listener(q)
+
     return Response(generate(), mimetype='text/event-stream')
 
 @bp.route('/api/logs/<job_id>')
 def stream_job_logs(job_id):
     """Streams logs for a specific job."""
-    if job_id not in job_log_queues:
-        return jsonify({'error': 'Job log not found'}), 404
+    history, q = job_manager.register_job_listener(job_id)
+
+    if history is None:
+         return jsonify({'error': 'Job log not found'}), 404
 
     def generate():
-        q = job_log_queues[job_id]
-        while True:
-            try:
-                message = q.get(timeout=20)
-                yield f"data: {message}\n\n"
-            except: # queue.Empty
-                # If job is finished and queue is empty, we might want to stop?
-                # For now, keep alive so user can read history until they close tab.
-                yield ": keep-alive\n\n"
+        try:
+            # 1. Yield History
+            for msg in history:
+                yield f"data: {msg}\n\n"
+
+            # 2. Yield new messages
+            while True:
+                try:
+                    message = q.get(timeout=20)
+                    yield f"data: {message}\n\n"
+                except queue.Empty:
+                    yield ": keep-alive\n\n"
+                except GeneratorExit:
+                    break
+        finally:
+            job_manager.unregister_job_listener(job_id, q)
+
     return Response(generate(), mimetype='text/event-stream')
 
 # --- Job API ---

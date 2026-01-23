@@ -8,26 +8,58 @@ from concurrent.futures import ThreadPoolExecutor
 # Global context to store current job ID in thread
 job_context = threading.local()
 
-# Global queues
-system_log_queue = queue.Queue() # For global "System" view
-job_log_queues = {} # job_id -> Queue
+# Constants
+MAX_LOG_LINES = 5000
+
+# Global Buffers (Persistent History)
+system_log_buffer = []
+job_log_buffers = {} # job_id -> list of strings
+
+# Global Listeners (Active Connections)
+# We use a set of Queues. When a message comes in, we put it into all active queues.
+system_log_listeners = set() # Set of Queue objects
+job_log_listeners = {} # job_id -> Set of Queue objects
+
+# Lock for Log Structures
+log_lock = threading.Lock()
 
 def log(message):
-    """Adds a message to the log queue."""
+    """Adds a message to the log buffer and broadcasts to listeners."""
     timestamp = time.strftime("%H:%M:%S")
     formatted_message = f"[{timestamp}] {message}"
     print(formatted_message)  # stdout
 
-    # Always add to system log
-    system_log_queue.put(formatted_message)
+    with log_lock:
+        # 1. System Log
+        system_log_buffer.append(formatted_message)
+        if len(system_log_buffer) > MAX_LOG_LINES:
+            system_log_buffer.pop(0)
 
-    # If inside a job, add to job's private queue
-    job_id = getattr(job_context, 'job_id', None)
-    if job_id and job_id in job_log_queues:
-        try:
-            job_log_queues[job_id].put(formatted_message)
-        except Exception:
-            pass
+        # Broadcast to System Listeners
+        for q in list(system_log_listeners):
+            try:
+                q.put(formatted_message)
+            except:
+                pass
+
+        # 2. Job Log
+        job_id = getattr(job_context, 'job_id', None)
+        if job_id:
+            # Ensure buffer exists
+            if job_id not in job_log_buffers:
+                job_log_buffers[job_id] = []
+
+            # Append
+            job_log_buffers[job_id].append(formatted_message)
+
+            # Broadcast to Job Listeners
+            if job_id in job_log_listeners:
+                listeners = job_log_listeners[job_id]
+                for q in list(listeners):
+                    try:
+                        q.put(formatted_message)
+                    except:
+                        pass
 
 class JobManager:
     def __init__(self, max_workers=4):
@@ -58,8 +90,9 @@ class JobManager:
 
         with self.lock:
             self.pending_jobs.append(job)
-            # Create log queue immediately
-            job_log_queues[job_id] = queue.Queue()
+            # Initialize log buffer
+            with log_lock:
+                job_log_buffers[job_id] = []
 
         log(f"Job Queued: {name}")
 
@@ -70,10 +103,6 @@ class JobManager:
 
     def _process_queue(self):
         """Picks a job from pending and runs it if slots available."""
-        # This is called whenever a job is added, or a job finishes.
-        # But since we use ThreadPoolExecutor to RUN the job, we just need to submit the worker task.
-        # Wait, the executor IS the worker pool.
-
         # Loop to fill available slots
         while True:
             job_to_run = None
@@ -148,11 +177,8 @@ class JobManager:
                 self.history.insert(0, job)
                 if len(self.history) > 50: self.history.pop()
 
-                # Cleanup log queue (delayed or keep for a bit?)
-                # We should keep it for viewing history of recently finished jobs?
-                # For now, we don't delete it immediately so user can see "Finished" logs.
-                # Maybe clear it when clearing history or after a long timeout.
-                # Let's leave it in memory for now, it's just text strings.
+                # Note: We do NOT delete the log buffer here.
+                # We keep it so the user can view logs of finished jobs.
 
             # Trigger next job
             self._process_queue()
@@ -241,13 +267,54 @@ class JobManager:
     def clear_history(self):
         with self.lock:
             self.history = []
-            # Also clear log queues for finished jobs?
-            # Safe to clear queues that are not running
+
+            # Clean up logs for non-running jobs
             running_ids = set(self.running_jobs.keys())
-            for jid in list(job_log_queues.keys()):
-                if jid not in running_ids:
-                    del job_log_queues[jid]
+
+            with log_lock:
+                for jid in list(job_log_buffers.keys()):
+                    if jid not in running_ids:
+                        del job_log_buffers[jid]
+                        # Clean listeners if any (should be none ideally)
+                        if jid in job_log_listeners:
+                             del job_log_listeners[jid]
+
+    # --- Log Listener Methods ---
+
+    def register_system_listener(self):
+        """Returns (current_history, queue)."""
+        q = queue.Queue()
+        with log_lock:
+            system_log_listeners.add(q)
+            history = list(system_log_buffer)
+        return history, q
+
+    def unregister_system_listener(self, q):
+        with log_lock:
+            if q in system_log_listeners:
+                system_log_listeners.remove(q)
+
+    def register_job_listener(self, job_id):
+        """Returns (current_history, queue). Returns (None, None) if job not found log."""
+        q = queue.Queue()
+        with log_lock:
+            if job_id not in job_log_buffers:
+                return None, None
+
+            if job_id not in job_log_listeners:
+                job_log_listeners[job_id] = set()
+            job_log_listeners[job_id].add(q)
+            history = list(job_log_buffers[job_id])
+
+        return history, q
+
+    def unregister_job_listener(self, job_id, q):
+        with log_lock:
+            if job_id in job_log_listeners:
+                if q in job_log_listeners[job_id]:
+                    job_log_listeners[job_id].remove(q)
+                if not job_log_listeners[job_id]:
+                    del job_log_listeners[job_id]
 
 # Create global instance
 job_manager = JobManager(max_workers=4)
-# Worker thread is no longer needed as ThreadPoolExecutor manages threads
