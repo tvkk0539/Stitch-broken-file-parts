@@ -26,18 +26,33 @@ const catalog = {
         // Add Filter listeners if we add filter UI later
     },
 
-    render: () => {
+    filter: (query) => {
+        const term = query.toLowerCase();
+        catalog.render(item => {
+            if(!term) return true;
+            return item.title.toLowerCase().includes(term) ||
+                   (item.category && item.category.toLowerCase().includes(term));
+        });
+    },
+
+    render: (filterFn = null) => {
         const container = document.getElementById('catalog-grid');
         if (!container) return;
 
         container.innerHTML = '';
 
-        if (catalog.state.items.length === 0) {
-            container.innerHTML = '<div class="catalog-empty">No items in library. Import items from Files view.</div>';
+        // Apply filter if provided, otherwise show all
+        const itemsToShow = filterFn ? catalog.state.items.filter(filterFn) : catalog.state.items;
+
+        if (itemsToShow.length === 0) {
+            const msg = catalog.state.items.length === 0
+                ? 'No items in library. Import items from Files view.'
+                : 'No matches found.';
+            container.innerHTML = `<div class="catalog-empty">${msg}</div>`;
             return;
         }
 
-        catalog.state.items.forEach(item => {
+        itemsToShow.forEach(item => {
             const card = document.createElement('div');
             card.className = 'catalog-card';
 
