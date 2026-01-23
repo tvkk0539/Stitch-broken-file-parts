@@ -7,6 +7,7 @@ from app.managers.extract import ExtractManager
 from app.managers.inspector import InspectorManager
 from app.managers.github_tool import GitHubManager
 from app.managers.catalog import CatalogManager
+from app.managers.sync import SyncManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -97,6 +98,32 @@ def delete_catalog_item(item_id):
         return jsonify({'status': 'success'})
     else:
         return jsonify({'status': 'error', 'message': 'Item not found'}), 404
+
+# --- Sync API ---
+
+@bp.route('/api/sync/init', methods=['POST'])
+def sync_init():
+    data = request.json
+    repo_url = data.get('repo_url')
+    token = data.get('token')
+
+    if not repo_url or not token:
+        return jsonify({'status': 'error', 'message': 'Missing URL or Token'}), 400
+
+    success, msg = SyncManager.init_sync(repo_url, token)
+    if success:
+        catalog_manager.reload() # Reload from new path
+        return jsonify({'status': 'success', 'message': msg})
+    else:
+        return jsonify({'status': 'error', 'message': msg}), 500
+
+@bp.route('/api/sync/push', methods=['POST'])
+def sync_push():
+    success, msg = SyncManager.push_data("Manual backup trigger")
+    if success:
+        return jsonify({'status': 'success', 'message': msg})
+    else:
+        return jsonify({'status': 'error', 'message': msg}), 500
 
 @bp.route('/api/system/stats')
 def system_stats():

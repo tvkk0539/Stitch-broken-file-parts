@@ -344,6 +344,25 @@
                         </div>
                     </div>
 
+                    <!-- Data Backup Settings -->
+                    <div class="form-group" style="border-top:1px solid var(--border-color); padding-top:20px;">
+                        <h3 style="margin-top:0; color:var(--accent-color);">Data Sync (Backup)</h3>
+                        <p style="color:var(--text-muted); font-size:0.9em; margin-bottom:15px;">Connect a Private GitHub Repository to backup your catalog.json automatically.</p>
+
+                        <div class="form-group">
+                            <label>Backup Repository URL (Private)</label>
+                            <input type="text" id="set-backup-repo" placeholder="https://github.com/myuser/my-private-data.git">
+                        </div>
+                        <div class="form-group">
+                            <label>GitHub Token (Repo Scope)</label>
+                            <input type="password" id="set-backup-token" placeholder="ghp_... (Leave empty to use main token if same)">
+                        </div>
+                        <div style="display:flex; gap:10px; margin-top:10px;">
+                            <button onclick="triggerDataSyncInit()" class="secondary">Link & Pull Data</button>
+                            <button onclick="triggerDataSyncPush()" class="purple-btn">Force Push Backup</button>
+                        </div>
+                    </div>
+
                     <div style="text-align:right; margin-top:30px;">
                         <button id="save-set" class="secondary" style="width:200px;">Save Changes</button>
                     </div>
