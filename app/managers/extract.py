@@ -25,8 +25,11 @@ class ExtractManager:
                             archive_file = f
                             break
             elif method == '7z':
+                # Broaden search for universal format support
+                # Prioritize common archive types
+                extensions = ('.7z', '.zip', '.rar', '.tar', '.gz', '.bz2', '.xz', '.iso', '.img', '.001')
                 for f in files:
-                    if f.endswith('.7z') or f.endswith('.001'):
+                    if f.lower().endswith(extensions):
                         archive_file = f
                         break
 

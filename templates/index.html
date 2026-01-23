@@ -463,7 +463,13 @@
     <div id="extract-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header"><h3>Extract</h3></div>
-            <div class="form-group"><label>Method:</label><select id="ext-method"><option value="unrar">UnRAR</option><option value="7z">7-Zip</option></select></div>
+            <div class="form-group">
+                <label>Method:</label>
+                <select id="ext-method">
+                    <option value="unrar">UnRAR (Best for RAR only)</option>
+                    <option value="7z">7-Zip (Universal: 7z, Zip, Tar, ISO, RAR, etc.)</option>
+                </select>
+            </div>
             <div class="form-group"><label>Password:</label><input type="text" id="ext-pass"></div>
             <div class="modal-actions"><button id="cancel-ext" class="danger">Cancel</button><button id="confirm-ext" class="secondary">Extract</button></div>
         </div>
