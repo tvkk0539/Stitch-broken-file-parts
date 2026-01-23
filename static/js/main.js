@@ -8,6 +8,11 @@ let mcAction = 'move';
 let mcCurrentBrowserPath = '';
 let mcContext = 'local';
 
+// Log Tabs State
+let activeLogTab = 'system'; // 'system' or job_id
+let logEventSource = null;
+let currentRunningJobIds = []; // Track to add/remove tabs
+
 // --- View Router ---
 function switchView(viewName) {
     // Hide all views
@@ -70,16 +75,126 @@ async function fetchStats() {
     } catch(e) {}
 }
 
-// --- Logs ---
+// --- Logs & Tabs ---
+
 function initLogs() {
+    // Inject Tab Structure if not present (replacing simple header)
+    const logsView = document.getElementById('view-logs');
+    if (!document.getElementById('log-tabs-container')) {
+        logsView.innerHTML = `
+            <div id="log-tabs-container" style="display:flex; gap:10px; border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:10px; overflow-x:auto;">
+                <button class="log-tab active" data-id="system" onclick="switchLogTab('system')">System</button>
+            </div>
+            <div id="console">Waiting for logs...</div>
+        `;
+    }
+
+    // Connect to System Log by default
+    connectLogStream('system');
+}
+
+function switchLogTab(id) {
+    activeLogTab = id;
+
+    // UI Update
+    document.querySelectorAll('.log-tab').forEach(b => {
+        if(b.dataset.id === id) b.classList.add('active');
+        else b.classList.remove('active');
+    });
+
+    // Reconnect Stream
+    connectLogStream(id);
+}
+
+function connectLogStream(id) {
+    if(logEventSource) {
+        logEventSource.close();
+    }
+
     const consoleDiv = document.getElementById('console');
-    const evtSource = new EventSource("/api/logs");
-    evtSource.onmessage = function(event) {
+    consoleDiv.innerHTML = ''; // Clear current view
+
+    const url = id === 'system' ? '/api/logs' : `/api/logs/${id}`;
+
+    logEventSource = new EventSource(url);
+
+    logEventSource.onmessage = function(event) {
         const newLog = document.createElement('div');
         newLog.textContent = event.data;
         consoleDiv.appendChild(newLog);
         consoleDiv.scrollTop = consoleDiv.scrollHeight;
     };
+
+    logEventSource.onerror = function() {
+        // If job finishes, stream might close.
+        // Optional: show "Stream ended"
+    };
+}
+
+// Called by queue.js polling loop
+function updateLogTabs(data) {
+    const container = document.getElementById('log-tabs-container');
+    if(!container) return; // logs view not ready
+
+    const running = data.running || [];
+    const runningIds = new Set(running.map(j => j.id));
+
+    // 1. Add new tabs
+    running.forEach(job => {
+        if (!currentRunningJobIds.includes(job.id)) {
+            const btn = document.createElement('button');
+            btn.className = 'log-tab';
+            btn.dataset.id = job.id;
+            btn.textContent = getShortName(job.name);
+            btn.title = job.name;
+            btn.onclick = () => switchLogTab(job.id);
+            container.appendChild(btn);
+            currentRunningJobIds.push(job.id);
+        }
+    });
+
+    // 2. Remove tabs for finished jobs?
+    // User might want to see logs of finished jobs.
+    // Strategy: Keep them until "Clear History" or manual close?
+    // To match user request "shows only one job... until finishes", we probably WANT to see finished ones.
+    // BUT: if we keep them forever, tabs will overflow.
+    // Compromise: Keep them in the list, but maybe mark them as (Done).
+    // For now, let's NOT remove them automatically so user can inspect.
+    // We will just update their text to indicate done?
+
+    // Actually, simply remove them from "running" list doesn't mean we must remove tab immediately.
+    // But if we remove tab, user loses the specific log context.
+    // Let's remove tab ONLY if it's NOT active. If active, keep it until user switches away?
+    // Or just keep them for a bit.
+    // Simple approach: Only show tabs for RUNNING jobs. If job finishes, it disappears from tabs?
+    // User complaint was: "others won't show until first job finishes".
+    // So the goal is to see concurrent running jobs.
+    // I will REMOVE tabs for finished jobs to keep UI clean, UNLESS it's the active tab.
+
+    const tabs = Array.from(container.children);
+    tabs.forEach(tab => {
+        const tid = tab.dataset.id;
+        if(tid === 'system') return;
+
+        if (!runningIds.has(tid)) {
+             // Job finished
+             if(activeLogTab === tid) {
+                 tab.textContent = `(Done) ${tab.textContent.replace('(Done) ', '')}`;
+                 tab.style.opacity = '0.7';
+             } else {
+                 // Remove inactive, finished job tabs
+                 tab.remove();
+                 currentRunningJobIds = currentRunningJobIds.filter(id => id !== tid);
+             }
+        }
+    });
+}
+
+function getShortName(name) {
+    // "Download 5 items from GDrive" -> "Download..."
+    // "Pack my_movie" -> "Pack..."
+    if(name.length > 15) return name.substring(0, 15) + '...';
+    return name;
 }
 
 // Initialize core components on load

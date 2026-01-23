@@ -1,6 +1,4 @@
-import threading
 from flask import Flask
-from app.core.job_manager import worker, job_manager
 from app.routes import bp
 
 def create_app():
@@ -8,7 +6,6 @@ def create_app():
     app = Flask(__name__, template_folder='../templates', static_folder='../static')
     app.register_blueprint(bp)
 
-    # Start worker
-    threading.Thread(target=worker, args=(job_manager,), daemon=True).start()
+    # Note: Worker thread is now managed internally by JobManager's ThreadPoolExecutor
 
     return app
