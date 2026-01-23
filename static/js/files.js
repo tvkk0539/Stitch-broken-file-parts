@@ -179,9 +179,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('archive-btn').onclick = async () => {
         if (typeof loadRemotesSelect === 'function') loadRemotesSelect(document.getElementById('arc-remote'));
         document.getElementById('arc-name').value = selectedPaths[0].split('/').pop();
+
+        // Load preference
+        const savedNaming = localStorage.getItem('arc-naming-pref');
+        if(savedNaming) document.getElementById('arc-naming').value = savedNaming;
+
+        // Trigger change to update visibility
+        document.getElementById('arc-fmt').dispatchEvent(new Event('change'));
+
         document.getElementById('archive-modal').style.display = 'block';
     };
+
+    document.getElementById('arc-fmt').onchange = (e) => {
+        const isRar = e.target.value === 'rar';
+        const grp = document.getElementById('arc-naming-group');
+        if(grp) grp.style.display = isRar ? 'block' : 'none';
+    };
+
     document.getElementById('start-arc').onclick = async () => {
+         const naming = document.getElementById('arc-naming').value;
+         localStorage.setItem('arc-naming-pref', naming);
+
          document.getElementById('archive-modal').style.display = 'none';
          await fetch('/api/archive', {
              method:'POST',
@@ -192,6 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  split_size: document.getElementById('arc-size').value,
                  password: document.getElementById('arc-pass').value,
                  format: document.getElementById('arc-fmt').value,
+                 naming_scheme: naming,
                  create_par2: document.getElementById('arc-par2').checked,
                  upload: document.getElementById('arc-upload').checked,
                  remote: document.getElementById('arc-remote').value,

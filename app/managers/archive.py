@@ -4,17 +4,29 @@ from app.managers.rclone import RcloneManager
 import os
 import subprocess
 import glob
+import re
 
 class ArchiveManager:
     @staticmethod
-    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path=''):
+    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path='', naming_scheme='part1'):
         parent_dir = os.path.dirname(source_path)
         base_name = os.path.basename(source_path)
 
-        # Extension handling
-        ext = '.rar' if fmt == 'rar' else '.7z'
-        if not archive_name.endswith(ext):
-            archive_name += ext
+        # 1. Clean the name (remove extensions)
+        clean_name = archive_name
+        if clean_name.lower().endswith('.rar'): clean_name = clean_name[:-4]
+        elif clean_name.lower().endswith('.7z'): clean_name = clean_name[:-3]
+
+        # 2. Construct Output Name based on Scheme
+        if fmt == 'rar':
+            if naming_scheme == 'part001':
+                archive_name = f"{clean_name}.part001.rar"
+            elif naming_scheme == 'part01':
+                archive_name = f"{clean_name}.part01.rar"
+            else:
+                archive_name = f"{clean_name}.rar"
+        else:
+            archive_name = f"{clean_name}.7z"
 
         log(f"Packing '{base_name}' into '{archive_name}' ({fmt})")
 
@@ -83,9 +95,23 @@ class ArchiveManager:
                 job_manager.update_job_details({'action': 'Generating PAR2 Recovery Files'})
 
                 # Determine what files to protect
-                target_pattern = archive_name.replace('.rar', '.part*.rar') if fmt == 'rar' else archive_name + ".*"
+                # Recalculate clean_name for safety in case local vars drifted (though they haven't)
+                clean_name = archive_name
+                if clean_name.lower().endswith('.rar'):
+                    # Handle .part001.rar case to get base
+                    if re.search(r'\.part\d+\.rar$', clean_name, re.IGNORECASE):
+                        clean_name = re.sub(r'\.part\d+\.rar$', '', clean_name, flags=re.IGNORECASE)
+                    elif clean_name.lower().endswith('.rar'):
+                        clean_name = clean_name[:-4]
 
+                target_pattern = f"{clean_name}.part*.rar" if fmt == 'rar' else archive_name + ".*"
+
+                # If target pattern didn't match anything, maybe it wasn't split?
+                # Try simple wildcard
                 files_to_protect = glob.glob(os.path.join(parent_dir, target_pattern))
+                if fmt == 'rar' and not files_to_protect:
+                     # Fallback for non-split RARs
+                     files_to_protect = glob.glob(os.path.join(parent_dir, f"{clean_name}.rar"))
                 if fmt == '7z' and not files_to_protect and os.path.exists(os.path.join(parent_dir, archive_name)):
                      files_to_protect = [os.path.join(parent_dir, archive_name)]
 
