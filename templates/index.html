@@ -14,6 +14,10 @@
             <div class="nav-icon">📂</div>
             <div class="nav-label">Files</div>
         </div>
+        <div class="nav-item" data-view="catalog" onclick="switchView('catalog')">
+            <div class="nav-icon">🎥</div>
+            <div class="nav-label">Catalog</div>
+        </div>
         <div class="nav-item" data-view="queue" onclick="switchView('queue')">
             <div class="nav-icon">⏳</div>
             <div class="nav-label">Queue</div>
@@ -123,6 +127,20 @@
                     </div>
                 </div>
 
+            </div>
+
+            <!-- VIEW: CATALOG -->
+            <div id="view-catalog" class="view-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="margin:0; border:none;">Private Catalog</h2>
+                    <div style="display:flex; gap:10px;">
+                        <button class="purple-btn" onclick="catalog.openAddModal()">+ Add Item</button>
+                        <button class="secondary" onclick="catalog.load()">Refresh</button>
+                    </div>
+                </div>
+                <div id="catalog-grid" class="catalog-grid">
+                    <!-- JS Injected -->
+                </div>
             </div>
 
             <!-- VIEW: QUEUE -->
@@ -498,6 +516,47 @@
     <div id="mkdir-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>New Folder</h3></div><input type="text" id="mkdir-name" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-mkdir" class="danger">Cancel</button><button id="confirm-mkdir" class="secondary">Create</button></div></div></div>
     <div id="inspect-modal" class="modal"><div class="modal-content" style="width:600px;"><div class="modal-header"><h3>File Info</h3></div><div id="inspect-content" style="max-height:400px; overflow-y:auto;"></div><div class="modal-actions"><button id="close-inspect" class="secondary">Close</button></div></div></div>
 
+    <!-- Catalog Detail Modal -->
+    <div id="catalog-detail-modal" class="modal" style="z-index: 1020;">
+        <div class="modal-content" style="width: 800px; padding: 0; background: #141414;">
+            <div style="position:absolute; top:15px; right:15px; z-index:10;">
+                <button onclick="catalog.closeDetail()" class="icon-btn" style="background:rgba(0,0,0,0.5); border-radius:50%; width:30px; height:30px;">✖</button>
+            </div>
+            <div id="catalog-detail-content"></div>
+        </div>
+    </div>
+
+    <!-- Catalog Add Modal -->
+    <div id="catalog-add-modal" class="modal" style="z-index: 1021;">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Add to Catalog</h3></div>
+            <div class="form-group">
+                <label>Title (Display Name)</label>
+                <input type="text" id="cat-add-title" placeholder="e.g. My Project Backup">
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <input type="text" id="cat-add-category" placeholder="Movies, Games, Archives...">
+            </div>
+            <div class="form-group">
+                <label>Download URL</label>
+                <input type="text" id="cat-add-url" placeholder="https://github.com/...">
+            </div>
+            <div class="form-group">
+                <label>Filename (Optional)</label>
+                <input type="text" id="cat-add-filename" placeholder="Data_01.rar">
+            </div>
+             <div class="form-group">
+                <label>Size (Bytes) (Optional)</label>
+                <input type="number" id="cat-add-size" value="0">
+            </div>
+            <div class="modal-actions">
+                <button onclick="document.getElementById('catalog-add-modal').style.display='none'" class="danger">Cancel</button>
+                <button onclick="catalog.submitAdd()" class="secondary">Add Item</button>
+            </div>
+        </div>
+    </div>
+
     <!-- GitHub Login Modal -->
     <div id="gh-login-modal" class="modal">
         <div class="modal-content">
@@ -642,6 +701,7 @@
     <script src="/static/js/cloud.js"></script>
     <script src="/static/js/queue.js"></script>
     <script src="/static/js/settings.js"></script>
+    <script src="/static/js/catalog.js"></script>
     <script src="/static/js/apps/github.js"></script>
 </body>
 </html>

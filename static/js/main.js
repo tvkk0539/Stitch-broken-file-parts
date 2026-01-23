@@ -201,4 +201,5 @@ function getShortName(name) {
 document.addEventListener('DOMContentLoaded', () => {
     initLogs();
     startStatsPoller();
+    if(window.catalog) window.catalog.init();
 });

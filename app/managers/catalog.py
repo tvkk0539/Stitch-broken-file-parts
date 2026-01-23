@@ -8,11 +8,13 @@ logger = logging.getLogger(__name__)
 
 class CatalogManager:
     """
-    Manages the 'catalog.json' file which serves as the local database
-    for the Bridge Architecture.
+    Manages the 'catalog.json' file which serves as the local database.
+    Integrates directly with the Flask app.
     """
 
     def __init__(self, catalog_path="catalog.json"):
+        # Ensure we store it in a persistent location if needed,
+        # but root dir is fine for this setup.
         self.catalog_path = catalog_path
         self.catalog = self.load_catalog()
 
@@ -24,7 +26,9 @@ class CatalogManager:
 
         try:
             with open(self.catalog_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                # Sort by created_at desc
+                return sorted(data, key=lambda x: x.get('created_at', ''), reverse=True)
         except Exception as e:
             logger.error(f"Failed to load catalog: {e}")
             return []
@@ -40,21 +44,26 @@ class CatalogManager:
             logger.error(f"Failed to save catalog: {e}")
             return False
 
+    def get_all(self):
+        return self.catalog
+
+    def get_by_id(self, item_id):
+        for item in self.catalog:
+            if item.get("id") == item_id:
+                return item
+        return None
+
+    def delete_entry(self, item_id):
+        initial_len = len(self.catalog)
+        self.catalog = [x for x in self.catalog if x.get("id") != item_id]
+        if len(self.catalog) < initial_len:
+            self.save_catalog()
+            return True
+        return False
+
     def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True):
         """
         Creates a new catalog entry dictionary.
-
-        Args:
-            title (str): The display title (e.g. "Avengers").
-            file_name (str): The actual filename (e.g. "Data_99.rar").
-            file_size (int): Size in bytes.
-            url (str): The GitHub Release download URL.
-            category (str): Category (Movies, Apps, etc).
-            tags (list): List of string tags.
-            is_encrypted (bool): Whether the file is password protected/obfuscated.
-
-        Returns:
-            dict: The new entry object.
         """
         if tags is None:
             tags = []
@@ -85,15 +94,3 @@ class CatalogManager:
                 return f"{size:.{decimal_places}f} {unit}"
             size /= 1024.0
         return f"{size:.{decimal_places}f} PB"
-
-    # -------------------------------------------------------------------------
-    # Bridge / Sync Logic (Placeholder for Phase 2 integration)
-    # -------------------------------------------------------------------------
-    def sync_to_github(self, repo_name, token):
-        """
-        Future implementation:
-        1. Clone/Pull the Private Bridge Repo to a temp folder.
-        2. Copy local catalog.json to that folder.
-        3. Git add, commit, push.
-        """
-        pass

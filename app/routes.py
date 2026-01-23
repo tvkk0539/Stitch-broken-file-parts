@@ -6,6 +6,7 @@ from app.managers.repair import RepairManager
 from app.managers.extract import ExtractManager
 from app.managers.inspector import InspectorManager
 from app.managers.github_tool import GitHubManager
+from app.managers.catalog import CatalogManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -16,6 +17,8 @@ import queue
 bp = Blueprint('main', __name__)
 
 DOWNLOAD_ROOT = os.environ.get('DOWNLOAD_ROOT', '/data/downloads')
+
+catalog_manager = CatalogManager()
 
 @bp.route('/')
 def index():
@@ -51,6 +54,49 @@ def list_files():
         'parent_path': os.path.dirname(req_path) if req_path else None,
         'items': items
     })
+
+# --- Catalog API ---
+
+@bp.route('/api/catalog', methods=['GET'])
+def list_catalog():
+    """List all items in the catalog."""
+    return jsonify(catalog_manager.get_all())
+
+@bp.route('/api/catalog', methods=['POST'])
+def add_catalog_item():
+    """Add a new item to the catalog (Manual Import)."""
+    data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # Basic validation
+    required = ['title', 'file_name', 'url']
+    for field in required:
+        if field not in data:
+             return jsonify({'error': f'Missing field: {field}'}), 400
+
+    entry = catalog_manager.create_entry(
+        title=data.get('title'),
+        file_name=data.get('file_name'),
+        file_size=int(data.get('size_bytes', 0)),
+        url=data.get('url'),
+        category=data.get('category', 'General'),
+        tags=data.get('tags', []),
+        is_encrypted=data.get('is_encrypted', True)
+    )
+
+    if catalog_manager.add_entry(entry):
+        return jsonify({'status': 'success', 'entry': entry})
+    else:
+        return jsonify({'status': 'error', 'message': 'Failed to save'}), 500
+
+@bp.route('/api/catalog/<item_id>', methods=['DELETE'])
+def delete_catalog_item(item_id):
+    """Delete an item from the catalog."""
+    if catalog_manager.delete_entry(item_id):
+        return jsonify({'status': 'success'})
+    else:
+        return jsonify({'status': 'error', 'message': 'Item not found'}), 404
 
 @bp.route('/api/system/stats')
 def system_stats():
