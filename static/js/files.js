@@ -113,6 +113,7 @@ function updateButtonState() {
     const repairBtn = document.getElementById('repair-btn');
     const extractBtn = document.getElementById('extract-btn');
     const archiveBtn = document.getElementById('archive-btn');
+    const compressBtn = document.getElementById('compress-btn');
     const uploadBtn = document.getElementById('upload-btn');
     const moveBtn = document.getElementById('move-btn');
     const copyBtn = document.getElementById('copy-btn');
@@ -131,6 +132,7 @@ function updateButtonState() {
         if(repairBtn) repairBtn.disabled = !single;
         if(extractBtn) extractBtn.disabled = !single;
         if(archiveBtn) archiveBtn.disabled = !single;
+        if(compressBtn) compressBtn.disabled = !single;
         if(renameBtn) renameBtn.disabled = !single;
         if(inspectBtn) inspectBtn.disabled = !has;
         if(uploadBtn) uploadBtn.disabled = !has;
@@ -224,6 +226,48 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     document.getElementById('arc-upload').onchange = (e) => {
         document.getElementById('arc-upload-opts').style.display = e.target.checked ? 'block' : 'none';
+    };
+
+    // Compress
+    document.getElementById('compress-btn').onclick = () => {
+        document.getElementById('comp-name').value = selectedPaths[0].split('/').pop();
+        document.getElementById('comp-fmt').dispatchEvent(new Event('change'));
+        document.getElementById('compress-modal').style.display = 'block';
+    };
+
+    document.getElementById('comp-fmt').onchange = (e) => {
+        // Hide password for non-supported formats (tar, gz, bz2)
+        const val = e.target.value;
+        const supportsPass = (val === '7z' || val === 'zip');
+        const passGroup = document.getElementById('comp-pass-group');
+        const passInput = document.getElementById('comp-pass');
+
+        if (supportsPass) {
+            passInput.disabled = false;
+            passInput.placeholder = "Optional";
+            passGroup.style.opacity = "1";
+        } else {
+            passInput.disabled = true;
+            passInput.value = "";
+            passInput.placeholder = "Not supported for " + val;
+            passGroup.style.opacity = "0.5";
+        }
+    };
+
+    document.getElementById('start-comp').onclick = async () => {
+        document.getElementById('compress-modal').style.display = 'none';
+        await fetch('/api/compress', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                path: selectedPaths[0],
+                name: document.getElementById('comp-name').value,
+                format: document.getElementById('comp-fmt').value,
+                level: document.getElementById('comp-level').value,
+                password: document.getElementById('comp-pass').value
+            })
+        });
+        showToast('Compression Queued', 'success');
     };
 
     // Upload

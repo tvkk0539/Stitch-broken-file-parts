@@ -160,3 +160,93 @@ class ArchiveManager:
         except Exception as e:
             log(f"Error during archiving: {str(e)}")
             job_manager.update_job_details({'error': str(e)})
+
+    @staticmethod
+    def run_compress_job(source_path, name, fmt, level, password=None):
+        parent_dir = os.path.dirname(source_path)
+        base_name = os.path.basename(source_path)
+
+        # Ensure correct extension
+        # If user typed "MyFile.zip", don't add .zip again.
+        # But if format is tar.gz, and user typed MyFile, make it MyFile.tar.gz
+
+        # Simple logic: Strip known extension if present, then append correct one
+        clean_name = name
+        for ext in ['.7z', '.zip', '.tar.gz', '.tar.bz2', '.tar']:
+            if clean_name.endswith(ext):
+                clean_name = clean_name[:-len(ext)]
+                break
+
+        archive_name = f"{clean_name}.{fmt}"
+
+        log(f"Compressing '{base_name}' -> '{archive_name}' (Format: {fmt}, Level: {level})")
+
+        job_manager.update_job_details({
+            'action': f"Compressing to {fmt.upper()}",
+            'target': archive_name
+        })
+
+        cmd = []
+
+        # Use native 'tar' for TAR formats (handles recursion correctly)
+        if fmt.startswith('tar'):
+            # -c: Create
+            # -f: File
+            flags = '-cf'
+            if 'gz' in fmt: flags = '-czf'
+            if 'bz2' in fmt: flags = '-cjf'
+
+            # tar -czf archive.tar.gz -C parent base_name
+            # -C is crucial to avoid storing full absolute paths
+            cmd = ['tar', flags, archive_name, '-C', parent_dir, base_name]
+
+        else:
+            # Use 7-Zip for 7z and Zip
+            type_flag = f"-t{fmt}"
+
+            # Level: -mx0 to -mx9
+            mx_flag = f"-mx{level}"
+
+            cmd = ['7z', 'a', type_flag, mx_flag, '-y']
+
+            if password and (fmt == '7z' or fmt == 'zip'):
+                cmd.append(f'-p{password}')
+                if fmt == '7z':
+                    cmd.append('-mhe=on') # Encrypt headers for 7z
+
+            cmd.append(archive_name)
+            cmd.append(source_path)
+
+        try:
+            if job_manager.is_cancelled(): return
+
+            process = subprocess.Popen(
+                cmd,
+                cwd=parent_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True
+            )
+            job_manager.set_current_process(process)
+
+            for line in process.stdout:
+                line = line.strip()
+                if line and ("%" in line or "Creating" in line):
+                     log(f"[{fmt.upper()}] {line}")
+
+            process.wait()
+
+            if process.returncode != 0:
+                if job_manager.is_cancelled():
+                    log("Compression Cancelled")
+                else:
+                    log(f"Compression failed (Code {process.returncode})")
+                    job_manager.update_job_details({'error': f"Failed (Code {process.returncode})"})
+                    NotificationManager.send_notification(f"❌ ParFix: Compression Failed for {archive_name}")
+            else:
+                log("Compression successful.")
+                NotificationManager.send_notification(f"✅ ParFix: Compressed {archive_name}")
+
+        except Exception as e:
+            log(f"Error during compression: {str(e)}")
+            job_manager.update_job_details({'error': str(e)})

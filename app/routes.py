@@ -192,6 +192,26 @@ def trigger_archive():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/compress', methods=['POST'])
+def trigger_compress():
+    data = request.json
+    target_path = data.get('path')
+    name = data.get('name')
+    fmt = data.get('format', '7z')
+    level = data.get('level', '5')
+    password = data.get('password')
+
+    if not target_path or not name: return jsonify({'error': 'Missing args'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, target_path)
+
+    job_id = job_manager.add_job(
+        f"Compress {name} ({fmt})",
+        ArchiveManager.run_compress_job,
+        args=(abs_path, name, fmt, level, password)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
 @bp.route('/api/upload', methods=['POST'])
 def trigger_manual_upload():
     data = request.json
