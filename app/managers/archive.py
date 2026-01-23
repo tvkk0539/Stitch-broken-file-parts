@@ -25,14 +25,16 @@ class ArchiveManager:
 
         cmd = []
         if fmt == 'rar':
-            cmd = ['rar', 'a', '-m0', f'-v{split_size}', '-ep1']
+            # -y: Assume Yes on questions (overwrite, etc)
+            cmd = ['rar', 'a', '-m0', '-y', f'-v{split_size}', '-ep1']
             if password:
                 cmd.append(f'-hp{password}')
             cmd.append(archive_name)
             cmd.append(source_path)
         else:
             size_arg = split_size.lower().replace('m', 'm').replace('g', 'g')
-            cmd = ['7z', 'a', f'-v{size_arg}', '-mx0']
+            # -y: Assume Yes
+            cmd = ['7z', 'a', f'-v{size_arg}', '-mx0', '-y']
             if password:
                 cmd.append(f'-p{password}')
                 cmd.append('-mhe=on')
@@ -91,7 +93,8 @@ class ArchiveManager:
                     files_to_protect.sort()
                     generated_files.extend(files_to_protect)
 
-                    par2_cmd = ['par2', 'c', '-r10', par2_base] + [os.path.basename(f) for f in files_to_protect]
+                    # -q: Quiet (No prompts)
+                    par2_cmd = ['par2', 'c', '-q', '-r10', par2_base] + [os.path.basename(f) for f in files_to_protect]
 
                     p2_process = subprocess.Popen(
                         par2_cmd,

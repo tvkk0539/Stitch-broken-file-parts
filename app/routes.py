@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, jsonify, request, Response
-from app.core.job_manager import log_queue, job_manager, log
+from app.core.job_manager import system_log_queue, job_log_queues, job_manager, log
 from app.managers.rclone import RcloneManager
 from app.managers.archive import ArchiveManager
 from app.managers.repair import RepairManager
@@ -77,12 +77,31 @@ def system_stats():
 
 @bp.route('/api/logs')
 def stream_logs():
+    """Streams global system logs."""
     def generate():
         while True:
             try:
-                message = log_queue.get(timeout=20)
+                message = system_log_queue.get(timeout=20)
                 yield f"data: {message}\n\n"
             except: # queue.Empty
+                yield ": keep-alive\n\n"
+    return Response(generate(), mimetype='text/event-stream')
+
+@bp.route('/api/logs/<job_id>')
+def stream_job_logs(job_id):
+    """Streams logs for a specific job."""
+    if job_id not in job_log_queues:
+        return jsonify({'error': 'Job log not found'}), 404
+
+    def generate():
+        q = job_log_queues[job_id]
+        while True:
+            try:
+                message = q.get(timeout=20)
+                yield f"data: {message}\n\n"
+            except: # queue.Empty
+                # If job is finished and queue is empty, we might want to stop?
+                # For now, keep alive so user can read history until they close tab.
                 yield ": keep-alive\n\n"
     return Response(generate(), mimetype='text/event-stream')
 
@@ -522,6 +541,44 @@ def github_download():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/apps/github/download/batch', methods=['POST'])
+def github_download_batch():
+    data = request.json
+    assets = data.get('assets') # List of {url, filename}
+    path = data.get('path', '')
+    account_id = data.get('account_id')
+
+    if not assets: return jsonify({'error': 'Assets required'}), 400
+
+    abs_dest = os.path.join(DOWNLOAD_ROOT, path)
+
+    job_id = job_manager.add_job(
+        f"GitHub Batch Download ({len(assets)} items)",
+        GitHubManager.run_batch_download_job,
+        args=(assets, abs_dest, account_id)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/apps/github/release/delete', methods=['POST'])
+def github_delete_release():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    release_id = data.get('release_id')
+    account_id = data.get('account_id')
+    if not release_id: return jsonify({'error': 'ID required'}), 400
+    return jsonify(GitHubManager.delete_release(owner, repo, release_id, account_id))
+
+@bp.route('/api/apps/github/release/asset/delete', methods=['POST'])
+def github_delete_asset():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    asset_id = data.get('asset_id')
+    account_id = data.get('account_id')
+    if not asset_id: return jsonify({'error': 'ID required'}), 400
+    return jsonify(GitHubManager.delete_release_asset(owner, repo, asset_id, account_id))
+
 @bp.route('/api/apps/github/publish', methods=['POST'])
 def github_publish():
     data = request.json
@@ -601,6 +658,99 @@ def github_clone_repo():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/apps/github/repo/import', methods=['POST'])
+def github_import_repo():
+    data = request.json
+    source_url = data.get('source_url')
+    target_name = data.get('target_name')
+    private = data.get('private', False)
+    account_id = data.get('account_id')
+
+    if not source_url or not target_name or not account_id:
+        return jsonify({'error': 'Missing args'}), 400
+
+    job_id = job_manager.add_job(
+        f"Import Repo: {target_name}",
+        GitHubManager.run_import_job,
+        args=(source_url, target_name, private, account_id)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/apps/github/repo/branches', methods=['POST'])
+def github_repo_branches():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    account_id = data.get('account_id')
+    return jsonify(GitHubManager.get_branches(owner, repo, account_id))
+
+@bp.route('/api/apps/github/repo/contents', methods=['POST'])
+def github_repo_contents():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    path = data.get('path', '')
+    branch = data.get('branch', 'main')
+    account_id = data.get('account_id')
+    return jsonify(GitHubManager.get_contents(owner, repo, path, account_id, branch))
+
+@bp.route('/api/apps/github/repo/file/put', methods=['POST'])
+def github_repo_file_put():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    path = data.get('path')
+    content = data.get('content') # Base64
+    message = data.get('message')
+    sha = data.get('sha') # Optional (for update)
+    branch = data.get('branch', 'main')
+    account_id = data.get('account_id')
+
+    if not path or content is None: return jsonify({'error': 'Missing path or content'}), 400
+
+    return jsonify(GitHubManager.create_update_file(
+        owner, repo, path, content, message, account_id, sha, branch
+    ))
+
+@bp.route('/api/apps/github/repo/file/delete', methods=['POST'])
+def github_repo_file_delete():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    path = data.get('path')
+    sha = data.get('sha')
+    message = data.get('message')
+    branch = data.get('branch', 'main')
+    account_id = data.get('account_id')
+
+    if not path or not sha: return jsonify({'error': 'Missing path or sha'}), 400
+
+    return jsonify(GitHubManager.delete_repo_file(
+        owner, repo, path, sha, message, account_id, branch
+    ))
+
+@bp.route('/api/apps/github/repo/upload-server', methods=['POST'])
+def github_upload_server():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    local_path = data.get('local_path')
+    remote_path = data.get('remote_path')
+    message = data.get('message')
+    branch = data.get('branch', 'main')
+    account_id = data.get('account_id')
+
+    if not local_path or not remote_path: return jsonify({'error': 'Missing paths'}), 400
+
+    abs_local = os.path.join(DOWNLOAD_ROOT, local_path)
+
+    job_id = job_manager.add_job(
+        f"Push {os.path.basename(local_path)} to GitHub",
+        GitHubManager.upload_server_file_job,
+        args=(owner, repo, abs_local, remote_path, message, branch, account_id)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
 # --- Actions ---
 @bp.route('/api/apps/github/actions/workflows', methods=['POST'])
 def github_list_workflows():
@@ -621,3 +771,32 @@ def github_trigger_run():
 def github_cancel_run():
     data = request.json
     return jsonify(GitHubManager.cancel_workflow_run(data.get('repo'), data.get('id'), data.get('account_id')))
+
+# --- Secrets ---
+@bp.route('/api/apps/github/secrets/list', methods=['POST'])
+def github_list_secrets():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    account_id = data.get('account_id')
+    return jsonify(GitHubManager.list_secrets(owner, repo, account_id))
+
+@bp.route('/api/apps/github/secrets/put', methods=['POST'])
+def github_put_secret():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    name = data.get('name')
+    value = data.get('value')
+    account_id = data.get('account_id')
+    if not name or not value: return jsonify({'error': 'Name and Value required'}), 400
+    return jsonify(GitHubManager.put_secret(owner, repo, name, value, account_id))
+
+@bp.route('/api/apps/github/secrets/delete', methods=['POST'])
+def github_delete_secret():
+    data = request.json
+    owner = data.get('owner')
+    repo = data.get('repo')
+    name = data.get('name')
+    account_id = data.get('account_id')
+    return jsonify(GitHubManager.delete_secret(owner, repo, name, account_id))

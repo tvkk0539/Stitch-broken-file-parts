@@ -27,69 +27,104 @@ class RcloneManager:
         if base_upload_path and not base_upload_path.endswith('/'):
             base_upload_path += '/'
 
-        # Process each selected item
-        for i, src_path in enumerate(source_paths):
-            if job_manager.is_cancelled():
-                log("Upload job cancelled.")
-                break
+        # Performance Flags
+        # --transfers 8: Boost speed for multiple files
+        # --checkers 16: Speed up scanning
+        perf_flags = ['--transfers', '8', '--checkers', '16', '--stats', '2s', '-v']
 
-            basename = os.path.basename(src_path)
+        # Determine strategy
+        # If multiple files are selected, use --files-from to do one parallel batch.
+        # However, creating a temporary file list requires handling absolute paths correctly.
+        # rclone --files-from expects paths relative to the root if not careful,
+        # or absolute paths if configured.
+        # Safest way for mixed content (files/folders) from different potential parents (unlikely in this UI but possible)
+        # is to iterate if they are from different dirs, or use --files-from if from same dir.
+        # In our UI, `selectedPaths` are relative to DOWNLOAD_ROOT.
+
+        # Let's verify if we can use a single batch.
+        # We will create a temp file list.
+
+        import tempfile
+
+        # Filter valid paths
+        valid_paths = [p for p in source_paths if os.path.exists(p)]
+        if not valid_paths: return True
+
+        try:
+            # Create temp file for --files-from
+            # Note: rclone expects the file list to match the source root passed to command.
+            # Our source root is effectively DOWNLOAD_ROOT (or common parent).
+            # But `source_paths` are absolute local paths.
+            # To use --files-from efficiently, we pass "/" as source and absolute paths in list?
+            # Rclone warns about using / as source.
+
+            # Better strategy: Group by parent directory?
+            # Or just use the loop BUT spawn them in parallel using Popen?
+            # Python threading is easier if we want to track progress.
+            # But the user asked for "rclone parallel", which rclone does best itself.
+
+            # Let's try the --files-from approach with common parent.
+            # Assuming all paths are under DOWNLOAD_ROOT.
+            common_root = os.path.dirname(os.path.commonprefix(valid_paths))
+            if not common_root or common_root == '/':
+                 common_root = os.path.dirname(valid_paths[0])
+
+            # Prepare list relative to common_root
+            rel_paths = []
+            for p in valid_paths:
+                rel = os.path.relpath(p, common_root)
+                rel_paths.append(rel)
+
+            with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_file:
+                tmp_file.write('\n'.join(rel_paths))
+                tmp_path = tmp_file.name
+
+            # One Big Command
+            log(f"Batch Uploading {len(valid_paths)} items from {common_root}...")
             job_manager.update_job_details({
-                'action': f"Uploading item {i+1} of {len(source_paths)}",
-                'current_item': basename
+                'action': f"Batch Uploading {len(valid_paths)} items",
+                'current_item': "Processing..."
             })
 
-            try:
-                if not os.path.exists(src_path):
-                    log(f"Skipping missing file: {src_path}")
-                    continue
+            # Destination logic is tricky with files-from.
+            # If we copy to remote:base_upload_path, rclone preserves directory structure from the 'root'.
+            # E.g. root=/data, file=sub/file.txt -> remote:base/sub/file.txt
+            # This is usually desired behavior for bulk uploads.
 
-                # Determine command based on type
-                if os.path.isdir(src_path):
-                    dest_path = f"{base_upload_path}{basename}"
-                    log(f"Uploading FOLDER: {basename} -> {dest_path}")
+            cmd = ['rclone', 'copy', common_root, f"{remote}:{base_upload_path}",
+                   '--files-from', tmp_path] + perf_flags
 
-                    cmd = ['rclone', 'copy', src_path, f"{remote}:{dest_path}",
-                           '--transfers', str(transfers), '--stats', '2s', '-v']
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True
+            )
+            job_manager.set_current_process(process)
+
+            for line in process.stdout:
+                line = line.strip()
+                if "Transferred:" in line or "100%" in line:
+                    log(f"[UPLOAD] {line}")
+                elif "error" in line.lower():
+                    log(f"[RCLONE ERROR] {line}")
+
+            process.wait()
+            os.remove(tmp_path)
+
+            if process.returncode != 0:
+                if job_manager.is_cancelled():
+                    log("Upload Cancelled")
                 else:
-                    log(f"Uploading FILE: {basename} -> {base_upload_path}")
+                    log(f"Upload Batch Failed (Code {process.returncode})")
+                    job_manager.update_job_details({'error': "Upload failed"})
+            else:
+                log("Batch Upload Completed")
+                NotificationManager.send_notification(f"✅ ParFix: Uploaded {len(valid_paths)} items")
 
-                    cmd = ['rclone', 'copy', src_path, f"{remote}:{base_upload_path}",
-                           '--transfers', str(transfers), '--stats', '2s', '-v']
-
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True
-                )
-
-                # Register process for cancellation
-                job_manager.set_current_process(process)
-
-                for line in process.stdout:
-                    line = line.strip()
-                    if not line: continue
-                    if "error" in line.lower() or "failed" in line.lower():
-                        log(f"[RCLONE ERROR] {line}")
-                    elif "Transferred:" in line or "Errors:" in line or "Checks:" in line:
-                         if "Transferred:" in line: log(f"[UPLOAD] {line}")
-                    elif "100%" in line:
-                         log(f"[UPLOAD] {line}")
-
-                process.wait()
-                if process.returncode != 0:
-                    if job_manager.is_cancelled():
-                        log(f"Upload cancelled for {basename}")
-                        break
-                    log(f"Upload failed for {basename} (Code {process.returncode})")
-                    job_manager.update_job_details({'error': f"Upload failed for {basename} (Code {process.returncode})"})
-                else:
-                    log(f"Upload completed for {basename}")
-
-            except Exception as e:
-                log(f"Rclone Error processing {src_path}: {e}")
-                job_manager.update_job_details({'error': str(e)})
+        except Exception as e:
+            log(f"Upload Error: {e}")
+            job_manager.update_job_details({'error': str(e)})
 
         return True
 

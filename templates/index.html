@@ -197,7 +197,9 @@
 
                     <!-- MY REPOS -->
                     <div id="gh-view-repos">
-                        <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center;">
+                            <input type="text" id="gh-repos-filter" placeholder="🔍 Search repositories..."
+                                   style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:300px;">
                             <button class="icon-btn" onclick="fetchMyRepos()" title="Refresh Repos">🔄</button>
                         </div>
                         <div id="gh-repos-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:15px;">
@@ -230,9 +232,24 @@
 
                     <!-- PUBLISHER -->
                     <div id="gh-view-pub" style="display:none;">
-                        <div style="background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color); max-width: 600px;">
+                        <div style="background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color); max-width: 800px;">
+
+                            <!-- Fetch Existing Release Section -->
+                            <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+                                <label style="display:block; margin-bottom:10px; color:var(--accent-color);">Option A: Select Existing Release</label>
+                                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                                    <input type="text" id="gh-pub-repo-fetch" placeholder="e.g. myuser/myrepo" style="flex:1;">
+                                    <button class="secondary" onclick="fetchGhPubReleases()">Fetch Releases</button>
+                                </div>
+                                <div id="gh-pub-fetch-container" style="display:none;">
+                                    <input type="text" id="gh-pub-filter" placeholder="🔍 Filter releases..."
+                                           style="width:100%; background:#13141c; border:1px solid var(--border-color); color:var(--text-color); margin-bottom:10px; padding:5px;">
+                                    <div id="gh-pub-results" style="max-height:300px; overflow-y:auto; border:1px solid var(--border-color); border-radius:4px; margin-bottom:10px;"></div>
+                                </div>
+                            </div>
+
                             <div class="form-group">
-                                <label>Repository</label>
+                                <label>Repository (Target)</label>
                                 <input type="text" id="gh-pub-repo" placeholder="e.g. myuser/myrepo">
                             </div>
                             <div class="form-group">
@@ -339,6 +356,59 @@
         </div>
     </div>
 
+    <!-- Secrets Modal -->
+    <div id="gh-secrets-modal" class="modal">
+        <div class="modal-content" style="width:600px;">
+            <div class="modal-header">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 id="gh-secrets-title">Repository Secrets</h3>
+                    <button onclick="document.getElementById('gh-secrets-modal').style.display='none'" class="icon-btn">✖</button>
+                </div>
+            </div>
+
+            <!-- List -->
+            <div id="gh-secrets-list" style="margin-bottom:20px; max-height:200px; overflow-y:auto;">Loading...</div>
+
+            <!-- Add/Update Form -->
+            <div style="border-top:1px solid var(--border-color); padding-top:20px;">
+                <h4 style="margin-top:0;">Add / Update Secret</h4>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="gh-secret-name" placeholder="MY_SECRET_KEY">
+                </div>
+                <div class="form-group">
+                    <label>Value</label>
+                    <textarea id="gh-secret-value" rows="3" style="width:100%; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; border-radius:4px; padding:10px;" placeholder="Secret value..."></textarea>
+                </div>
+                <div style="text-align:right;">
+                    <button class="secondary" onclick="saveGhSecret()">Save Secret</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Repo Modal -->
+    <div id="gh-import-repo-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Import Repository</h3></div>
+            <div class="form-group">
+                <label>Source Repository URL</label>
+                <input type="text" id="gh-import-source" placeholder="https://github.com/user/repo.git">
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Works with Public repos or Private repos you have access to.</div>
+            </div>
+            <div class="form-group"><label>Target Repository Name</label><input type="text" id="gh-import-target"></div>
+            <div class="form-group">
+                <label style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="gh-import-private" checked> Private Repository
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button onclick="document.getElementById('gh-import-repo-modal').style.display='none'" class="danger">Cancel</button>
+                <button id="confirm-gh-import" class="secondary">Import</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Upload Modal -->
     <div id="upload-modal" class="modal">
         <div class="modal-content">
@@ -425,6 +495,73 @@
             <div class="modal-actions">
                 <button onclick="document.getElementById('gh-rename-repo-modal').style.display='none'" class="danger">Cancel</button>
                 <button id="confirm-gh-rename" class="secondary">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub Code Browser Modal -->
+    <div id="gh-browser-modal" class="modal" style="z-index: 1005;">
+        <div class="modal-content" style="width: 80vw; height: 80vh; display: flex; flex-direction: column; padding: 0;">
+            <!-- Header -->
+            <div style="padding: 15px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-dark); display: flex; justify-content: space-between; align-items: center;">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <h3 style="margin:0;" id="gh-browser-title">Repository</h3>
+                    <select id="gh-browser-branch" style="background:#13141c; color:#fff; border:1px solid var(--border-color); padding:5px; border-radius:4px;">
+                        <option>Loading...</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="secondary" onclick="openGhUploadModal()">⬆️ Upload</button>
+                    <button class="icon-btn" onclick="openGhNewFolderModal()" title="New Folder">📂+</button>
+                    <button class="icon-btn" onclick="document.getElementById('gh-browser-modal').style.display='none'" title="Close">✖</button>
+                </div>
+            </div>
+
+            <!-- Breadcrumbs -->
+            <div id="gh-browser-breadcrumbs" style="padding: 10px 20px; background: #1a1b26; border-bottom: 1px solid var(--border-color); font-family: monospace;">
+                /
+            </div>
+
+            <!-- File List -->
+            <div id="gh-browser-list" style="flex: 1; overflow-y: auto; padding: 10px 20px;">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub Editor Modal -->
+    <div id="gh-editor-modal" class="modal" style="z-index: 1010;">
+        <div class="modal-content" style="width: 80vw; height: 85vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 id="gh-editor-filename">Editing File</h3>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                <textarea id="gh-editor-content" style="flex: 1; background: #13141c; color: #c0caf5; border: 1px solid var(--border-color); padding: 10px; font-family: monospace; resize: none;"></textarea>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="gh-editor-message" placeholder="Commit message (optional)" style="flex: 1;">
+                    <button class="danger" onclick="document.getElementById('gh-editor-modal').style.display='none'">Cancel</button>
+                    <button class="secondary" onclick="saveGhFile()">Commit Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub Upload Selection Modal -->
+    <div id="gh-upload-modal" class="modal" style="z-index: 1010;">
+        <div class="modal-content" style="width: 400px;">
+            <div class="modal-header"><h3>Upload to Repository</h3></div>
+            <div style="display:flex; flex-direction:column; gap:15px;">
+                <button class="purple-btn" style="padding:15px;" onclick="document.getElementById('gh-upload-input').click()">
+                    💻 Upload from PC
+                </button>
+                <input type="file" id="gh-upload-input" style="display:none;" onchange="handleGhPcUpload(this)">
+
+                <button class="secondary" style="padding:15px;" onclick="openGhServerPicker()">
+                    ☁️ Upload from Server (Local Files)
+                </button>
+            </div>
+            <div class="modal-actions" style="margin-top:20px;">
+                <button onclick="document.getElementById('gh-upload-modal').style.display='none'" class="danger">Cancel</button>
             </div>
         </div>
     </div>

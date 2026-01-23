@@ -5,6 +5,8 @@ import requests
 import os
 import shutil
 import subprocess
+import base64
+from nacl import encoding, public
 
 class GitHubManager:
 
@@ -319,10 +321,245 @@ class GitHubManager:
             return {'status': 'cancelled'}
         except Exception as e: return {'error': str(e)}
 
+    # --- Contents & File Browser ---
+
+    @staticmethod
+    def get_branches(owner, repo, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/branches?per_page=100"
+            r = requests.get(url, headers=headers)
+            if r.status_code != 200: return {'error': f"Failed to list branches: {r.text}"}
+
+            return [b['name'] for b in r.json()]
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def get_contents(owner, repo, path, account_id, branch='main'):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            # Clean path
+            path = path.strip('/')
+            url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={branch}"
+            r = requests.get(url, headers=headers)
+
+            if r.status_code != 200:
+                 return {'error': f"Failed to fetch contents: {r.status_code}"}
+
+            data = r.json()
+
+            # If it's a list, it's a directory
+            if isinstance(data, list):
+                items = []
+                for item in data:
+                    items.append({
+                        'name': item['name'],
+                        'path': item['path'],
+                        'type': item['type'], # 'file' or 'dir'
+                        'size': item['size'],
+                        'sha': item['sha'],
+                        'url': item['html_url']
+                    })
+                # Sort: dirs first
+                items.sort(key=lambda x: (x['type'] != 'dir', x['name'].lower()))
+                return {'type': 'dir', 'items': items}
+
+            # If it's a dict, it's a file
+            elif isinstance(data, dict):
+                 return {
+                     'type': 'file',
+                     'name': data['name'],
+                     'path': data['path'],
+                     'size': data['size'],
+                     'sha': data['sha'],
+                     'content': data.get('content'), # Base64 encoded
+                     'encoding': data.get('encoding')
+                 }
+
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def create_update_file(owner, repo, path, content_b64, message, account_id, sha=None, branch='main'):
+        """
+        Creates or updates a file.
+        content_b64: Base64 encoded string of the file content.
+        sha: Required if updating an existing file.
+        """
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+
+            payload = {
+                'message': message,
+                'content': content_b64,
+                'branch': branch
+            }
+            if sha:
+                payload['sha'] = sha
+
+            r = requests.put(url, json=payload, headers=headers)
+
+            if r.status_code in [200, 201]:
+                action = "Updated" if sha else "Created"
+                return {'status': 'success', 'action': action, 'commit': r.json()['commit']['sha']}
+            else:
+                return {'error': f"Operation failed: {r.text}"}
+
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def delete_repo_file(owner, repo, path, sha, message, account_id, branch='main'):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+            payload = {
+                'message': message,
+                'sha': sha,
+                'branch': branch
+            }
+
+            r = requests.delete(url, json=payload, headers=headers)
+
+            if r.status_code == 200:
+                return {'status': 'deleted', 'commit': r.json()['commit']['sha']}
+            else:
+                return {'error': f"Delete failed: {r.text}"}
+
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def upload_server_file_job(owner, repo, local_path, remote_path, message, branch, account_id):
+        """
+        Reads a local file and pushes it to GitHub.
+        """
+        log(f"Starting Upload to GitHub: {local_path} -> {remote_path}")
+        job_manager.update_job_details({'action': f"Reading {os.path.basename(local_path)}..."})
+
+        try:
+            if not os.path.exists(local_path):
+                raise Exception("Local file not found")
+
+            # Check file size (GitHub API limit ~100MB)
+            size_mb = os.path.getsize(local_path) / (1024 * 1024)
+            if size_mb > 95:
+                 raise Exception("File too large for GitHub API (>95MB)")
+
+            # Read file
+            with open(local_path, 'rb') as f:
+                content = f.read()
+
+            content_b64 = base64.b64encode(content).decode('utf-8')
+
+            # Check if file exists to get SHA (for update)
+            # Use get_contents to check
+            existing = GitHubManager.get_contents(owner, repo, remote_path, account_id, branch)
+            sha = None
+            if not isinstance(existing, dict) or 'error' not in existing:
+                 # It might exist
+                 if isinstance(existing, dict) and existing.get('type') == 'file':
+                     sha = existing.get('sha')
+
+            job_manager.update_job_details({'action': "Pushing to GitHub..."})
+
+            res = GitHubManager.create_update_file(
+                owner, repo, remote_path, content_b64, message, account_id, sha, branch
+            )
+
+            if 'error' in res:
+                raise Exception(res['error'])
+
+            log(f"Upload Successful: {res['action']}")
+            NotificationManager.send_notification(f"✅ ParFix: Uploaded {os.path.basename(local_path)} to {repo}")
+
+        except Exception as e:
+            log(f"GitHub Upload Failed: {e}")
+            job_manager.update_job_details({'error': str(e)})
+
+    # --- Secrets ---
+
+    @staticmethod
+    def list_secrets(owner, repo, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets"
+            r = requests.get(url, headers=headers)
+            if r.status_code != 200: return {'error': f"Failed to list secrets: {r.text}"}
+
+            data = r.json()
+            return {'total_count': data.get('total_count', 0), 'secrets': data.get('secrets', [])}
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def put_secret(owner, repo, name, value, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+        try:
+            # 1. Get Public Key
+            key_url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/public-key"
+            r = requests.get(key_url, headers=headers)
+            if r.status_code != 200: return {'error': f"Failed to get public key: {r.text}"}
+
+            key_data = r.json()
+            public_key_id = key_data['key_id']
+            public_key_val = key_data['key']
+
+            # 2. Encrypt Value
+            public_key = public.PublicKey(public_key_val.encode("utf-8"), encoding.Base64Encoder())
+            sealed_box = public.SealedBox(public_key)
+            encrypted = sealed_box.encrypt(value.encode("utf-8"))
+            encrypted_b64 = base64.b64encode(encrypted).decode("utf-8")
+
+            # 3. Put Secret
+            put_url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/{name}"
+            payload = {
+                'encrypted_value': encrypted_b64,
+                'key_id': public_key_id
+            }
+
+            r = requests.put(put_url, json=payload, headers=headers)
+            if r.status_code in [201, 204]:
+                return {'status': 'success'}
+            return {'error': f"Failed to set secret: {r.text}"}
+
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def delete_secret(owner, repo, name, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/actions/secrets/{name}"
+            r = requests.delete(url, headers=headers)
+            if r.status_code == 204: return {'status': 'deleted'}
+            return {'error': f"Failed to delete: {r.text}"}
+        except Exception as e: return {'error': str(e)}
+
     @staticmethod
     def get_releases(repo_url, account_id=None):
         """
-        Fetches the latest releases for a given repo.
+        Fetches list of releases for a given repo.
         Optionally uses an account token for higher rate limits.
         """
         try:
@@ -339,31 +576,42 @@ class GitHubManager:
             if token:
                 headers['Authorization'] = f'token {token}'
 
-            # Get Latest Release
-            url = f"https://api.github.com/repos/{repo}/releases/latest"
-            log(f"Fetching GitHub Release: {url}")
+            # Get List of Releases (First 30)
+            url = f"https://api.github.com/repos/{repo}/releases?per_page=30"
+            log(f"Fetching GitHub Releases: {url}")
 
             resp = requests.get(url, headers=headers, timeout=10)
             if resp.status_code != 200:
                 return {'error': f"GitHub API Error: {resp.status_code} {resp.reason}"}
 
-            data = resp.json()
+            releases_data = resp.json()
+            if not isinstance(releases_data, list):
+                # Fallback if endpoint behaves unexpectedly or empty
+                return []
 
-            release_info = {
-                'tag': data.get('tag_name'),
-                'name': data.get('name'),
-                'published_at': data.get('published_at'),
-                'assets': []
-            }
+            results = []
+            for data in releases_data:
+                release_info = {
+                    'id': data.get('id'),
+                    'tag': data.get('tag_name'),
+                    'name': data.get('name'),
+                    'published_at': data.get('published_at'),
+                    'prerelease': data.get('prerelease', False),
+                    'draft': data.get('draft', False),
+                    'assets': []
+                }
 
-            for asset in data.get('assets', []):
-                release_info['assets'].append({
-                    'name': asset['name'],
-                    'size': asset['size'],
-                    'download_url': asset['browser_download_url']
-                })
+                for asset in data.get('assets', []):
+                    release_info['assets'].append({
+                        'id': asset['id'],
+                        'name': asset['name'],
+                        'size': asset['size'],
+                        'download_url': asset['browser_download_url']
+                    })
 
-            return release_info
+                results.append(release_info)
+
+            return results
 
         except Exception as e:
             log(f"GitHub Error: {e}")
@@ -504,3 +752,175 @@ class GitHubManager:
         except Exception as e:
             log(f"Publish Failed: {e}")
             job_manager.update_job_details({'error': str(e)})
+
+    @staticmethod
+    def run_import_job(source_url, target_name, private, account_id):
+        log(f"Starting Import: {source_url} -> {target_name}")
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token:
+            job_manager.update_job_details({'error': 'Account token not found'})
+            return
+
+        # Prepare URLs with Auth
+        # Source Auth: Try to use the same token (assuming user owns it or has access)
+        # If public, token doesn't hurt.
+        clean_source = source_url.replace('https://', '').replace('http://', '')
+        source_auth_url = f"https://oauth2:{token}@{clean_source}"
+
+        temp_dir = f"/tmp/import_{target_name}_{os.getpid()}"
+
+        try:
+            # 1. Create Empty Repo
+            log(f"Creating repository: {target_name}")
+            job_manager.update_job_details({'action': 'Creating new repository...'})
+
+            res = GitHubManager.create_repository(target_name, private, "Imported via ParFix", account_id)
+            if 'error' in res:
+                raise Exception(f"Failed to create repo: {res['error']}")
+
+            new_repo_full = res['repo'] # owner/name
+            new_repo_url = f"https://oauth2:{token}@github.com/{new_repo_full}.git"
+
+            # 2. Clone Mirror
+            log("Cloning source (Mirror)...")
+            job_manager.update_job_details({'action': 'Cloning source repository...'})
+
+            if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+            os.makedirs(temp_dir)
+
+            cmd_clone = ['git', 'clone', '--mirror', source_auth_url, '.']
+            proc_clone = subprocess.Popen(
+                cmd_clone, cwd=temp_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True
+            )
+            job_manager.set_current_process(proc_clone)
+
+            for line in proc_clone.stdout:
+                if "Receiving objects" in line: log(f"[GIT CLONE] {line.strip()}")
+
+            proc_clone.wait()
+            if proc_clone.returncode != 0:
+                raise Exception("Git Clone Failed. Check source URL or permissions.")
+
+            # 3. Push Mirror
+            if job_manager.is_cancelled(): return
+
+            log("Pushing to new repository...")
+            job_manager.update_job_details({'action': 'Pushing to new repository...'})
+
+            cmd_push = ['git', 'push', '--mirror', new_repo_url]
+            proc_push = subprocess.Popen(
+                cmd_push, cwd=temp_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True
+            )
+            job_manager.set_current_process(proc_push)
+
+            for line in proc_push.stdout:
+                log(f"[GIT PUSH] {line.strip()}")
+
+            proc_push.wait()
+            if proc_push.returncode != 0:
+                raise Exception("Git Push Failed.")
+
+            log("Import Successful")
+            NotificationManager.send_notification(f"✅ ParFix: Imported {target_name} from {source_url}")
+
+        except Exception as e:
+            log(f"Import Failed: {e}")
+            job_manager.update_job_details({'error': str(e)})
+        finally:
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+
+    @staticmethod
+    def delete_release(owner, repo, release_id, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/releases/{release_id}"
+            r = requests.delete(url, headers=headers)
+            if r.status_code == 204: return {'status': 'deleted'}
+            return {'error': f"Failed: {r.text}"}
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def delete_release_asset(owner, repo, asset_id, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        try:
+            url = f"https://api.github.com/repos/{owner}/{repo}/releases/assets/{asset_id}"
+            r = requests.delete(url, headers=headers)
+            if r.status_code == 204: return {'status': 'deleted'}
+            return {'error': f"Failed: {r.text}"}
+        except Exception as e: return {'error': str(e)}
+
+    @staticmethod
+    def run_batch_download_job(assets, dest_root, account_id):
+        """
+        Downloads multiple assets in parallel.
+        assets: list of dicts {'url': ..., 'filename': ...}
+        """
+        import concurrent.futures
+
+        total = len(assets)
+        log(f"Starting Batch Download: {total} files")
+        job_manager.update_job_details({'action': f'Starting Batch Download ({total} files)'})
+
+        if not os.path.exists(dest_root):
+            os.makedirs(dest_root, exist_ok=True)
+
+        token = GitHubManager._get_token_for_account(account_id)
+        headers = {}
+        if token:
+            headers['Authorization'] = f'token {token}'
+            headers['Accept'] = 'application/octet-stream'
+
+        completed = 0
+        errors = 0
+
+        def download_one(asset):
+            url = asset['url']
+            name = asset['filename']
+            path = os.path.join(dest_root, name)
+
+            try:
+                # Basic download without progress tracking per file to simplify batch logic
+                # We trust requests.get handling redirects
+                with requests.get(url, headers=headers, stream=True) as r:
+                    r.raise_for_status()
+                    with open(path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if job_manager.is_cancelled(): return False
+                            f.write(chunk)
+                return True
+            except Exception as e:
+                log(f"Error downloading {name}: {e}")
+                return False
+
+        # Use ThreadPoolExecutor
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            # Map futures to assets
+            future_to_asset = {executor.submit(download_one, asset): asset for asset in assets}
+
+            for future in concurrent.futures.as_completed(future_to_asset):
+                if job_manager.is_cancelled():
+                    log("Batch Download Cancelled")
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    return
+
+                res = future.result()
+                if res:
+                    completed += 1
+                else:
+                    errors += 1
+
+                percent = int((completed + errors) / total * 100)
+                job_manager.update_job_details({
+                    'progress': f"{percent}%",
+                    'action': f"Downloaded {completed}/{total} (Errors: {errors})"
+                })
+
+        log(f"Batch Download Finished. Success: {completed}, Errors: {errors}")
+        NotificationManager.send_notification(f"✅ ParFix: Batch Downloaded {completed} files")

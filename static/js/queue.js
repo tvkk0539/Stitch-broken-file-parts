@@ -12,15 +12,27 @@ async function fetchJobs() {
         const data = await res.json();
         renderJobQueue(data);
         updateActiveJobWidget(data);
+
+        // Notify main.js to update logs tabs if function exists
+        if(typeof updateLogTabs === 'function') {
+            updateLogTabs(data);
+        }
     } catch (e) {}
 }
 
 function updateActiveJobWidget(data) {
-    if(data.current) {
-        activeJobText.textContent = `Running: ${data.current.name}`;
+    const runningCount = data.running ? data.running.length : 0;
+    const pendingCount = data.pending ? data.pending.length : 0;
+
+    if (runningCount > 0) {
+        if (runningCount === 1) {
+            activeJobText.textContent = `Running: ${data.running[0].name}`;
+        } else {
+            activeJobText.textContent = `${runningCount} Jobs Running`;
+        }
         activeJobText.style.color = 'var(--accent-color)';
-    } else if (data.pending && data.pending.length > 0) {
-        activeJobText.textContent = `${data.pending.length} Jobs Queued`;
+    } else if (pendingCount > 0) {
+        activeJobText.textContent = `${pendingCount} Jobs Queued`;
         activeJobText.style.color = 'var(--text-muted)';
     } else {
         activeJobText.textContent = "Idle";
@@ -31,9 +43,9 @@ function updateActiveJobWidget(data) {
 function renderJobQueue(data) {
     jobQueueContainer.innerHTML = '';
 
-    if (data.current) {
+    if (data.running && data.running.length > 0) {
         jobQueueContainer.innerHTML += '<h3>Running</h3>';
-        jobQueueContainer.appendChild(createJobCard(data.current, 'running'));
+        data.running.forEach(j => jobQueueContainer.appendChild(createJobCard(j, 'running')));
     }
     if (data.pending && data.pending.length > 0) {
         jobQueueContainer.innerHTML += '<h3>Pending</h3>';
@@ -43,7 +55,7 @@ function renderJobQueue(data) {
         jobQueueContainer.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;border-bottom:1px solid #414868;padding-bottom:5px;"><h3>History</h3><button class="icon-btn" onclick="clearHistory()">Clear</button></div>`;
         data.history.forEach(j => jobQueueContainer.appendChild(createJobCard(j, j.status || 'completed')));
     }
-    if (!data.current && (!data.pending || data.pending.length === 0) && (!data.history || data.history.length === 0)) {
+    if ((!data.running || data.running.length === 0) && (!data.pending || data.pending.length === 0) && (!data.history || data.history.length === 0)) {
         jobQueueContainer.innerHTML = '<div style="text-align:center;color:var(--text-muted);margin-top:50px;">Queue is empty</div>';
     }
 }
@@ -54,6 +66,7 @@ function createJobCard(job, status) {
 
     let statusText = status.toUpperCase();
     if(status==='running') statusText = 'RUNNING...';
+    if(status==='cancelling') statusText = 'CANCELLING...';
 
     card.innerHTML = `
         <div class="job-header">
