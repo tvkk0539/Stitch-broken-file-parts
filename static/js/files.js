@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.getElementById('comp-fmt').onchange = (e) => {
-        // Hide password for non-supported formats (tar, gz, bz2)
+        // Hide password for non-supported formats (tar, gz, bz2, iso)
         const val = e.target.value;
         const supportsPass = (val === '7z' || val === 'zip');
         const passGroup = document.getElementById('comp-pass-group');

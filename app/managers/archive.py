@@ -172,7 +172,7 @@ class ArchiveManager:
 
         # Simple logic: Strip known extension if present, then append correct one
         clean_name = name
-        for ext in ['.7z', '.zip', '.tar.gz', '.tar.bz2', '.tar']:
+        for ext in ['.7z', '.zip', '.tar.gz', '.tar.bz2', '.tar', '.iso']:
             if clean_name.endswith(ext):
                 clean_name = clean_name[:-len(ext)]
                 break
@@ -199,6 +199,14 @@ class ArchiveManager:
             # tar -czf archive.tar.gz -C parent base_name
             # -C is crucial to avoid storing full absolute paths
             cmd = ['tar', flags, archive_name, '-C', parent_dir, base_name]
+
+        elif fmt == 'iso':
+            # Use genisoimage for ISO creation
+            # -J: Joliet extensions (Windows compat)
+            # -R: Rock Ridge extensions (Linux compat)
+            # -V: Volume ID
+            # -o: Output
+            cmd = ['genisoimage', '-J', '-R', '-V', clean_name, '-o', archive_name, base_name]
 
         else:
             # Use 7-Zip for 7z and Zip
