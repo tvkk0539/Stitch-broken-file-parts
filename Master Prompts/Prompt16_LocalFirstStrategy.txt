@@ -1,0 +1,37 @@
+# The Local-First Catalog Strategy: A Strategic Pivot
+
+## 1. Context & History
+In previous architectural planning (see `Prompt14_CloudRunIndexer` and `Prompt15_BridgeArchitecture`), we explored a distributed system design:
+*   **The Vision:** A "Public Netflix" accessible via the web.
+*   **The Design:** Separating the **Manager** (ParFix) from the **Viewer** (Cloud Run Website) using a Private GitHub Repository as a "Bridge" database.
+*   **The Goal:** High availability and shareability.
+
+## 2. The Strategic Decision (The Pivot)
+Upon reflection, we decided to shift focus from a "Public Service" to a **"Professional Personal Library."**
+
+**Why we changed course:**
+*   **Simplicity:** Running a separate cloud infrastructure (Google Cloud, multiple Repos) adds unnecessary maintenance overhead for a single user.
+*   **Privacy:** A local-first approach ensures that the database (`catalog.json`) never leaves the user's controlled environment unless explicitly backed up.
+*   **Integration:** By building the Catalog *inside* ParFix, we create a tighter loop between "Downloading," "Packing," and "Cataloging." The user doesn't need to switch apps to see their library.
+
+## 3. The Current Architecture: Integrated Catalog
+Instead of a separate "Indexer App," the Catalog is now a core module of ParFix.
+
+### Core Components
+1.  **Backend:** `CatalogManager` (in `app/managers/catalog.py`) directly manipulates a local `catalog.json` file.
+2.  **Frontend:** A new "Catalog View" (`#view-catalog`) built with `catalog.js` renders the "Netflix-style" grid using the same professional design language as the rest of the app.
+3.  **Data Flow:**
+    *   *User Action:* "Add to Catalog" (Manual or Auto-on-Upload).
+    *   *System:* Updates local JSON -> Refreshes Grid immediately.
+
+## 4. Future Roadmap: The "Dormant Bridge"
+Crucially, **we have not burned the bridge; we have merely lowered the drawbridge.**
+
+The data structure we implemented (`catalog.json` schema) is *identical* to what the Cloud Run app would have expected. This means:
+*   **Future Expansion:** If you ever decide to share your library with friends, we simply need to:
+    1.  Add a "Sync" button to ParFix (using the logic from Prompt 15).
+    2.  Deploy the Cloud Run template (from Prompt 14).
+*   **No Refactoring Needed:** The data is already in the correct format. We are "Cloud-Ready" but "Locally-Hosted."
+
+## 5. Summary
+We have chosen **Operational Efficiency** over **Distributed Complexity** for the current phase, while maintaining full compatibility with a future cloud expansion.
