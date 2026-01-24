@@ -185,6 +185,10 @@ def sync_push():
     else:
         return jsonify({'status': 'error', 'message': msg}), 500
 
+@bp.route('/api/sync/status', methods=['GET'])
+def sync_status():
+    return jsonify({'configured': SyncManager.is_configured()})
+
 @bp.route('/api/system/stats')
 def system_stats():
     # Disk Usage

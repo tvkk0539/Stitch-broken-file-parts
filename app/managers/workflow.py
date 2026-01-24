@@ -123,6 +123,7 @@ class WorkflowManager:
         """
         Scans source folder for Pre-Indexing metadata (Tree, Size, Count).
         Enforces 'Folder First' condition.
+        Scans Root for Cover Images.
         """
         if not files: raise Exception("No input files for Analysis")
 
@@ -148,6 +149,18 @@ class WorkflowManager:
         total_size = 0
         file_count = 0
         dir_count = 0
+        cover_image = None
+
+        # Scan Root for Cover Image (jpg, png, webp, jpeg)
+        # Only in ROOT of target_path, not subfolders.
+        for f in os.listdir(target_path):
+            fp = os.path.join(target_path, f)
+            if os.path.isfile(fp):
+                ext = os.path.splitext(f)[1].lower()
+                if ext in ['.jpg', '.jpeg', '.png', '.webp']:
+                    if not cover_image: # Take first found
+                        cover_image = fp
+                        log(f"📸 Found Cover Image: {f}")
 
         for root, dirs, filenames in os.walk(target_path):
             level = root.replace(target_path, '').count(os.sep)
@@ -170,7 +183,9 @@ class WorkflowManager:
             'tree_text': tree_text,
             'total_size': total_size,
             'file_count': file_count,
-            'folder_path': target_path # Updated path if wrapped
+            'folder_path': target_path,
+            'cover_image': cover_image,
+            'missing_cover': (cover_image is None)
         }
 
     @staticmethod
@@ -308,6 +323,7 @@ class WorkflowManager:
     def _step_catalog(context, conf):
         """
         Adds entry to catalog using context data.
+        Handles Smart Cover Image and No-Cover tags.
         """
         cm = CatalogManager()
 
@@ -317,14 +333,42 @@ class WorkflowManager:
         # Calculate compressed size
         comp_size = sum(a['size'] for a in assets)
 
+        tags = ['Auto-Indexed']
+
+        # Handle Cover Image
+        image_path = None
+        if meta.get('cover_image'):
+            # Copy/Optimize image to Catalog Assets
+            # We assume cover_image is a local path
+            try:
+                # We need to open it as a file object for CatalogManager.save_image
+                # CatalogManager expects a FileStorage-like object usually (from Flask)
+                # OR we can modify save_image to accept a path?
+                # Actually save_image calls .save(path) or Image.open(file_obj).
+                # Image.open(path) works fine!
+                # But save_image calls file_obj.filename to get extension.
+                # Let's create a dummy object wrapper or just pass the path if we overload save_image?
+                # No, simpler: Open it in binary mode.
+                with open(meta['cover_image'], 'rb') as f:
+                    # Mock Flask FileStorage attribute
+                    f.filename = os.path.basename(meta['cover_image'])
+                    image_path = cm.save_image(f, optimize=True)
+                    log(f"✅ Processed Cover Image: {image_path}")
+            except Exception as e:
+                log(f"❌ Failed to process cover image: {e}")
+
+        if meta.get('missing_cover'):
+            tags.append('No-Cover')
+
         entry = cm.create_entry(
             title=meta.get('title', 'Unknown'),
             file_name=f"{len(assets)} Archives",
             file_size=comp_size,
             url=f"https://github.com/{conf.get('repo')}",
             category=conf.get('category', 'General'),
-            tags=['Auto-Indexed'],
+            tags=tags,
             assets=assets,
+            image=image_path,
             priority=int(conf.get('priority', 1))
         )
         cm.add_entry(entry)

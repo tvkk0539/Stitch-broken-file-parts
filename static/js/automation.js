@@ -167,9 +167,23 @@ async function saveWorkflow() {
 }
 
 async function runWorkflow(id) {
-    // For demo, we run on selected files
+    // 1. Pre-Flight Check: Sync Status
+    try {
+        const syncRes = await fetch('/api/sync/status');
+        const syncData = await syncRes.json();
+        if (!syncData.configured) {
+            alert("⚠️ Automation Blocked: Data Sync is NOT configured.\n\nPlease go to Settings and link a Private GitHub Repository to ensure your catalog and images are backed up safely.");
+            switchView('settings');
+            return;
+        }
+    } catch(e) {
+        alert("Failed to check Sync Status: " + e);
+        return;
+    }
+
+    // 2. Input Validation
     if(selectedPaths.length === 0) {
-        alert("Please select files in the Files tab first!");
+        alert("Please select a folder in the Files tab first!");
         switchView('files');
         return;
     }
