@@ -524,24 +524,25 @@ button.icon-btn {
     padding-bottom: 40px;
 }
 
-.catalog-filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--border-color);
+#catalog-header-filters::-webkit-scrollbar {
+    height: 4px;
+}
+#catalog-header-filters::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
 }
 
 .filter-pill {
     background-color: #24283b;
     border: 1px solid var(--border-color);
     color: var(--text-muted);
-    padding: 5px 12px;
+    padding: 4px 10px;
     border-radius: 15px;
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 0.85em;
+    white-space: nowrap;
     transition: all 0.2s;
+    user-select: none;
 }
 
 .filter-pill:hover {

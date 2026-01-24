@@ -135,23 +135,37 @@
 
             <!-- VIEW: CATALOG -->
             <div id="view-catalog" class="view-section">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap: wrap; gap: 15px;">
                     <h2 style="margin:0; border:none;">Private Catalog</h2>
-                    <div style="display:flex; gap:10px; align-items: center;">
+
+                    <div style="display:flex; gap:10px; align-items: center; flex: 1; justify-content: flex-end;">
+                        <!-- Filters Container injected here -->
+                        <div id="catalog-header-filters" style="display:flex; gap:5px; overflow-x:auto; max-width: 400px; padding-bottom:2px;">
+                            <!-- JS Injected Pills -->
+                        </div>
+
                         <input type="text" id="catalog-search" placeholder="Search library..."
                                onkeyup="catalog.filter(this.value)"
-                               style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:250px;">
+                               style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:200px;">
                         <button class="purple-btn" onclick="catalog.openAddModal()">+ Add Item</button>
-                        <button class="secondary" onclick="catalog.load()">Refresh</button>
+                        <button class="secondary" onclick="catalog.reload()">Refresh</button>
                     </div>
-                </div>
-                <!-- Advanced Filters -->
-                <div id="catalog-filters" class="catalog-filters">
-                    <!-- JS Injected Pills -->
                 </div>
 
                 <div id="catalog-grid" class="catalog-grid">
                     <!-- JS Injected -->
+                </div>
+            </div>
+
+            <!-- VIEW: CATALOG DETAIL (Full Page) -->
+            <div id="view-catalog-detail" class="view-section">
+                <div style="margin-bottom: 20px;">
+                    <button onclick="catalog.closeDetail()" class="icon-btn" style="display:flex; align-items:center; gap:5px; padding: 5px 15px; border: 1px solid var(--border-color);">
+                        ⬅ Back to Library
+                    </button>
+                </div>
+                <div id="catalog-detail-content">
+                    <!-- Injected Detail View -->
                 </div>
             </div>
 
@@ -558,15 +572,6 @@
     <div id="mkdir-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>New Folder</h3></div><input type="text" id="mkdir-name" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-mkdir" class="danger">Cancel</button><button id="confirm-mkdir" class="secondary">Create</button></div></div></div>
     <div id="inspect-modal" class="modal"><div class="modal-content" style="width:600px;"><div class="modal-header"><h3>File Info</h3></div><div id="inspect-content" style="max-height:400px; overflow-y:auto;"></div><div class="modal-actions"><button id="close-inspect" class="secondary">Close</button></div></div></div>
 
-    <!-- Catalog Detail Modal -->
-    <div id="catalog-detail-modal" class="modal" style="z-index: 1020;">
-        <div class="modal-content" style="width: 800px; padding: 0; background: #141414;">
-            <div style="position:absolute; top:15px; right:15px; z-index:10;">
-                <button onclick="catalog.closeDetail()" class="icon-btn" style="background:rgba(0,0,0,0.5); border-radius:50%; width:30px; height:30px;">✖</button>
-            </div>
-            <div id="catalog-detail-content"></div>
-        </div>
-    </div>
 
     <!-- Catalog Add Modal -->
     <div id="catalog-add-modal" class="modal" style="z-index: 1021;">

@@ -12,29 +12,54 @@ const catalog = {
     },
 
     init: async () => {
-        // Setup Filter Bar UI first if empty
-        const filters = document.getElementById('catalog-filters');
-        if(filters && filters.innerHTML === '') {
-            // We can't generate cloud from partial data easily without a separate aggregation API.
-            // For now, we will rely on users searching tags via text or add a simple "Popular Tags" later.
-            // Or we fetch 'all' tags once? Let's skip tag cloud auto-generation for now or just fetch it separately.
-            // To keep it simple: We won't auto-generate cloud from 10k items client side.
-            // We will allow adding filters manually or just search.
-            // But user asked for filter bar.
-            // Let's hide it for now or make it static?
-            // BETTER: Load first 50 items and generate tags from them + maybe a "Load Tags" API?
-            // Let's stick to standard search for now to ensure speed.
-            filters.style.display = 'none';
-        }
+        await catalog.loadTags();
         await catalog.reload();
 
         // Infinite Scroll Listener
-        const grid = document.getElementById('view-catalog');
+        const grid = document.getElementById('catalog-grid').parentNode; // view-catalog
         grid.addEventListener('scroll', () => {
             if(grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 100) {
                 catalog.loadNextPage();
             }
         });
+    },
+
+    loadTags: async () => {
+        try {
+            const res = await fetch('/api/catalog/tags');
+            const tags = await res.json();
+            const container = document.getElementById('catalog-header-filters');
+            if(!container) return;
+
+            container.innerHTML = '';
+
+            // Add "All" pill? Or just list tags.
+            // Let's list tags.
+            tags.forEach(tag => {
+                const pill = document.createElement('div');
+                pill.className = 'filter-pill';
+                pill.textContent = tag;
+                pill.onclick = () => catalog.toggleTag(tag, pill);
+                container.appendChild(pill);
+            });
+        } catch (e) { console.error("Load tags failed", e); }
+    },
+
+    toggleTag: (tag, el) => {
+        if(catalog.state.activeTags.has(tag)) {
+            catalog.state.activeTags.delete(tag);
+            el.classList.remove('active');
+        } else {
+            // Single tag mode for now if backend only supports ?tag=X
+            // Or support multiple? The backend `query += " AND tags LIKE ?"` supports one.
+            // So we clear others.
+            catalog.state.activeTags.clear();
+            document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+
+            catalog.state.activeTags.add(tag);
+            el.classList.add('active');
+        }
+        catalog.reload();
     },
 
     reload: async () => {
@@ -56,8 +81,13 @@ const catalog = {
                 limit: catalog.state.limit,
                 search: catalog.state.searchQuery
             });
-            // Add tag params if we had them (e.g. from filter bar)
-            // if(catalog.state.activeTags.size > 0) ... (Server needs to support list, current supports single tag)
+
+            // Add tag param
+            if(catalog.state.activeTags.size > 0) {
+                // Get first one
+                const tag = Array.from(catalog.state.activeTags)[0];
+                params.append('tag', tag);
+            }
 
             const res = await fetch(`/api/catalog?${params.toString()}`);
             const data = await res.json();
@@ -141,13 +171,7 @@ const catalog = {
     openDetail: (item) => {
         try {
             console.log("Opening detail for:", item);
-            const modal = document.getElementById('catalog-detail-modal');
             const content = document.getElementById('catalog-detail-content');
-
-            if(!modal) {
-                alert("Critical Error: Detail modal element not found!");
-                return;
-            }
 
             // Image Logic for Detail
             let posterHtml = '';
@@ -219,9 +243,12 @@ const catalog = {
                 </div>
             `;
 
-            modal.classList.add('active');
+            // Switch View Manually (Simulate SwitchView but custom logic)
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-catalog-detail').classList.add('active');
+
         } catch (e) {
-            console.error("Error opening detail modal:", e);
+            console.error("Error opening detail:", e);
             alert("Failed to open item details. See console for error.");
         }
     },
@@ -237,7 +264,8 @@ const catalog = {
     },
 
     closeDetail: () => {
-        document.getElementById('catalog-detail-modal').classList.remove('active');
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-catalog').classList.add('active');
     },
 
     openAddModal: () => {
