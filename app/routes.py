@@ -114,7 +114,10 @@ def catalog_upload_image():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    filename = catalog_manager.save_image(file)
+    # Get optimization flag (default true)
+    optimize = request.form.get('optimize', 'true').lower() == 'true'
+
+    filename = catalog_manager.save_image(file, optimize=optimize)
     if filename:
         return jsonify({'status': 'success', 'filename': filename})
     else:

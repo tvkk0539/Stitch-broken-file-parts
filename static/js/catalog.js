@@ -286,8 +286,11 @@ const catalog = {
         // Upload Image if File Selected
         if(imgFile) {
             try {
+                const optimize = document.getElementById('cat-add-optimize').checked;
                 const fd = new FormData();
                 fd.append('file', imgFile);
+                fd.append('optimize', optimize); // Send flag
+
                 showToast("Uploading Image...");
                 const res = await fetch('/api/catalog/upload-image', {method:'POST', body:fd});
                 const d = await res.json();

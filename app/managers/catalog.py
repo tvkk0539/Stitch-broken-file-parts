@@ -7,6 +7,7 @@ from datetime import datetime
 from app.managers.sync import SyncManager
 from app.managers.github_tool import GitHubManager
 from werkzeug.utils import secure_filename
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +309,7 @@ class CatalogManager:
             logger.error(f"Fetch metadata error: {e}")
             return {'error': str(e)}
 
-    def save_image(self, file_obj):
+    def save_image(self, file_obj, optimize=True):
         """Saves image to data/assets/images and returns filename."""
         try:
             if SyncManager.is_configured():
@@ -319,11 +320,27 @@ class CatalogManager:
             os.makedirs(base_dir, exist_ok=True)
 
             ext = os.path.splitext(file_obj.filename)[1].lower()
-            if ext not in ['.jpg', '.jpeg', '.png', '.webp']: ext = '.jpg'
+            if optimize:
+                ext = '.jpg'
+            elif ext not in ['.jpg', '.jpeg', '.png', '.webp']:
+                ext = '.jpg'
 
             filename = f"{uuid.uuid4()}{ext}"
             file_path = os.path.join(base_dir, filename)
-            file_obj.save(file_path)
+
+            if optimize:
+                img = Image.open(file_obj)
+                if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+
+                max_width = 800
+                if img.width > max_width:
+                    ratio = max_width / float(img.width)
+                    new_height = int((float(img.height) * float(ratio)))
+                    img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+
+                img.save(file_path, "JPEG", quality=90)
+            else:
+                file_obj.save(file_path)
 
             if SyncManager.is_configured():
                 SyncManager.push_data(f"Added image asset: {filename}")

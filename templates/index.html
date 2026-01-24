@@ -576,7 +576,12 @@
                     <button onclick="document.getElementById('cat-add-image-file').click()" class="secondary" style="flex:0; white-space:nowrap;">📁 Upload</button>
                     <input type="text" id="cat-add-image-text" placeholder="Or paste URL here..." style="flex:1;">
                 </div>
-                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Upload a file to store securely, or paste a public URL.</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+                    <div style="font-size:0.8em; color:var(--text-muted);">Upload to store securely in assets.</div>
+                    <label style="font-size:0.8em; color:var(--accent-color); cursor:pointer;">
+                        <input type="checkbox" id="cat-add-optimize" checked> Optimize Image (Resize & Compress)
+                    </label>
+                </div>
             </div>
             <div class="form-group">
                 <label>Download URL (GitHub Release)</label>
