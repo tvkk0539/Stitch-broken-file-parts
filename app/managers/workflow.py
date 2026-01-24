@@ -177,25 +177,18 @@ class WorkflowManager:
     def _step_pack(files, conf):
         """
         Runs Packer. Returns list of generated RAR/PAR2 files.
-        Input 'files' might be the raw list, but if 'analyze' ran, we should use 'meta.folder_path'?
-        We need to be careful about context.
-        Let's assume 'files' input to this step is valid. If wrapped, we rely on the user selecting the new folder?
-        Actually, execute_workflow_job passes 'files' through steps.
-        _step_analyze should update 'files' in context!
-        But here we only update context['meta'].
-        We should fix execute_workflow_job to update context['files'] if analyze changes it.
         """
-        # Logic fix: If input was wrapped, analyze step should return new path
-        # But wait, step_analyze returns a dict.
-        # Let's assume for now the user selected a folder correctly OR we handle it here.
-        # If we rely on _step_analyze to fix path, we need to pass that info.
-
         target_path = files[0]
-        # Check if analyze step wrapped it?
-        # Hard to know without state.
-        # For professional stability, let's enforce folder check AGAIN here or rely on inputs.
+        original_name = os.path.basename(target_path)
+        name = original_name
 
-        name = os.path.basename(target_path)
+        # Obfuscation Logic
+        obfuscate = conf.get('obfuscate', False)
+        if obfuscate:
+            # Base64 Encode Filename (URL Safe)
+            name_b64 = base64.urlsafe_b64encode(original_name.encode('utf-8')).decode('utf-8')
+            name = name_b64.rstrip('=') # Remove padding for cleaner filenames
+            log(f"🕵️ Obfuscating Filename: {original_name} -> {name}")
 
         ArchiveManager.run_archive_job(
             target_path,
@@ -213,11 +206,6 @@ class WorkflowManager:
         # Scan for output files (RAR/PAR2) in the parent dir
         parent = os.path.dirname(target_path)
         output_files = []
-
-        # Naive scan: look for files starting with 'name' in parent
-        # This might pick up old files.
-        # Professional approach: Check timestamps or exact naming patterns.
-        # RAR naming: name.part001.rar, name.vol00+01.par2
 
         for f in os.listdir(parent):
             if f.startswith(name) and (f.endswith('.rar') or f.endswith('.par2')):
@@ -238,10 +226,27 @@ class WorkflowManager:
         repo = conf.get('repo')
         tag_template = conf.get('tag_template', 'v{date}_{name}')
 
+        # Obfuscation Logic
+        obfuscate_title = conf.get('obfuscate_title', False)
+
         # Generate Tag
         date_str = datetime.now().strftime("%Y%m%d")
-        title_slug = meta.get('title', 'upload').replace(' ', '_')
-        tag_name = tag_template.replace('{date}', date_str).replace('{name}', title_slug)
+
+        raw_title = meta.get('title', 'upload')
+        title_slug = raw_title.replace(' ', '_')
+
+        if obfuscate_title:
+            # Base64 Encode Title
+            title_b64 = base64.urlsafe_b64encode(raw_title.encode('utf-8')).decode('utf-8').rstrip('=')
+            display_title = title_b64
+            # Keep tag simple or obfuscated? Tag is public URL.
+            # Usually safer to obfuscate tag too if title is hidden.
+            tag_slug = title_b64
+        else:
+            display_title = raw_title
+            tag_slug = title_slug
+
+        tag_name = tag_template.replace('{date}', date_str).replace('{name}', tag_slug)
 
         # Body: Base64 Tree
         tree_b64 = base64.b64encode(meta.get('tree_text', '').encode('utf-8')).decode('utf-8')
@@ -267,7 +272,7 @@ class WorkflowManager:
         clean_repo = repo.replace('https://github.com/', '').strip('/')
         create_url = f"https://api.github.com/repos/{clean_repo}/releases"
         headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
-        payload = {"tag_name": tag_name, "name": meta.get('title', tag_name), "body": body}
+        payload = {"tag_name": tag_name, "name": display_title, "body": body}
 
         import requests
         r = requests.post(create_url, json=payload, headers=headers)
@@ -312,15 +317,11 @@ class WorkflowManager:
         # Calculate compressed size
         comp_size = sum(a['size'] for a in assets)
 
-        # Original Tree in Description?
-        # Catalog schema doesn't have 'description' yet, but has 'tags'.
-        # We can store tree in a text file asset? Or just rely on GitHub release body.
-
         entry = cm.create_entry(
             title=meta.get('title', 'Unknown'),
             file_name=f"{len(assets)} Archives",
             file_size=comp_size,
-            url=f"https://github.com/{conf.get('repo')}", # Base repo url? Or release url?
+            url=f"https://github.com/{conf.get('repo')}",
             category=conf.get('category', 'General'),
             tags=['Auto-Indexed'],
             assets=assets,

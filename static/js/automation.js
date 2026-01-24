@@ -97,13 +97,14 @@ function updateStepConfigUI(select) {
     } else if (type === 'pack') {
         c1.placeholder = "Split (e.g. 1024M)";
         c2.placeholder = "Naming (part001)";
-        c3.style.display = 'none';
-        desc.textContent = "Creates split RAR archives with Recovery Record.";
+        c3.placeholder = "Obfuscate Filename? (true/false)";
+        c3.style.display = 'block';
+        desc.textContent = "Creates split RAR archives. Obfuscation uses Base64 filenames.";
     } else if (type === 'github_publish') {
         c1.placeholder = "Repo (user/repo)";
-        c2.placeholder = "Account ID (See GitHub App)";
-        c3.placeholder = "Tag (v{date}_{name})";
-        desc.textContent = "Uploads archives to Release. Embeds Analysis Tree in Body.";
+        c2.placeholder = "Account ID";
+        c3.placeholder = "Obfuscate Title? (true/false)";
+        desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
     } else if (type === 'catalog_add') {
         c1.placeholder = "Category (Movies/4K)";
         c2.placeholder = "Priority (2=High, 1=Normal)";
@@ -125,9 +126,20 @@ async function saveWorkflow() {
 
         let config = {};
         if(type === 'pack') {
-            config = { split: conf1 || '1024M', naming: conf2 || 'part001', format: 'rar', recovery: true };
+            config = {
+                split: conf1 || '1024M',
+                naming: conf2 || 'part001',
+                format: 'rar',
+                recovery: true,
+                obfuscate: (conf3 && conf3.toLowerCase() === 'true')
+            };
         } else if(type === 'github_publish') {
-            config = { repo: conf1, account_id: conf2, tag_template: conf3 || 'v{date}_{name}' };
+            config = {
+                repo: conf1,
+                account_id: conf2,
+                obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
+                tag_template: 'v{date}_{name}'
+            };
         } else if(type === 'catalog_add') {
             config = { category: conf1 || 'General', priority: parseInt(conf2) || 1 };
         }
