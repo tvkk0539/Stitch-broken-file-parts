@@ -20,8 +20,8 @@ async function triggerDataSyncInit() {
         return;
     }
 
-    // Save first to ensure backend has them
-    await document.getElementById('save-set').click();
+    // Do NOT trigger save-set click, as it might overwrite config if fields are empty.
+    // We send repo/token directly to init.
 
     try {
         showToast("Linking Repository... please wait.");
@@ -34,7 +34,9 @@ async function triggerDataSyncInit() {
         if(data.status === 'success') {
             showToast("Success: Repository Linked!");
             // Refresh catalog since we might have pulled new data
-            if(window.catalog) window.catalog.load();
+            if(window.catalog) window.catalog.reload();
+            // Reload settings to ensure we see the saved repo/token
+            loadSettings();
         } else {
             alert("Sync Error: " + data.message);
         }

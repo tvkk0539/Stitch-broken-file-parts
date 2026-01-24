@@ -129,7 +129,7 @@ function updateStepConfigUI(select) {
         const c1_final = container.querySelector('.wf-conf-1');
 
         c1_final.placeholder = "Repo (user/repo)";
-        c2.placeholder = "Account ID";
+        c2.placeholder = "Account ID (Number from GitHub App)";
         c3.placeholder = "Obfuscate Title? (true/false)";
         desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
     } else if (type === 'catalog_add') {
