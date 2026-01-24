@@ -192,6 +192,9 @@ const catalog = {
                             <i class="fas fa-download"></i> Open Release
                         </a>
                         ${extraActions}
+                        <button onclick="catalog.openEditModal('${item.id}')" class="btn btn-info btn-lg" style="background-color:#e0af68; color:#1a1b26;">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
                         <button onclick="catalog.deleteItem('${item.id}')" class="btn btn-danger">
                             <i class="fas fa-trash"></i> Remove
                         </button>
@@ -328,6 +331,94 @@ const catalog = {
         });
 
         document.getElementById('catalog-add-modal').style.display = 'none';
+    },
+
+    openEditModal: (id) => {
+        const item = catalog.state.items.find(x => x.id === id);
+        if(!item) return;
+
+        document.getElementById('cat-edit-id').value = id;
+        document.getElementById('cat-edit-title').value = item.title;
+        document.getElementById('cat-edit-category').value = item.category || '';
+        document.getElementById('cat-edit-tags').value = (item.tags || []).join(', ');
+        document.getElementById('cat-edit-url').value = item.release_url || '';
+
+        // Reset image inputs
+        document.getElementById('cat-edit-image-text').value = '';
+        document.getElementById('cat-edit-image-file').value = '';
+
+        // Preview
+        const preview = document.getElementById('cat-edit-preview');
+        if(item.image) {
+            preview.src = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
+            preview.style.display = 'block';
+        } else {
+            preview.style.display = 'none';
+        }
+
+        // Close detail, open edit
+        catalog.closeDetail();
+        document.getElementById('catalog-edit-modal').style.display = 'block';
+    },
+
+    submitEdit: async () => {
+        const id = document.getElementById('cat-edit-id').value;
+        const title = document.getElementById('cat-edit-title').value;
+        const category = document.getElementById('cat-edit-category').value;
+        const tagsRaw = document.getElementById('cat-edit-tags').value;
+        const url = document.getElementById('cat-edit-url').value;
+
+        const imgText = document.getElementById('cat-edit-image-text').value;
+        const imgFile = document.getElementById('cat-edit-image-file').files[0];
+
+        let newImage = null;
+
+        // Handle Image Upload if changed
+        if(imgFile) {
+            try {
+                const optimize = document.getElementById('cat-edit-optimize').checked;
+                const fd = new FormData();
+                fd.append('file', imgFile);
+                fd.append('optimize', optimize);
+
+                showToast("Uploading new image...");
+                const res = await fetch('/api/catalog/upload-image', {method:'POST', body:fd});
+                const d = await res.json();
+                if(d.status === 'success') newImage = d.filename;
+                else { alert("Image Upload Failed: " + d.error); return; }
+            } catch(e) { alert("Upload Error: " + e); return; }
+        } else if (imgText) {
+            newImage = imgText;
+        }
+
+        const tags = tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0);
+
+        const payload = {
+            title: title,
+            category: category,
+            tags: tags,
+            release_url: url
+        };
+        if(newImage) payload.image = newImage;
+
+        try {
+            const res = await fetch(`/api/catalog/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const d = await res.json();
+
+            if(d.status === 'success') {
+                showToast("Item Updated!");
+                document.getElementById('catalog-edit-modal').style.display = 'none';
+                catalog.reload();
+            } else {
+                alert("Update Failed: " + (d.error || d.message));
+            }
+        } catch(e) {
+            alert("Update Request Failed: " + e);
+        }
     },
 
     deleteItem: async (id) => {

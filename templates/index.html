@@ -607,6 +607,48 @@
         </div>
     </div>
 
+    <!-- Catalog Edit Modal (Similar to Add but for updates) -->
+    <div id="catalog-edit-modal" class="modal" style="z-index: 1022;">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Edit Item</h3></div>
+            <input type="hidden" id="cat-edit-id">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="cat-edit-title">
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <input type="text" id="cat-edit-category">
+            </div>
+            <div class="form-group">
+                <label>Tags</label>
+                <input type="text" id="cat-edit-tags">
+            </div>
+            <div class="form-group">
+                <label>Poster Image (Replace?)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <img id="cat-edit-preview" src="" style="height:40px; width:40px; object-fit:cover; border-radius:4px; display:none;">
+                    <input type="file" id="cat-edit-image-file" style="display:none;" onchange="document.getElementById('cat-edit-image-text').value = this.files[0].name">
+                    <button onclick="document.getElementById('cat-edit-image-file').click()" class="secondary" style="flex:0; white-space:nowrap;">📁 Upload New</button>
+                    <input type="text" id="cat-edit-image-text" placeholder="Or paste URL..." style="flex:1;">
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+                    <label style="font-size:0.8em; color:var(--accent-color); cursor:pointer;">
+                        <input type="checkbox" id="cat-edit-optimize" checked> Optimize Image
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Download URL</label>
+                <input type="text" id="cat-edit-url">
+            </div>
+            <div class="modal-actions">
+                <button onclick="document.getElementById('catalog-edit-modal').style.display='none'" class="danger">Cancel</button>
+                <button onclick="catalog.submitEdit()" class="secondary">Update Item</button>
+            </div>
+        </div>
+    </div>
+
     <!-- GitHub Login Modal -->
     <div id="gh-login-modal" class="modal">
         <div class="modal-content">

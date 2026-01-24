@@ -215,14 +215,87 @@ class CatalogManager:
     def delete_entry(self, item_id):
         try:
             with self._get_conn() as conn:
+                # 1. Get image to delete first
+                row = conn.execute("SELECT image FROM items WHERE id = ?", (item_id,)).fetchone()
+                image_to_delete = row['image'] if row else None
+
+                # 2. Delete DB Row
                 cursor = conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
                 conn.commit()
+
                 if cursor.rowcount > 0:
+                    # 3. Delete image if row deleted successfully
+                    if image_to_delete:
+                        self._delete_image_file(image_to_delete)
+
                     self.trigger_sync(f"Deleted item {item_id}")
                     return True
         except Exception as e:
             logger.error(f"Delete Error: {e}")
         return False
+
+    def update_entry(self, item_id, data):
+        """
+        Updates an existing entry.
+        Handles image replacement logic (delete old if replaced).
+        """
+        try:
+            with self._get_conn() as conn:
+                # 1. Fetch current entry
+                current = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+                if not current:
+                    return {'error': 'Item not found'}
+
+                current = self._row_to_dict(current)
+
+                # 2. Image Replacement Logic
+                old_image = current.get('image')
+
+                # Check if 'image' key exists in update data
+                if 'image' in data:
+                    new_image = data['image']
+                    # If changed, delete old image
+                    if old_image and new_image != old_image:
+                        self._delete_image_file(old_image)
+                    final_image = new_image
+                else:
+                    final_image = old_image
+
+                conn.execute("""
+                    UPDATE items SET
+                        title = ?,
+                        category = ?,
+                        tags = ?,
+                        image = ?,
+                        release_url = ?,
+                        assets = ?
+                    WHERE id = ?
+                """, (
+                    data.get('title', current['title']),
+                    data.get('category', current['category']),
+                    json.dumps(data.get('tags', current['tags'])),
+                    final_image,
+                    data.get('release_url', current['release_url']),
+                    json.dumps(data.get('assets', current['assets'])),
+                    item_id
+                ))
+                conn.commit()
+
+            self.trigger_sync(f"Updated item: {item_id}")
+            return {'status': 'success'}
+
+        except Exception as e:
+            logger.error(f"Update Entry Error: {e}")
+            return {'error': str(e)}
+
+    def _delete_image_file(self, filename):
+        """Deletes the physical image file."""
+        try:
+            path = self.get_image_path(filename)
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception as e:
+            logger.error(f"Failed to delete image {filename}: {e}")
 
     def trigger_sync(self, message):
         """Calls SyncManager to push the DB file."""

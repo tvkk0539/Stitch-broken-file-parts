@@ -133,6 +133,15 @@ def catalog_serve_image(filename):
     else:
         return jsonify({'error': 'Image not found'}), 404
 
+@bp.route('/api/catalog/<item_id>', methods=['PUT'])
+def update_catalog_item(item_id):
+    """Update an item in the catalog."""
+    data = request.json
+    res = catalog_manager.update_entry(item_id, data)
+    if 'error' in res:
+        return jsonify(res), 500
+    return jsonify(res)
+
 @bp.route('/api/catalog/<item_id>', methods=['DELETE'])
 def delete_catalog_item(item_id):
     """Delete an item from the catalog."""
