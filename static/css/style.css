@@ -450,6 +450,10 @@ button.icon-btn {
     backdrop-filter: blur(2px);
 }
 
+.modal.active {
+    display: block;
+}
+
 .modal-content {
     background-color: var(--panel-bg);
     margin: 10% auto;

@@ -140,8 +140,14 @@ const catalog = {
 
     openDetail: (item) => {
         try {
+            console.log("Opening detail for:", item);
             const modal = document.getElementById('catalog-detail-modal');
             const content = document.getElementById('catalog-detail-content');
+
+            if(!modal) {
+                alert("Critical Error: Detail modal element not found!");
+                return;
+            }
 
             // Image Logic for Detail
             let posterHtml = '';
