@@ -383,12 +383,34 @@ class CatalogManager:
     def trigger_sync(self, message):
         """Calls SyncManager to push the DB file."""
         if SyncManager.is_configured():
+            # Export DB to JSON for safe backup
+            self._export_to_json()
+
             # Ensure we are syncing the DB file
             ok, msg = SyncManager.push_data(message)
             if ok:
                 logger.info(f"Sync Success: {msg}")
             else:
                 logger.error(f"Sync Failed: {msg}")
+
+    def _export_to_json(self):
+        """Exports the entire SQLite DB to catalog.json for backup."""
+        try:
+            # We use get_all with a very large limit to get everything
+            # In a real massive production app, we might stream this,
+            # but for a personal library (even 10k items), this is fine.
+            # Using 1M limit to ensure we get all.
+            items = self.get_all(page=1, limit=1000000)
+
+            # Remove any non-serializable fields if necessary
+            # (items returned by get_all are already dicts with parsed JSON)
+
+            with open(self.json_path, 'w', encoding='utf-8') as f:
+                json.dump(items, f, indent=2, ensure_ascii=False)
+
+            logger.info(f"Exported {len(items)} items to {self.json_path}")
+        except Exception as e:
+            logger.error(f"JSON Export Error: {e}")
 
     def fetch_github_metadata(self, url):
         """Proxy to GitHubManager to fetch release details."""

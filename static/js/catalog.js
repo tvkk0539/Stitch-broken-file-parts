@@ -147,6 +147,13 @@ const catalog = {
         const container = document.getElementById('catalog-grid');
         if (!container) return;
 
+        // Render Hero if this is the first page and we have items
+        if (catalog.state.page === 1 && catalog.state.items.length > 0) {
+            catalog.renderHero(catalog.state.items[0]);
+        } else if (catalog.state.items.length === 0) {
+             document.getElementById('catalog-hero-container').innerHTML = ''; // Clear hero if no results
+        }
+
         if (catalog.state.items.length === 0) {
             container.innerHTML = `<div class="catalog-empty">No items found matching your filters.</div>`;
             return;
@@ -193,6 +200,44 @@ const catalog = {
             card.onclick = () => catalog.openDetail(item);
             container.appendChild(card);
         });
+    },
+
+    // --- Hero Section Renderer ---
+    renderHero: (item) => {
+        const heroContainer = document.getElementById('catalog-hero-container');
+        if(!heroContainer) return;
+
+        // Image Logic
+        let bgStyle = '';
+        if (item.image) {
+            const imgSrc = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
+            bgStyle = `background-image: url('${imgSrc}');`;
+        } else {
+            bgStyle = `background: linear-gradient(135deg, #1f2335, #000);`;
+        }
+
+        const catDisplay = item.category ? item.category.split('/').pop() : 'Featured';
+        const dateStr = item.created_at ? item.created_at.substring(0, 10) : '';
+
+        heroContainer.innerHTML = `
+            <div class="hero-banner" style="${bgStyle}">
+                <div class="hero-overlay">
+                    <div class="hero-content">
+                        <div class="hero-label">LATEST ADDITION</div>
+                        <h1 class="hero-title">${item.title}</h1>
+                        <div class="hero-meta">
+                            <span>${catDisplay}</span> • <span>${item.size_human}</span> • <span>${dateStr}</span>
+                        </div>
+                        <div class="hero-actions">
+                             <button onclick="catalog.openDetail(catalog.state.items[0])" class="hero-btn-primary">
+                                 ▶ Details
+                             </button>
+                             ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="hero-btn-secondary">🌍 Open</a>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     },
 
     openDetail: (item) => {

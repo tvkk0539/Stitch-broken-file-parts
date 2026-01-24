@@ -57,5 +57,22 @@ class TestCatalogManager(unittest.TestCase):
         self.assertEqual(updated['title'], "New Title")
         self.assertEqual(updated['description'], "Updated Description")
 
+    def test_json_export_on_add(self):
+        # Configure SyncManager to be "configured" by creating .git
+        os.makedirs(os.path.join(self.test_dir, ".git"))
+
+        # Add entry (should trigger sync -> export)
+        entry = self.mgr.create_entry("Backup Test", "bkp.zip", 10, "url")
+        self.mgr.add_entry(entry)
+
+        # Check if catalog.json exists
+        json_path = os.path.join(self.test_dir, "catalog.json")
+        self.assertTrue(os.path.exists(json_path), "catalog.json should be created")
+
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+            self.assertEqual(len(data), 1)
+            self.assertEqual(data[0]['title'], "Backup Test")
+
 if __name__ == '__main__':
     unittest.main()
