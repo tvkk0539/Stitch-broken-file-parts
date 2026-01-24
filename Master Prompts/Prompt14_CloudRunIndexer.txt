@@ -1,0 +1,65 @@
+# The "Cloud Run Indexer" Strategy: A Professional Media Catalog
+
+This document outlines the architecture for building a standalone "Index Website" to browse and manage the obfuscated content created by ParFix.
+
+## 1. The Vision
+To create a professional, Netflix-style or Data-centric website that acts as a "Digital Librarian" for your private GitHub Release archives.
+*   **Hosted on:** Google Cloud Run (Free Tier).
+*   **Purpose:** To turn obfuscated, secure filenames (`Data_99.rar`) into a beautiful, searchable catalog ("Avengers Endgame").
+
+## 2. Architecture: The Two Pillars
+
+### A. The "Manager" (ParFix)
+This is the tool you already have. Its role expands to become the "Data Source".
+*   **Action:** When you "Pack & Upload" a file:
+    1.  ParFix encrypts/obfuscates the file.
+    2.  ParFix uploads it to GitHub Releases.
+    3.  **New:** ParFix updates a `catalog.json` file.
+        ```json
+        {
+          "id": "Data_99",
+          "title": "Avengers Endgame",
+          "category": "Movies",
+          "size": "15GB",
+          "download_url": "https://github.com/.../Data_99.rar",
+          "timestamp": 1706030000
+        }
+        ```
+    4.  **Sync:** ParFix automatically pushes this `catalog.json` to a **Private GitHub Repository**.
+
+### B. The "Index Website" (Cloud Run App)
+This is a new, separate lightweight application running 24/7 on Google Cloud.
+*   **Source:** It connects to your Private Repo and reads `catalog.json`.
+*   **Security:** It sits behind a login page (Basic Auth or OAuth).
+
+## 3. Features of the Index Website
+
+### 🖥️ Professional UI
+*   **Dashboard:** "Recently Added" carousel or grid.
+*   **View Modes:**
+    *   *Gallery Mode:* Movie posters / Album art.
+    *   *Data Mode:* Dense table with sortable columns (Size, Date, Name).
+
+### 🔍 Live Search Engine
+*   Because it runs on Cloud Run (Python/Node), search is instant and smart.
+*   Filter by Category (Movies, Games, Docs).
+
+### 📄 Rich Detail Pages
+*   Clicking an item opens a Detail View.
+*   **Metadata Integration:** The app can fetch data from TMDB/IMDB on the fly using the title.
+    *   *Display:* Plot summary, Release Year, Cast.
+*   **Tech Specs:** File size, PAR2 status, Part count.
+*   **Action:** A big **"Download"** button that links directly to the secure GitHub Release asset.
+
+## 4. Why Google Cloud Run?
+*   **Cost:** The "Free Tier" allows 2 million requests/month. For a personal index, this is effectively **Free Forever**.
+*   **Security:** Google handles the SSL/HTTPS certificates automatically.
+*   **Scalability:** It scales to zero when you aren't using it (saving resources) and wakes up instantly when you visit the site.
+*   **Containerized:** We can deploy it as a single Docker image.
+
+## 5. Deployment Workflow
+1.  **Build:** We create a `Dockerfile` for the Indexer App.
+2.  **Deploy:** Run `gcloud run deploy`.
+3.  **Config:** Set environment variables (GitHub Token for private repo access) in the GCP Console.
+
+This ecosystem separates **Management** (ParFix) from **Consumption** (Indexer), creating a robust, professional, and secure media library.

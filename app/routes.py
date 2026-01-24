@@ -6,6 +6,9 @@ from app.managers.repair import RepairManager
 from app.managers.extract import ExtractManager
 from app.managers.inspector import InspectorManager
 from app.managers.github_tool import GitHubManager
+from app.managers.catalog import CatalogManager
+from app.managers.sync import SyncManager
+from app.managers.workflow import WorkflowManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -16,6 +19,8 @@ import queue
 bp = Blueprint('main', __name__)
 
 DOWNLOAD_ROOT = os.environ.get('DOWNLOAD_ROOT', '/data/downloads')
+
+catalog_manager = CatalogManager()
 
 @bp.route('/')
 def index():
@@ -51,6 +56,187 @@ def list_files():
         'parent_path': os.path.dirname(req_path) if req_path else None,
         'items': items
     })
+
+# --- Catalog API ---
+
+@bp.route('/api/catalog', methods=['GET'])
+def list_catalog():
+    """List items with pagination and filtering."""
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 50))
+    search = request.args.get('search', '')
+    tag = request.args.get('tag', '')
+    category = request.args.get('category', '')
+
+    items = catalog_manager.get_all(page, limit, search, tag, category)
+    return jsonify(items)
+
+@bp.route('/api/catalog', methods=['POST'])
+def add_catalog_item():
+    """Add a new item to the catalog (Manual Import)."""
+    data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # Basic validation
+    required = ['title', 'file_name', 'url']
+    for field in required:
+        if field not in data:
+             return jsonify({'error': f'Missing field: {field}'}), 400
+
+    entry = catalog_manager.create_entry(
+        title=data.get('title'),
+        file_name=data.get('file_name'),
+        file_size=int(data.get('size_bytes', 0)),
+        url=data.get('url'),
+        category=data.get('category', 'General'),
+        tags=data.get('tags', []),
+        is_encrypted=data.get('is_encrypted', True),
+        assets=data.get('assets', [])
+    )
+
+    if catalog_manager.add_entry(entry):
+        return jsonify({'status': 'success', 'entry': entry})
+    else:
+        return jsonify({'status': 'error', 'message': 'Failed to save'}), 500
+
+@bp.route('/api/catalog/fetch-metadata', methods=['POST'])
+def catalog_fetch_metadata():
+    data = request.json
+    url = data.get('url')
+    if not url: return jsonify({'error': 'URL required'}), 400
+
+    return jsonify(catalog_manager.fetch_github_metadata(url))
+
+@bp.route('/api/catalog/upload-image', methods=['POST'])
+def catalog_upload_image():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    # Get optimization flag (default true)
+    optimize = request.form.get('optimize', 'true').lower() == 'true'
+
+    filename = catalog_manager.save_image(file, optimize=optimize)
+    if filename:
+        return jsonify({'status': 'success', 'filename': filename})
+    else:
+        return jsonify({'error': 'Failed to save image'}), 500
+
+@bp.route('/api/catalog/image/<filename>')
+def catalog_serve_image(filename):
+    """Serves the image from the secure data directory."""
+    from werkzeug.utils import secure_filename
+
+    safe_name = secure_filename(filename)
+    abs_path = catalog_manager.get_image_path(safe_name)
+
+    if os.path.exists(abs_path):
+        from flask import send_file
+        return send_file(abs_path)
+    else:
+        return jsonify({'error': 'Image not found'}), 404
+
+@bp.route('/api/catalog/tags', methods=['GET'])
+def catalog_get_tags():
+    """Returns all unique tags for the filter cloud."""
+    return jsonify(catalog_manager.get_all_tags())
+
+@bp.route('/api/catalog/categories', methods=['GET'])
+def catalog_get_categories():
+    """Returns all unique categories."""
+    return jsonify(catalog_manager.get_all_categories())
+
+@bp.route('/api/catalog/<item_id>', methods=['PUT'])
+def update_catalog_item(item_id):
+    """Update an item in the catalog."""
+    data = request.json
+    res = catalog_manager.update_entry(item_id, data)
+    if 'error' in res:
+        return jsonify(res), 500
+    return jsonify(res)
+
+@bp.route('/api/catalog/<item_id>', methods=['DELETE'])
+def delete_catalog_item(item_id):
+    """Delete an item from the catalog."""
+    if catalog_manager.delete_entry(item_id):
+        return jsonify({'status': 'success'})
+    else:
+        return jsonify({'status': 'error', 'message': 'Item not found'}), 404
+
+# --- Automation API ---
+
+workflow_manager = WorkflowManager()
+
+@bp.route('/api/automation/workflows', methods=['GET'])
+def list_workflows():
+    return jsonify(workflow_manager.get_all())
+
+@bp.route('/api/automation/workflows', methods=['POST'])
+def create_workflow():
+    data = request.json
+    wf = workflow_manager.create_workflow(data['name'], data['steps'])
+    return jsonify(wf)
+
+@bp.route('/api/automation/workflows/<wf_id>', methods=['DELETE'])
+def delete_workflow(wf_id):
+    workflow_manager.delete_workflow(wf_id)
+    return jsonify({'status': 'deleted'})
+
+@bp.route('/api/automation/run/<wf_id>', methods=['POST'])
+def run_workflow(wf_id):
+    data = request.json
+    paths = data.get('files', [])
+    wf_data = next((w for w in workflow_manager.get_all() if w['id'] == wf_id), None)
+
+    if not wf_data: return jsonify({'error': 'Workflow not found'}), 404
+
+    # Resolve absolute paths
+    abs_paths = [os.path.join(DOWNLOAD_ROOT, p) for p in paths]
+    # Filter only existing
+    abs_paths = [p for p in abs_paths if os.path.exists(p)]
+
+    if not abs_paths: return jsonify({'error': 'No valid files selected'}), 400
+
+    # We pass wf_data to job so it doesn't need to read file (thread safety)
+    job_id = job_manager.add_job(
+        f"Workflow: {wf_data['name']}",
+        WorkflowManager.execute_workflow_job,
+        args=(wf_id, abs_paths, wf_data)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+# --- Sync API ---
+
+@bp.route('/api/sync/init', methods=['POST'])
+def sync_init():
+    data = request.json
+    repo_url = data.get('repo_url')
+    token = data.get('token')
+
+    if not repo_url or not token:
+        return jsonify({'status': 'error', 'message': 'Missing URL or Token'}), 400
+
+    success, msg = SyncManager.init_sync(repo_url, token)
+    if success:
+        catalog_manager.reload() # Reload from new path
+        return jsonify({'status': 'success', 'message': msg})
+    else:
+        return jsonify({'status': 'error', 'message': msg}), 500
+
+@bp.route('/api/sync/push', methods=['POST'])
+def sync_push():
+    success, msg = SyncManager.push_data("Manual backup trigger")
+    if success:
+        return jsonify({'status': 'success', 'message': msg})
+    else:
+        return jsonify({'status': 'error', 'message': msg}), 500
+
+@bp.route('/api/sync/status', methods=['GET'])
+def sync_status():
+    return jsonify({'configured': SyncManager.is_configured()})
 
 @bp.route('/api/system/stats')
 def system_stats():
@@ -187,7 +373,28 @@ def trigger_archive():
         ArchiveManager.run_archive_job,
         args=(abs_path, name, data.get('split_size', '1024M'), data.get('password'),
               data.get('format', 'rar'), data.get('create_par2', True),
-              data.get('upload', False), data.get('remote'), data.get('upload_path', ''))
+              data.get('upload', False), data.get('remote'), data.get('upload_path', ''),
+              data.get('naming_scheme', 'part1'), data.get('rar_recovery_record', True))
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/compress', methods=['POST'])
+def trigger_compress():
+    data = request.json
+    target_path = data.get('path')
+    name = data.get('name')
+    fmt = data.get('format', '7z')
+    level = data.get('level', '5')
+    password = data.get('password')
+
+    if not target_path or not name: return jsonify({'error': 'Missing args'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, target_path)
+
+    job_id = job_manager.add_job(
+        f"Compress {name} ({fmt})",
+        ArchiveManager.run_compress_job,
+        args=(abs_path, name, fmt, level, password)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 

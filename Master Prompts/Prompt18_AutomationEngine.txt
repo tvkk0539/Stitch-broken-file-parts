@@ -1,0 +1,52 @@
+# The Automation Engine: "One-Click DevOps"
+
+## 1. The Vision
+To transform ParFix from a collection of manual tools into an automated pipeline engine (like n8n or Zapier).
+The user defines a **Workflow** once, then executes it on any file with a single click.
+
+## 2. Architecture
+
+### A. The "Workflow" Object
+Stored in `data/workflows.json` (synced via Bridge).
+```json
+{
+  "id": "uuid",
+  "name": "Movie to GitHub Index",
+  "steps": [
+    {
+      "type": "pack",
+      "config": { "format": "rar", "split": "1GB", "naming": "part001", "password": "secure" }
+    },
+    {
+      "type": "github_publish",
+      "config": { "account_id": "123", "repo": "my-backup", "tag_template": "v{date}_{name}" }
+    },
+    {
+      "type": "catalog_add",
+      "config": { "category": "Movies", "priority": 1 }
+    }
+  ]
+}
+```
+
+### B. The "Orchestrator" (`WorkflowManager`)
+This manager runs as a background thread when a workflow is triggered.
+It creates a "Master Job" in the queue, and then spawns "Child Jobs" sequentially.
+
+**Context Passing (The "Pipe"):**
+1.  **Step 1 (Pack):** Input = `/downloads/Avengers.mkv`. Output = `/downloads/Avengers.part*.rar`.
+2.  **Step 2 (Publish):** Input = (Result from Step 1). It uploads these files. Output = List of Asset URLs.
+3.  **Step 3 (Catalog):** Input = (Result from Step 2). It creates an entry "Avengers" with those URLs.
+
+## 3. Supported Steps (Phase 1)
+1.  **Pack (Archive):** Create split archives.
+2.  **Compress:** Create ISO/7z.
+3.  **Upload (Rclone):** Push to cloud.
+4.  **Publish (GitHub):** Create Release + Upload Assets.
+5.  **Index (Catalog):** Add to local DB + Sync to Bridge.
+
+## 4. Execution Flow
+1.  User selects file in **Files Tab**.
+2.  Clicks "Run Automation" -> Selects "Movie Pipeline".
+3.  System locks the UI Job Card ("Workflow Running: Step 1/3").
+4.  Upon completion, the entire process is done without human intervention.

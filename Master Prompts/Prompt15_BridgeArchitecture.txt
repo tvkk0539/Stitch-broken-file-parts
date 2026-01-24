@@ -1,0 +1,77 @@
+# The Bridge Architecture: Decoupled Media Management
+
+## 1. Executive Summary
+The "Bridge Architecture" is a strategic design pattern used to decouple the **Management Plane** (ParFix) from the **Presentation Plane** (The Index Website). Instead of connecting a web server directly to a local machine or a complex SQL database, we use a **Private GitHub Repository** as a persistent, secure, and version-controlled "State Store".
+
+## 2. The Three Components
+
+### A. The "Writer" (ParFix)
+*   **Role:** The authoritative source of truth.
+*   **Location:** Runs locally on your server/Docker.
+*   **Responsibility:**
+    1.  Processes, encrypts, and uploads content.
+    2.  Generates the metadata (Title, Size, Link, Hash).
+    3.  **Updates the Bridge:** It commits changes to `catalog.json` and pushes them to the Private Repo.
+
+### B. The "Bridge" (Private GitHub Repo)
+*   **Role:** The Database and Synchronization Layer.
+*   **Location:** GitHub (Private Repository).
+*   **Content:**
+    *   `catalog.json`: The master index of all available content.
+    *   `assets/`: (Optional) Folder for storing poster images or thumbnails.
+*   **Benefit:** High availability. Even if your home server (ParFix) is offline, the Bridge is always online.
+
+### C. The "Reader" (Cloud Run Indexer)
+*   **Role:** The Consumer and Display Interface.
+*   **Location:** Google Cloud Run (Serverless Container).
+*   **Responsibility:**
+    1.  Fetches `catalog.json` from the Bridge Repo on request (or caches it).
+    2.  Renders the "Netflix-style" UI.
+    3.  Handles User Authentication (protecting the access links).
+*   **Nature:** Stateless. If the app crashes, it restarts instantly. It stores no data itself.
+
+## 3. Data Flow Diagram
+
+```
+[ Local Server ]      [ GitHub Cloud ]             [ Google Cloud ]
+|   ParFix     | ---> |  Bridge Repo | <---------- |  Indexer App |
+| (The Writer) | PUSH | (catalog.json)|   FETCH    | (The Reader) |
++--------------+      +--------------+             +--------------+
+       |                     ^                            |
+       | Uploads Asset       |                            | User Visits
+       v                     |                            v
+[ GitHub Releases ] ---------+                    [ End User ]
+(The Storage)
+```
+
+## 4. The Data Structure (`catalog.json`)
+The Bridge communicates via a strict JSON schema.
+
+```json
+[
+  {
+    "id": "uuid-v4-or-hash",
+    "title": "Project Alpha (2024)",
+    "category": "Archives",
+    "file_name": "Data_Pack_01.rar",
+    "size_bytes": 15032385536,
+    "size_human": "14.0 GB",
+    "release_url": "https://github.com/my-user/my-repo/releases/download/v1.0/Data_Pack_01.rar",
+    "created_at": "2024-05-20T14:30:00Z",
+    "tags": ["backup", "secure"],
+    "is_encrypted": true
+  }
+]
+```
+
+## 5. Security Strategy
+*   **Obfuscation:** The `release_url` points to an obfuscated file (e.g., `Data_99.rar`). The Indexer UI displays the "Real" title ("Project Alpha"), keeping the link obscure until clicked.
+*   **Access Control:**
+    *   **ParFix:** Needs a `Personal Access Token (PAT)` with `repo` scope to PUSH to the Bridge.
+    *   **Indexer:** Needs a `Personal Access Token (PAT)` with `repo` scope to READ the Bridge (since it's private).
+*   **Isolation:** Compromising the Web App (Indexer) does not compromise the Management Tool (ParFix) or the Source Files, as the Indexer only has "Read" access to the catalog.
+
+## 6. Why This Is "Professional"
+1.  **Zero Maintenance Database:** No SQL server to patch, backup, or scale. GitHub *is* the database.
+2.  **Version History:** Every update to the catalog is a Git commit. You can "undo" a catalog change by reverting the commit.
+3.  **Portability:** You can destroy the Cloud Run app and redeploy it in seconds. All state is preserved in the Bridge.

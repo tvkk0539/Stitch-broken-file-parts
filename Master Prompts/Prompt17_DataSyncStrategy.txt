@@ -1,0 +1,43 @@
+# The Data Sync Strategy: Public Code, Private Data
+
+## 1. The Problem
+*   **Context:** ParFix is open-source (Public Repository).
+*   **The Asset:** The user's Media Catalog (`catalog.json`) is private and valuable.
+*   **The Risk:** During development, testing, or re-deployment, local data files can be lost. Pushing data to the public repo is a security violation.
+
+## 2. The Solution: "Sidecar Sync"
+We implement a "Sidecar" pattern where the application maintains a second, separate connection to a **Private Data Repository**.
+
+### Architecture
+1.  **Main App:** Runs from the Public Repo.
+2.  **Data Folder:** A specific folder (`/data`) is:
+    *   Ignored by the Main Repo (`.gitignore`).
+    *   Actually a **Clone** of the Private Data Repo.
+
+### Workflow
+1.  **Initialization:**
+    *   User provides a `Backup Repo URL` and `Token`.
+    *   ParFix runs `git clone <private_repo> data/`.
+2.  **Read (Startup):**
+    *   ParFix loads `catalog.json` from `data/catalog.json`.
+3.  **Write (Action):**
+    *   User adds a file to Catalog.
+    *   ParFix saves to `data/catalog.json`.
+    *   ParFix immediately triggers:
+        ```bash
+        cd data/
+        git add catalog.json
+        git commit -m "Auto-update: Added 'Avengers'"
+        git push
+        ```
+4.  **Restore:**
+    *   If the user moves to a new computer, they simply enter the Repo URL/Token again. ParFix pulls the full history instantly.
+
+## 3. Implementation Details
+*   **Manager:** `SyncManager` (`app/managers/sync.py`) handles all Git operations using `subprocess`.
+*   **Security:** The Personal Access Token (PAT) is used for HTTPS authentication but is **never stored in the Data Repo itself**, only in the local `config.json` (which is also ignored).
+
+## 4. Professional Benefits
+*   **Zero Data Loss:** Real-time offsite backup.
+*   **Portability:** Your catalog follows you to any machine.
+*   **Security:** Complete separation of Public Logic and Private State.

@@ -14,6 +14,14 @@
             <div class="nav-icon">📂</div>
             <div class="nav-label">Files</div>
         </div>
+        <div class="nav-item" data-view="catalog" onclick="switchView('catalog')">
+            <div class="nav-icon">🎥</div>
+            <div class="nav-label">Catalog</div>
+        </div>
+        <div class="nav-item" data-view="automation" onclick="switchView('automation')">
+            <div class="nav-icon">🤖</div>
+            <div class="nav-label">Automation</div>
+        </div>
         <div class="nav-item" data-view="queue" onclick="switchView('queue')">
             <div class="nav-icon">⏳</div>
             <div class="nav-label">Queue</div>
@@ -101,6 +109,7 @@
                             <button id="repair-btn" disabled>Repair</button>
                             <button id="extract-btn" style="background-color:#00d9ff;" disabled>Extract</button>
                             <button id="archive-btn" class="secondary" disabled>Pack</button>
+                            <button id="compress-btn" class="success-btn" disabled style="background-color:#9ece6a; color:#1a1b26;">Compress</button>
                             <button id="upload-btn" class="purple-btn" disabled>Upload</button>
                             <button id="move-btn" class="warning-btn" disabled>➡️ Move</button>
                             <button id="copy-btn" class="info-btn" disabled>📋 Copy</button>
@@ -122,6 +131,78 @@
                     </div>
                 </div>
 
+            </div>
+
+            <!-- VIEW: CATALOG -->
+            <div id="view-catalog" class="view-section" style="padding: 0;">
+                <div style="display: flex; height: 100%;">
+
+                    <!-- Catalog Sidebar -->
+                    <div id="catalog-sidebar" style="width: 250px; background: var(--bg-dark); border-right: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                        <div style="padding: 20px; border-bottom: 1px solid var(--border-color);">
+                            <h3 style="margin: 0;">Library</h3>
+                        </div>
+                        <div style="padding: 10px; overflow-y: auto; flex: 1;">
+                             <div class="cat-sidebar-item active" onclick="catalog.filterCategory(null)">
+                                All Categories
+                             </div>
+                             <div id="catalog-categories-list">
+                                <!-- JS Injected -->
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Catalog Main Content -->
+                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+
+                        <!-- Header (Search & Actions) -->
+                        <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                             <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
+                                <input type="text" id="catalog-search" placeholder="Search..."
+                                   onkeyup="catalog.filter(this.value)"
+                                   style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:300px;">
+
+                                <select id="catalog-tag-filter" onchange="catalog.filterTag(this.value)" style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px; border-radius:4px; width: 150px;">
+                                    <option value="">All Tags</option>
+                                    <!-- JS Injected -->
+                                </select>
+                             </div>
+
+                             <div style="display: flex; gap: 10px;">
+                                <button class="purple-btn" onclick="catalog.openAddModal()">+ Add Item</button>
+                                <button class="secondary" onclick="catalog.reload()">Refresh</button>
+                             </div>
+                        </div>
+
+                        <!-- Content Grid -->
+                        <div id="catalog-grid" class="catalog-grid" style="padding: 20px; overflow-y: auto; flex: 1;">
+                            <!-- JS Injected -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: CATALOG DETAIL (Full Page) -->
+            <div id="view-catalog-detail" class="view-section">
+                <div style="margin-bottom: 20px;">
+                    <button onclick="catalog.closeDetail()" class="icon-btn" style="display:flex; align-items:center; gap:5px; padding: 5px 15px; border: 1px solid var(--border-color);">
+                        ⬅ Back to Library
+                    </button>
+                </div>
+                <div id="catalog-detail-content">
+                    <!-- Injected Detail View -->
+                </div>
+            </div>
+
+            <!-- VIEW: AUTOMATION -->
+            <div id="view-automation" class="view-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="margin:0; border:none;">Workflow Automation</h2>
+                    <button class="secondary" onclick="openWorkflowModal()">+ Create Workflow</button>
+                </div>
+                <div id="workflow-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
+                    <!-- JS Injected -->
+                </div>
             </div>
 
             <!-- VIEW: QUEUE -->
@@ -325,6 +406,25 @@
                         </div>
                     </div>
 
+                    <!-- Data Backup Settings -->
+                    <div class="form-group" style="border-top:1px solid var(--border-color); padding-top:20px;">
+                        <h3 style="margin-top:0; color:var(--accent-color);">Data Sync (Backup)</h3>
+                        <p style="color:var(--text-muted); font-size:0.9em; margin-bottom:15px;">Connect a Private GitHub Repository to backup your catalog.json automatically.</p>
+
+                        <div class="form-group">
+                            <label>Backup Repository URL (Private)</label>
+                            <input type="text" id="set-backup-repo" placeholder="https://github.com/myuser/my-private-data.git">
+                        </div>
+                        <div class="form-group">
+                            <label>GitHub Token (Repo Scope)</label>
+                            <input type="password" id="set-backup-token" placeholder="ghp_... (Leave empty to use main token if same)">
+                        </div>
+                        <div style="display:flex; gap:10px; margin-top:10px;">
+                            <button onclick="triggerDataSyncInit()" class="secondary">Link & Pull Data</button>
+                            <button onclick="triggerDataSyncPush()" class="purple-btn">Force Push Backup</button>
+                        </div>
+                    </div>
+
                     <div style="text-align:right; margin-top:30px;">
                         <button id="save-set" class="secondary" style="width:200px;">Save Changes</button>
                     </div>
@@ -341,8 +441,10 @@
             <div class="modal-header"><h3>Create Archive (Pack)</h3></div>
             <div class="form-group"><label>Name:</label><input type="text" id="arc-name"></div>
             <div class="form-group"><label>Format:</label><select id="arc-fmt"><option value="rar">RAR</option><option value="7z">7-Zip</option></select></div>
+            <div class="form-group" id="arc-naming-group"><label>Naming:</label><select id="arc-naming"><option value="part1">part1.rar (Default)</option><option value="part01">part01.rar</option><option value="part001">part001.rar</option></select></div>
             <div class="form-group"><label>Split:</label><select id="arc-size"><option value="100M">100M</option><option value="500M">500M</option><option value="1024M" selected>1GB</option><option value="2048M">2GB</option><option value="5120M">5GB</option></select></div>
             <div class="form-group"><label>Pass:</label><input type="text" id="arc-pass"></div>
+            <div class="form-group" id="arc-rr-group"><label><input type="checkbox" id="arc-rr" checked> Add RAR Recovery Record (5%)</label></div>
             <div class="form-group"><label><input type="checkbox" id="arc-par2" checked> Create PAR2</label></div>
             <div class="form-group"><label><input type="checkbox" id="arc-upload"> Upload after</label></div>
             <div id="arc-upload-opts" style="display:none; padding-left:15px; border-left:2px solid var(--border-color);">
@@ -352,6 +454,43 @@
             <div class="modal-actions">
                 <button id="cancel-arc" class="danger">Cancel</button>
                 <button id="start-arc" class="secondary">Pack</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compress Modal -->
+    <div id="compress-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Create Archive (Compress)</h3></div>
+            <div class="form-group"><label>Name:</label><input type="text" id="comp-name"></div>
+            <div class="form-group">
+                <label>Format:</label>
+                <select id="comp-fmt">
+                    <option value="7z">7z</option>
+                    <option value="zip">zip</option>
+                    <option value="tar">tar</option>
+                    <option value="tar.gz">tar.gz</option>
+                    <option value="tar.bz2">tar.bz2</option>
+                    <option value="iso">iso</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Compression Level:</label>
+                <select id="comp-level">
+                    <option value="0">Store (No compression, Fastest)</option>
+                    <option value="1">Fast</option>
+                    <option value="5" selected>Normal (Default)</option>
+                    <option value="7">Maximum</option>
+                    <option value="9">Ultra</option>
+                </select>
+            </div>
+            <div class="form-group" id="comp-pass-group">
+                <label>Password:</label>
+                <input type="text" id="comp-pass" placeholder="Optional">
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-comp" class="danger">Cancel</button>
+                <button id="start-comp" class="success-btn" style="background-color:#9ece6a; color:#1a1b26;">Start Compression</button>
             </div>
         </div>
     </div>
@@ -424,7 +563,13 @@
     <div id="extract-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header"><h3>Extract</h3></div>
-            <div class="form-group"><label>Method:</label><select id="ext-method"><option value="unrar">UnRAR</option><option value="7z">7-Zip</option></select></div>
+            <div class="form-group">
+                <label>Method:</label>
+                <select id="ext-method">
+                    <option value="unrar">UnRAR (Best for RAR only)</option>
+                    <option value="7z">7-Zip (Universal: 7z, Zip, Tar, ISO, RAR, etc.)</option>
+                </select>
+            </div>
             <div class="form-group"><label>Password:</label><input type="text" id="ext-pass"></div>
             <div class="modal-actions"><button id="cancel-ext" class="danger">Cancel</button><button id="confirm-ext" class="secondary">Extract</button></div>
         </div>
@@ -451,6 +596,139 @@
     <div id="rename-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>Rename</h3></div><input type="text" id="rename-input" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-rename" class="danger">Cancel</button><button id="confirm-rename" class="secondary">Rename</button></div></div></div>
     <div id="mkdir-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>New Folder</h3></div><input type="text" id="mkdir-name" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-mkdir" class="danger">Cancel</button><button id="confirm-mkdir" class="secondary">Create</button></div></div></div>
     <div id="inspect-modal" class="modal"><div class="modal-content" style="width:600px;"><div class="modal-header"><h3>File Info</h3></div><div id="inspect-content" style="max-height:400px; overflow-y:auto;"></div><div class="modal-actions"><button id="close-inspect" class="secondary">Close</button></div></div></div>
+
+
+    <!-- Catalog Add Modal -->
+    <div id="catalog-add-modal" class="modal" style="z-index: 1021;">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Add to Catalog</h3></div>
+            <div class="form-group">
+                <label>Title (Display Name)</label>
+                <input type="text" id="cat-add-title" placeholder="e.g. My Project Backup">
+            </div>
+            <div class="form-group">
+                <label>Category (Sub-categories support with /)</label>
+                <input type="text" id="cat-add-category" placeholder="Music/Songs/English">
+            </div>
+            <div class="form-group">
+                <label>Priority</label>
+                <select id="cat-add-priority">
+                    <option value="2">🔥 Necessary (High)</option>
+                    <option value="1" selected>Normal</option>
+                    <option value="0">💤 Unnecessary (Low)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Tags (Comma separated)</label>
+                <input type="text" id="cat-add-tags" placeholder="4K, HDR, Lossless, 2024">
+            </div>
+            <div class="form-group">
+                <label>Poster Image (Optional)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="file" id="cat-add-image-file" style="display:none;" onchange="document.getElementById('cat-add-image-text').value = this.files[0].name">
+                    <button onclick="document.getElementById('cat-add-image-file').click()" class="secondary" style="flex:0; white-space:nowrap;">📁 Upload</button>
+                    <input type="text" id="cat-add-image-text" placeholder="Or paste URL here..." style="flex:1;">
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+                    <div style="font-size:0.8em; color:var(--text-muted);">Upload to store securely in assets.</div>
+                    <label style="font-size:0.8em; color:var(--accent-color); cursor:pointer;">
+                        <input type="checkbox" id="cat-add-optimize" checked> Optimize Image (Resize & Compress)
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Download URL (GitHub Release)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="cat-add-url" placeholder="https://github.com/user/repo/releases/tag/v1.0">
+                    <button class="secondary" onclick="catalog.fetchMetadata()" style="flex:0; white-space:nowrap;">Fetch Details</button>
+                </div>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Click Fetch to auto-fill Size, Name and gather all file links.</div>
+            </div>
+            <div class="form-group">
+                <label>Filename (Auto)</label>
+                <input type="text" id="cat-add-filename" placeholder="Data_01.rar">
+            </div>
+             <div class="form-group">
+                <label>Size (Bytes) (Auto)</label>
+                <input type="number" id="cat-add-size" value="0">
+            </div>
+            <input type="hidden" id="cat-add-assets">
+            <div class="modal-actions">
+                <button onclick="document.getElementById('catalog-add-modal').style.display='none'" class="danger">Cancel</button>
+                <button onclick="catalog.submitAdd()" class="secondary">Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Catalog Edit Modal (Similar to Add but for updates) -->
+    <div id="catalog-edit-modal" class="modal" style="z-index: 1022;">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Edit Item</h3></div>
+            <input type="hidden" id="cat-edit-id">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="cat-edit-title">
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <input type="text" id="cat-edit-category">
+            </div>
+            <div class="form-group">
+                <label>Priority</label>
+                <select id="cat-edit-priority">
+                    <option value="2">🔥 Necessary (High)</option>
+                    <option value="1">Normal</option>
+                    <option value="0">💤 Unnecessary (Low)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Tags</label>
+                <input type="text" id="cat-edit-tags">
+            </div>
+            <div class="form-group">
+                <label>Poster Image (Replace?)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <img id="cat-edit-preview" src="" style="height:40px; width:40px; object-fit:cover; border-radius:4px; display:none;">
+                    <input type="file" id="cat-edit-image-file" style="display:none;" onchange="document.getElementById('cat-edit-image-text').value = this.files[0].name">
+                    <button onclick="document.getElementById('cat-edit-image-file').click()" class="secondary" style="flex:0; white-space:nowrap;">📁 Upload New</button>
+                    <input type="text" id="cat-edit-image-text" placeholder="Or paste URL..." style="flex:1;">
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+                    <label style="font-size:0.8em; color:var(--accent-color); cursor:pointer;">
+                        <input type="checkbox" id="cat-edit-optimize" checked> Optimize Image
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Download URL</label>
+                <input type="text" id="cat-edit-url">
+            </div>
+            <div class="modal-actions">
+                <button onclick="document.getElementById('catalog-edit-modal').style.display='none'" class="danger">Cancel</button>
+                <button onclick="catalog.submitEdit()" class="secondary">Update Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflow Create Modal -->
+    <div id="workflow-modal" class="modal" style="z-index: 1030;">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header"><h3>Create Workflow</h3></div>
+            <div class="form-group">
+                <label>Workflow Name</label>
+                <input type="text" id="wf-name" placeholder="e.g. Pack & Upload to GitHub">
+            </div>
+            <div id="wf-steps-container" style="border:1px solid var(--border-color); padding:10px; margin-bottom:15px; max-height:300px; overflow-y:auto;">
+                <!-- Steps injected here -->
+            </div>
+            <button class="icon-btn" onclick="addWorkflowStepUI()" style="width:100%; border:1px dashed var(--text-muted);">+ Add Step</button>
+
+            <div class="modal-actions">
+                <button onclick="document.getElementById('workflow-modal').style.display='none'" class="danger">Cancel</button>
+                <button onclick="saveWorkflow()" class="secondary">Save Workflow</button>
+            </div>
+        </div>
+    </div>
 
     <!-- GitHub Login Modal -->
     <div id="gh-login-modal" class="modal">
@@ -596,6 +874,8 @@
     <script src="/static/js/cloud.js"></script>
     <script src="/static/js/queue.js"></script>
     <script src="/static/js/settings.js"></script>
+    <script src="/static/js/catalog.js"></script>
+    <script src="/static/js/automation.js"></script>
     <script src="/static/js/apps/github.js"></script>
 </body>
 </html>

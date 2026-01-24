@@ -1,0 +1,70 @@
+# Obfuscation & Security Strategy for GitHub Releases
+
+This document outlines strategies for protecting the identity of content uploaded to public/semi-public storage (like GitHub Releases) while ensuring the owner can identify and retrieve it later.
+
+## The Goal
+Upload sensitive content (e.g., `Avengers.mkv`) packed as RAR/PAR2 to GitHub.
+*   **Security:** GitHub/Public should NOT know the content is "Avengers".
+*   **Identification:** The user MUST be able to identify "This file is Avengers" later.
+
+## Strategies
+
+### 1. The "Encrypted Headers" Method (Recommended)
+This relies on the native encryption features of RAR/7-Zip.
+*   **Concept:** You encrypt the archive *and* the file headers.
+*   **Mechanism:**
+    *   **Internal:** The file inside is named `Avengers.mkv`.
+    *   **Encryption:** The RAR is password protected with "Encrypt File Names" enabled (`-mhe=on` for 7z, `-hp` for RAR).
+    *   **External:** The RAR file itself is named `Backup_001.rar`.
+*   **Pros:**
+    *   Iron-clad security. No one can see filenames without the password.
+    *   No complex renaming logic needed for the content itself.
+*   **Cons:**
+    *   You need an external index to know that `Backup_001` = `Avengers`.
+
+### 2. The "Info File" Method (Usenet Standard)
+*   **Concept:** Embedding the identity inside the encrypted container.
+*   **Mechanism:**
+    1.  Create a text file `info.nfo` containing "Title: Avengers".
+    2.  Pack `Avengers.mkv` AND `info.nfo` into `Archive_XYZ.rar`.
+    3.  Encrypt with password + header encryption.
+*   **Pros:**
+    *   Self-contained. You never lose the mapping because it's inside the file.
+*   **Cons:**
+    *   To identify a file, you must download the RAR and provide the password to read the `info.nfo`. You can't just look at the GitHub file list.
+
+### 3. The "Obfuscated Filename" Method
+*   **Concept:** Renaming the outer file to something that looks random but contains the name.
+*   **Techniques:**
+    *   **Base64:** `Avengers` -> `QXZlbmdlcnM=.rar` (Weak security, easy to decode).
+    *   **ROT13:** `Avengers` -> `Niratref.rar` (Weak security).
+    *   **AES String:** Encrypt the string "Avengers" with a key -> `U2FsdGVkX1....rar`.
+*   **Pros:**
+    *   You can identify the file immediately without downloading it (by decrypting the name).
+*   **Cons:**
+    *   Long filenames.
+    *   If the encryption key is leaked, all names are revealed.
+
+### 4. The "ParFix Database" Method (Professional)
+*   **Concept:** Maintaining a local or cloud-synced mapping file.
+*   **Mechanism:**
+    1.  ParFix generates a random ID: `Project_Alpha`.
+    2.  ParFix records locally: `{"Project_Alpha": "Avengers.mkv"}`.
+    3.  User uploads `Project_Alpha.rar`.
+    4.  The mapping file is backed up separately (e.g., a private Gist or encrypted file).
+*   **Pros:**
+    *   Cleanest public appearance.
+    *   Fast lookup.
+*   **Cons:**
+    *   Risk of losing the database.
+
+## Professional Recommendation
+Combine **Method 1 (Encrypted Headers)** with **Method 3 (Encrypted String in Release Body)**.
+
+1.  **Pack:** Create `Data_123.rar` containing `Avengers.mkv`. Use RAR/7z Password + Header Encryption.
+2.  **Tag:** When creating the GitHub Release, put an **Encrypted Tag** in the Release Body (Description).
+    *   *Release Title:* `Backup 2024-01-23`
+    *   *Body:* `Content-ID: <Encrypted String of "Avengers">`
+3.  **Retrieve:** ParFix can read the Release Body, decrypt the string using your local password, and show you "Avengers" in the UI, even though the file on GitHub is just `Data_123.rar`.
+
+This provides **Zero-Knowledge Cloud Storage** with **User-Friendly Retrieval**.

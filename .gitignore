@@ -4,3 +4,10 @@ __pycache__/
 .DS_Store
 venv/
 .env
+
+# User Data & Configuration (Sensitive)
+config.json
+catalog.json
+rclone.conf
+downloads/
+data/
