@@ -18,6 +18,10 @@
             <div class="nav-icon">🎥</div>
             <div class="nav-label">Catalog</div>
         </div>
+        <div class="nav-item" data-view="automation" onclick="switchView('automation')">
+            <div class="nav-icon">🤖</div>
+            <div class="nav-label">Automation</div>
+        </div>
         <div class="nav-item" data-view="queue" onclick="switchView('queue')">
             <div class="nav-icon">⏳</div>
             <div class="nav-label">Queue</div>
@@ -147,6 +151,17 @@
                 </div>
 
                 <div id="catalog-grid" class="catalog-grid">
+                    <!-- JS Injected -->
+                </div>
+            </div>
+
+            <!-- VIEW: AUTOMATION -->
+            <div id="view-automation" class="view-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="margin:0; border:none;">Workflow Automation</h2>
+                    <button class="secondary" onclick="openWorkflowModal()">+ Create Workflow</button>
+                </div>
+                <div id="workflow-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
                     <!-- JS Injected -->
                 </div>
             </div>
@@ -665,6 +680,26 @@
         </div>
     </div>
 
+    <!-- Workflow Create Modal -->
+    <div id="workflow-modal" class="modal" style="z-index: 1030;">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header"><h3>Create Workflow</h3></div>
+            <div class="form-group">
+                <label>Workflow Name</label>
+                <input type="text" id="wf-name" placeholder="e.g. Pack & Upload to GitHub">
+            </div>
+            <div id="wf-steps-container" style="border:1px solid var(--border-color); padding:10px; margin-bottom:15px; max-height:300px; overflow-y:auto;">
+                <!-- Steps injected here -->
+            </div>
+            <button class="icon-btn" onclick="addWorkflowStepUI()" style="width:100%; border:1px dashed var(--text-muted);">+ Add Step</button>
+
+            <div class="modal-actions">
+                <button onclick="document.getElementById('workflow-modal').style.display='none'" class="danger">Cancel</button>
+                <button onclick="saveWorkflow()" class="secondary">Save Workflow</button>
+            </div>
+        </div>
+    </div>
+
     <!-- GitHub Login Modal -->
     <div id="gh-login-modal" class="modal">
         <div class="modal-content">
@@ -810,6 +845,7 @@
     <script src="/static/js/queue.js"></script>
     <script src="/static/js/settings.js"></script>
     <script src="/static/js/catalog.js"></script>
+    <script src="/static/js/automation.js"></script>
     <script src="/static/js/apps/github.js"></script>
 </body>
 </html>

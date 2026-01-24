@@ -140,6 +140,10 @@ class JobManager:
         args = job.get('args', ())
 
         try:
+            # We don't need explicit chaining support in JobManager core because
+            # WorkflowManager.execute_workflow_job runs in *this* thread and calls
+            # other functions synchronously. The `job_context` propagates.
+            # So, complex workflows can just be a function that calls other functions.
             target(*args)
 
             # Check cancellation status
