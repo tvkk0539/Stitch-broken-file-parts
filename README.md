@@ -31,12 +31,15 @@ A versatile tool for general compression and disc image creation.
 - **Levels:** Adjustable compression from "Store" (Fastest) to "Ultra".
 - **Encryption:** Secure 7z/Zip files with AES-256.
 
-### 🎥 Media Catalog (New!)
+### 🎥 Media Catalog (Professional)
 A built-in "Personal Netflix" to organize your archived media.
-- **Integrated View:** Browse your library in a beautiful, dark-mode grid view directly in ParFix.
-- **Local-First:** Your data lives in a simple `catalog.json` file. No complex database required.
-- **Search & Filter:** Instantly find items in your library using the real-time search bar.
-- **Data Sync Bridge:** Securely backup your private catalog to a **Private GitHub Repository** while keeping the application code public.
+- **SQLite Engine:** Powered by SQLite (`catalog.db`) for massive scalability (10,000+ items) and instant search.
+- **Infinite Scroll:** Browse huge libraries smoothly without pagination clicks.
+- **Advanced Filtering:** Filter by **Smart Tags** (Tag Cloud) and Search simultaneously.
+- **Smart Fetch:** Paste a GitHub Release URL to auto-fill Title, Size, and fetch all asset links.
+- **JDownloader Ready:** "Copy Links (JD)" button copies all asset URLs to clipboard for easy downloading.
+- **Poster Images:** Upload poster images or paste URLs. Images are securely stored and synced.
+- **Data Sync Bridge:** Securely backup your private catalog and images to a **Private GitHub Repository** while keeping the application code public.
 
 ### ☁️ Cloud File Manager (Professional)
 Transform your VPS into a Cloud Manager. No FUSE required.
@@ -245,17 +248,19 @@ y to your VPS.
 
 ### Using the Media Catalog (New!)
 1. Click **Catalog** in the sidebar.
-2. **Add Items:** Click **+ Add Item** and enter details (Title, URL, Category).
-3. **Search:** Use the search bar at the top to filter items instantly.
-4. **View:** Click an item card to see full details and download links.
+2. **Add Items:** Click **+ Add Item**.
+3. **Auto-Fill:** Paste a GitHub Release URL and click **Fetch Details** to auto-fill Title, Size, and get download links.
+4. **Tags & Images:** Add tags (comma-separated) and upload a Poster Image.
+5. **Search:** Use the Search Bar or click on **Tag Pills** to filter your library instantly.
+6. **Download:** Click an item -> "Copy Links (JD)" to paste directly into JDownloader.
 
 ### Data Sync Bridge (Backup)
-Protect your `catalog.json` without exposing it.
+Protect your private data (`catalog.db` and images) without exposing it in the public repo.
 1. Create a **Private** GitHub Repository (e.g., `my-data-backup`).
 2. Go to ParFix **Settings**.
 3. Enter the Repo URL and your GitHub Personal Access Token (PAT).
 4. Click **Link & Pull Data**.
-5. Now, every time you modify the Catalog, ParFix automatically pushes the change to your private repo.
+5. Now, every time you add an item or upload an image, ParFix automatically pushes the change to your private repo.
 
 ### Creating an Archive (Pack)
 1. Navigate to the file or folder you want to pack.
