@@ -1,105 +1,321 @@
-# ParFix Web Utility Pro
+# ParFix & Archive Utility
 
-**ParFix Pro** is a powerful, professional-grade media management and archival tool designed for power users, data hoarders, and DevOps enthusiasts. It combines robust file manipulation utilities with a "Netflix-style" media catalog, all reachable via a clean web interface.
+A lightweight web utility for **Repairing** and **Creating** archives, managing
+files, and syncing to the cloud. Now features a professional **Media Catalog** and **Data Bridge**.
 
-## 🚀 Key Features
+## Features
 
-### 📦 Archiving & Compression
-*   **Packer (Archiver):** Create split RAR archives for long-term storage.
-    *   **Naming Schemes:** Supports `part1.rar`, `part01.rar`, and `part001.rar` standards.
-    *   **Recovery:** Optional 5% RAR Recovery Record (`-rr5p`) and PAR2 file generation.
-    *   **Security:** Password protection and obfuscated filenames.
-*   **Compressor:** A versatile tool for general compression.
-    *   **Formats:** 7z, Zip, Tar, Tar.Gz, Tar.Bz2, and **ISO**.
-    *   **Levels:** Adjustable compression from "Store" (Fastest) to "Ultra".
-    *   **Encryption:** Secure 7z/Zip files with AES-256.
+### 🔧 Repair & Extract
+Designed to solve the "Scrambled RARs" issue often found with Debrid/Usenet down
+loads.
+- **Wildcard Repair:** Forces `par2` to scan all files, fixing scrambled filenam
+es.
+- **Auto-Extract:** Automatically extracts the movie/game after repair.
+- **Universal Extract (Upgraded):** Unpack RAR, 7-Zip, Zip, ISO, Tar, and more with a single click.
 
-### 🎥 Media Catalog (Integrated)
-*   **Personal Netflix:** Browse your archived media in a beautiful, dark-mode grid view.
-*   **Local-First:** Your data lives in a simple `catalog.json` file. No database required.
-*   **Data Sync Bridge:** securely backup your private catalog to a **Private GitHub Repository** while keeping the application code public.
-*   **Search & Filter:** Instantly find items in your library.
+### 📦 Create Archives (Packer)
+Easily create multi-part archives from large files or folders.
+- **Format:** Choose between **RAR** (Industry Standard) or **7-Zip**.
+- **PAR2 Protection:** Automatically generates `.par2` recovery files (10%) to p
+rotect against future data corruption (Bit rot).
+- **Split Archives:** Create `.part001.rar` files (e.g., 500MB, 1GB, 2GB chunks)
+.
+- **Store Mode:** Uses zero compression (`-m0`) for maximum speed.
+- **Password Protection:** Optional encryption for your archives.
+- **Naming Schemes:** Supports `part1.rar`, `part01.rar`, and `part001.rar` standards.
+- **Recovery Record:** Optional 5% RAR Recovery Record (`-rr5p`) added inside the archive.
 
-### ☁️ Cloud & GitHub Integration
-*   **Rclone Manager:** Seamlessly move data between your server and cloud storage (GDrive, OneDrive, S3, etc.) with parallel transfers.
-*   **GitHub Manager:**
-    *   **Downloader:** Fetch releases or assets from any public repository.
-    *   **Publisher:** Publish releases with rich notes, drafts, and pre-release toggles.
-    *   **Repo Browser:** View and edit code in your repositories without cloning.
-    *   **Actions Dashboard:** Trigger and monitor CI/CD workflows.
+### 🗜️ Compressor (New!)
+A versatile tool for general compression and disc image creation.
+- **Formats:** 7z, Zip, Tar, Tar.Gz, Tar.Bz2, and **ISO**.
+- **Levels:** Adjustable compression from "Store" (Fastest) to "Ultra".
+- **Encryption:** Secure 7z/Zip files with AES-256.
 
-### 🛠️ Utilities
-*   **Universal Extract:** Unpack RAR, 7z, Zip, ISO, Tar, and more with a single click.
-*   **File Manager:** A robust browser to Move, Copy, Rename, Delete, and Inspect files.
-*   **Inspector:** Deep media analysis (Bitrate, Codecs) using `mediainfo`.
+### 🎥 Media Catalog (New!)
+A built-in "Personal Netflix" to organize your archived media.
+- **Integrated View:** Browse your library in a beautiful, dark-mode grid view directly in ParFix.
+- **Local-First:** Your data lives in a simple `catalog.json` file. No complex database required.
+- **Search & Filter:** Instantly find items in your library using the real-time search bar.
+- **Data Sync Bridge:** Securely backup your private catalog to a **Private GitHub Repository** while keeping the application code public.
 
----
+### ☁️ Cloud File Manager (Professional)
+Transform your VPS into a Cloud Manager. No FUSE required.
+- **Remote Browser:** Browse your Rclone Remotes (Google Drive, OneDrive, etc.)
+just like local folders.
+- **Cloud-to-Cloud Transfer:** Move or Copy files between different cloud provid
+ers directly (e.g., GDrive -> OneDrive) without consuming local storage.
+- **Cloud Operations:** Rename, Delete, and Create Folders directly in the cloud
+.
+- **Download to VPS:** Select files in the cloud and download them to a specific
+ folder on your server.
+- **Config Upload:** Upload your `rclone.conf` directly from the Settings menu.
 
-## 🛠️ Installation
+### 🧩 Apps & Utilities
+A section for integrated tools and utilities.
+- **GitHub Release Manager:**
+    - **Multi-Account Support:** Login with multiple GitHub accounts and switch
+between them instantly using the **Account Hub**.
+    - **Repository Browser:** View all your repositories (Public/Private)
+ in a convenient grid with **Live Search** to quickly find specific repos.
+    - **Direct Code Browser:** Browse repository files and folders direct
+ly in the UI without cloning.
+        - **View & Edit:** Open text files in a built-in editor and commit chang
+es directly to GitHub.
+        - **Upload:** Upload files from your **PC** or **Server (VPS)** directly
+ to any folder in the repository.
+        - **Manage:** Create new folders, delete files, and switch branches (`ma
+in`, `dev`, etc.).
+    - **Visibility Control:** Toggle repositories between **Public** and **Priva
+te** directly from the dashboard.
+    - **Create & Import:** Create new empty repositories or **Import** existing
+ones from other URLs (supports mirroring public/private repos).
+    - **Clone Source:** Clone the source code of any repository to your VPS usin
+g `git clone` (authenticated).
+    - **Actions Manager:** Full CI/CD Dashboard. View workflows, trigger runs, a
+nd cancel active jobs.
+    - **Rich Publishing:**
+        - Create professional releases with Markdown release notes, **Draft** mo
+de, and **Pre-release** tags.
+        - **Release Selector:** Fetch and select an existing release to upload a
+ssets to.
+    - **Downloader & Release Manager:**
+        - **Multi-Version Support:** Browse the full history of releases with **
+Pagination** (Next/Prev) support.
+        - **Live Filter:** Instantly search through releases by tag or filename.
+        - **Batch Download:** "Download All" button to grab every asset in a rel
+ease simultaneously with parallel processing.
 
-### Option A: Docker (Recommended)
-The easiest way to run ParFix Pro.
+### 📂 Local File Management
+- **Full File Browser:** Navigate your mapped directories easily.
+- **Move & Copy:** Organize files with a built-in **Folder Browser** to select d
+estinations easily.
+- **Rename:** Quickly rename files or folders directly from the UI.
+- **Create Folder:** Create new directories for better organization (now availab
+le inside the Move/Copy selector too).
+- **Delete:** Manually delete files/folders to clean up space.
+- **Multi-Select:** Check multiple files/folders to perform batch actions (Uploa
+d, Move, Delete, etc.).
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/your-repo/ParFix.git
-cd ParFix
+### 🛡️ Stability & UX
+- **System Dashboard:** Live monitoring of **Disk Space**, **RAM**, and **CPU**
+usage prevents server overload.
+- **Deep Inspector:** Inspect video files (Resolution, Codec) and Archives (Cont
+ent List) instantly without extracting using `mediainfo`.
+- **Smart Job Queue:** All heavy tasks (Repair, Pack, Upload, Download) are queu
+ed and processed sequentially in the background. This prevents server crashes (O
+ut of Memory).
+- **Job Management UI:**
+    - **Visual Queue:** See exactly what is running and what is waiting in the "
+Job Queue" tab.
+    - **Cancellation:** Stop any running job or remove pending jobs with a singl
+e click.
+    - **Detailed Progress:** Click on any running job to see granular details.
+- **Toast Notifications:** Modern, non-blocking status popups (Success/Error/Inf
+o) replace annoying browser alerts.
+- **Health Monitoring:** Includes a Docker `HEALTHCHECK` to ensure the service i
+s always running correctly.
 
-# 2. Build and Run
-docker-compose up -d --build
+## 🚀 Deployment Guide (Detailed)
+
+You have two options to deploy this. Choose **Option B** if you want the easiest
+ setup.
+
+### Option A: Build it Yourself (Clone & Build)
+Use this if you want to modify the code.
+
+1. **Clone this repo** onto your server.
+2. **Build and Run:**
+   ```bash
+   docker-compose up -d --build
+   ```
+
+### Option B: Use the Pre-Built Image (Recommended)
+Use this to simply add the tool to your existing stack without downloading the s
+ource code manually.
+
+1. Open your `Rclone-Arr-Setup`'s `docker-compose.yml`.
+2. Add the service block below.
+3. Run `docker-compose up -d`.
+
+```yaml
+  parfix:
+    # This pulls the ready-made image from GitHub
+    image: ghcr.io/tvkk0539/parfix:latest
+    container_name: parfix
+    ports:
+      - "5001:5000"  # Access via http://YOUR_IP:5001
+    environment:
+      - DOWNLOAD_ROOT=/data/downloads
+      - CONFIG_FILE=/config/config.json
+    volumes:
+      # CRITICAL: Change the left side to match your real downloads folder!
+      - /path/to/your/real/downloads:/data/downloads
+      # OPTIONAL: Mount a local folder to persist Notification Settings
+      - ./parfix-config:/config
+      # OPTIONAL: Mount your rclone.conf for Cloud Upload features
+      # - /home/user/.config/rclone/rclone.conf:/root/.config/rclone/rclone.conf
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G  # 200M is too low for PAR2. Use 1G or remove this block.
 ```
 
-Access the UI at: `http://localhost:5000`
+## 💻 Accessing the Tool
 
-### Option B: Python (Manual)
-Requires Python 3.11+, `ffmpeg`, `mediainfo`, `rclone`, `rar`, `par2`, `genisoimage`.
+### Local Computer (Laptop/PC)
+If you are running this on your own computer (Windows/Mac/Linux with Docker Desk
+top):
+- **URL:** [http://localhost:5001](http://localhost:5001)
 
-```bash
-# 1. Install System Dependencies (Ubuntu/Debian)
-sudo apt update && sudo apt install -y ffmpeg mediainfo rclone par2 genisoimage git
+### Remote Server (VPS)
+If you are running this on a cloud server (GCP, AWS, DigitalOcean):
+- **URL:** `http://YOUR_SERVER_IP:5001`
+- **Firewall:** You **MUST open Port 5001** in your VPS Firewall (GCP Firewall,
+AWS Security Group, UFW, etc.).
+  - *GCP Example:* Create a firewall rule allowing `tcp:5001` on Ingress.
 
-# 2. Install Python Deps
-pip install -r requirements.txt
+## 🔒 Security & Reverse Proxy
 
-# 3. Run
-python3 run.py
-```
+**Scenario 2: Using a Reverse Proxy (Nginx Proxy Manager)**
+If you are using Nginx Proxy Manager (included in many Arr stacks):
+1. **Do NOT** open port 5001 to the public internet.
+2. In Nginx Proxy Manager, create a new Proxy Host:
+   - **Forward Hostname:** `parfix` (or the container IP)
+   - **Forward Port:** `5000` (Note: The internal container port is 5000)
+3. This is more secure as only Nginx handles the traffic.
 
----
+## 🛠 Usage
 
-## 📖 Usage Guide
+1. Open the tool in your browser.
+2. Navigate to the folder containing the scrambled files.
+   - *Note: You will see the scrambled RAR names (e.g., `6rLT...rar`) and the co
+rrect PAR2 name.*
+3. Click **"Repair & Extract"**.
+4. Watch the logs. The tool will:
+   - Run `par2` on all files.
+   - Fix the filenames.
+   - Extract the video file.
 
-### 1. The "Pack" Workflow
-Used for preparing large files for secure cloud storage (e.g., Usenet/Telegram style).
-1.  Select a file/folder in the **Files** tab.
-2.  Click **Pack**.
-3.  Choose your Split Size (e.g., 1GB) and Naming Scheme (e.g., `part001.rar`).
-4.  Enable **Recovery Record** for data safety.
-5.  Click Start. The job runs in the background.
+### Apps Section (New!)
+Click the **Apps** icon in the sidebar to access additional utilities.
 
-### 2. The "Compress" Workflow
-Used for general file sharing or ISO creation.
-1.  Select items.
-2.  Click **Compress**.
-3.  Select Format (e.g., **ISO** for disc images, **7z** for max compression).
-4.  Set Password (optional).
+#### GitHub Release Manager
+1. **Manage Accounts:**
+   - Click the GitHub Manager card to enter the **Account Hub**.
+   - Click **"+ Add Account"** and paste your Personal Access Token (PAT).
+   - See your avatar and username instantly verified.
+2. **Download:**
+   - Select an account from the hub.
+   - Enter a GitHub repository (e.g., `radarr/radarr`).
+    - **My Repos:** Browse your personal and organizational repositories.
+    - **Select:** Click any repo to auto-fill it for Downloading or Publishing.
+    - **Toggle Visibility:** Use the lock/unlock icon to switch between Public a
+nd Private visibility.
+    - **Create Repo:** Click the big "+" card to create a new empty repository.
+    - **Import Repo:** Click the "Import" card to mirror an existing repository
+(Public or Private) to your account.
+    - **Search:** Use the search bar to filter your repository list instantly.
+    - **Actions:** Click the "▶" button on any card to open the Actions Dashboar
+d (Run/Cancel workflows).
+    - **Code Browser:** Click the "📂" folder icon to browse code, edit files, an
+d upload content (PC or Server).
+3. **Download & Manage Releases:**
+    - Enter a GitHub repository (e.g., `radarr/radarr`) or select one from "My R
+epos".
+    - Click "Fetch" to see releases.
+    - **Browse:** Navigate through release history using the Pagination controls
+.
+    - **Filter:** Type in the search bar to find specific versions or filenames
+(e.g., "beta" or ".zip").
+    - **Download:** Click the download icon next to an asset, or "Download All"
+to grab everything.
+    - **Manage:** Use the Trash icons to delete assets or releases (if you own t
+he repo).
+    - **Clone Source:** Click "Clone Source" to `git clone` the entire repositor
+y to your VPS.
+4. **Publish:**
+   - Select an account (must have write access).
+   - Switch to the "Publisher" tab.
+   - **Option A (New):** Click "Fetch Releases" to select an existing tag.
+   - **Option B (Create):** Manually enter a new Tag (e.g., `v1.0.0`).
+   - Select a file to upload.
+   - (Optional) Add **Release Notes**, mark as **Draft**, or **Pre-release**.
+   - Click "Publish" / "Upload" to finish.
 
-### 3. Setting Up Data Sync (Backup)
+### Using the Media Catalog (New!)
+1. Click **Catalog** in the sidebar.
+2. **Add Items:** Click **+ Add Item** and enter details (Title, URL, Category).
+3. **Search:** Use the search bar at the top to filter items instantly.
+4. **View:** Click an item card to see full details and download links.
+
+### Data Sync Bridge (Backup)
 Protect your `catalog.json` without exposing it.
-1.  Create a **Private** GitHub Repository (e.g., `my-data-backup`).
-2.  Go to ParFix **Settings**.
-3.  Enter the Repo URL and your GitHub Personal Access Token (PAT).
-4.  Click **Link & Pull Data**.
-5.  Now, every time you modify the Catalog, ParFix automatically pushes the change to your private repo.
+1. Create a **Private** GitHub Repository (e.g., `my-data-backup`).
+2. Go to ParFix **Settings**.
+3. Enter the Repo URL and your GitHub Personal Access Token (PAT).
+4. Click **Link & Pull Data**.
+5. Now, every time you modify the Catalog, ParFix automatically pushes the change to your private repo.
 
----
+### Creating an Archive (Pack)
+1. Navigate to the file or folder you want to pack.
+2. Click **"Pack"**.
+3. Select your options:
+   - **Format:** RAR (Recommended for Usenet/Scene) or 7-Zip.
+   - **Naming:** Choose `part01` or `part001` styles.
+   - **Recovery:** Enable "Add RAR Recovery Record".
+   - **Split Size:** e.g., 1GB.
+   - **PAR2:** Check "Create PAR2 Recovery Files".
+4. Click **"Start Packing"**.
 
-## 🛡️ Security Note
-*   **Data Separation:** This project is designed to keep your data (`catalog.json`, `config.json`) separate from the code.
-*   **Git Ignore:** Sensitive files are strictly ignored by `.gitignore`.
-*   **Private Sync:** The Data Sync feature ensures your backups are encrypted (via HTTPS) and stored only in your private repository.
+### Creating an Archive (Compress)
+1. Select items.
+2. Click **"Compress"**.
+3. Select Format (e.g., **ISO**, **7z**, **Zip**).
+4. Select Compression Level (Store to Ultra).
+5. Click **"Start Compression"**.
 
----
+### Cloud Upload
+1. Select the file(s) or folder(s) you want to upload.
+2. Click **"Upload"**.
+3. Select your Rclone Remote (requires `rclone.conf` mounted).
+   - *Note: The default path `ParFix_Uploads/` handles folders intelligently. Fi
+les go into root, folders get their own subdirectories automatically.*
+4. (Optional) Adjust concurrency settings for faster parallel uploads.
+5. Click **"Start Upload"**.
+6. Switch to the **Job Queue** tab to monitor progress or cancel the upload.
 
-## 📄 License
-MIT License. Free for personal and professional use.
+## 📦 Bare Metal Installation (Debian/Ubuntu)
+
+If you prefer not to use Docker:
+
+1. Run the setup script as root:
+   ```bash
+   sudo ./setup.sh
+   ```
+2. Activate the virtual environment:
+   ```bash
+   source venv/bin/activate
+   ```
+3. Run the app:
+   ```bash
+   python app.py
+   ```
+
+## 💡 Advanced: Mapping Multiple Folders
+
+Do you have Movies on one drive and Games on another? You can map **multiple** f
+olders into the tool by nesting them inside `/data/downloads`.
+
+**Example `docker-compose.yml`:**
+
+```yaml
+    volumes:
+      # Map Drive A to a subfolder "Movies"
+      - /mnt/drive_a/movies:/data/downloads/movies
+
+      # Map Drive B to a subfolder "Games"
+      - /mnt/drive_b/games:/data/downloads/games
+```
+
+Now when you open ParFix, you will see two folders: `movies` and `games`.
