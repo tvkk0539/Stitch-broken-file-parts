@@ -187,11 +187,18 @@ def run_workflow(wf_id):
 
     if not wf_data: return jsonify({'error': 'Workflow not found'}), 404
 
+    # Resolve absolute paths
+    abs_paths = [os.path.join(DOWNLOAD_ROOT, p) for p in paths]
+    # Filter only existing
+    abs_paths = [p for p in abs_paths if os.path.exists(p)]
+
+    if not abs_paths: return jsonify({'error': 'No valid files selected'}), 400
+
     # We pass wf_data to job so it doesn't need to read file (thread safety)
     job_id = job_manager.add_job(
         f"Workflow: {wf_data['name']}",
         WorkflowManager.execute_workflow_job,
-        args=(wf_id, paths, wf_data)
+        args=(wf_id, abs_paths, wf_data)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
