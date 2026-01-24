@@ -139,79 +139,85 @@ const catalog = {
     },
 
     openDetail: (item) => {
-        const modal = document.getElementById('catalog-detail-modal');
-        const content = document.getElementById('catalog-detail-content');
+        try {
+            const modal = document.getElementById('catalog-detail-modal');
+            const content = document.getElementById('catalog-detail-content');
 
-        // Image Logic for Detail
-        let posterHtml = '';
-        if (item.image) {
-            const imgSrc = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
-            posterHtml = `<img src="${imgSrc}" style="width:100%; height:100%; object-fit:cover;">`;
-        } else {
-            const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
-            posterHtml = `<span>${initial}</span>`;
-        }
+            // Image Logic for Detail
+            let posterHtml = '';
+            if (item.image) {
+                const imgSrc = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
+                posterHtml = `<img src="${imgSrc}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src=''; this.parentElement.innerHTML='<span>?</span>'">`;
+            } else {
+                const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
+                posterHtml = `<span>${initial}</span>`;
+            }
 
-        // Check for assets
-        let extraActions = '';
-        let fileInfo = `Filename: <code>${item.file_name}</code>`;
+            // Check for assets
+            let extraActions = '';
+            let fileInfo = `Filename: <code>${item.file_name || 'Unknown'}</code>`;
 
-        if (item.assets && item.assets.length > 0) {
-            fileInfo = `Contains <strong>${item.assets.length}</strong> files. Total Size: <strong>${item.size_human}</strong>`;
-            // Add Copy Links button
-            extraActions = `
-                <button onclick="catalog.copyLinks('${item.id}')" class="btn btn-info btn-lg" title="Copy all links for JDownloader">
-                    📋 Copy Links (JD)
-                </button>
+            if (item.assets && item.assets.length > 0) {
+                fileInfo = `Contains <strong>${item.assets.length}</strong> files. Total Size: <strong>${item.size_human || '0 B'}</strong>`;
+                // Add Copy Links button
+                extraActions = `
+                    <button onclick="catalog.copyLinks('${item.id}')" class="btn btn-info btn-lg" title="Copy all links for JDownloader">
+                        📋 Copy Links (JD)
+                    </button>
+                `;
+            }
+
+            // Breadcrumb category
+            const catBreadcrumb = item.category ? item.category.split('/').map(c => `<span class="tag">${c}</span>`).join(' ') : '<span class="tag">General</span>';
+
+            // Tags
+            let tagHtml = '';
+            if(item.tags && item.tags.length > 0) {
+                tagHtml = item.tags.map(t => `<span class="tag tag-secure" style="border-color:#7aa2f7; color:#7aa2f7;">${t}</span>`).join(' ');
+            }
+
+            // Date Safe Check
+            const dateStr = item.created_at ? item.created_at.substring(0, 10) : 'Unknown Date';
+
+            content.innerHTML = `
+                <div class="catalog-hero">
+                    <div class="catalog-poster">
+                        ${posterHtml}
+                    </div>
+                    <div class="catalog-info">
+                        <h1>${item.title || 'Untitled'}</h1>
+                        <div class="catalog-tags">
+                            ${catBreadcrumb}
+                            <span class="tag">${item.size_human || '0 B'}</span>
+                            <span class="tag">${dateStr}</span>
+                            ${item.is_encrypted ? '<span class="tag tag-secure">Encrypted</span>' : ''}
+                            ${tagHtml}
+                        </div>
+
+                        <p class="catalog-desc">
+                            Securely archived in your private library.
+                            <br>${fileInfo}
+                        </p>
+
+                        <div class="catalog-actions">
+                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="btn btn-primary btn-lg"><i class="fas fa-download"></i> Open Release</a>` : ''}
+                            ${extraActions}
+                            <button onclick="catalog.openEditModal('${item.id}')" class="btn btn-info btn-lg" style="background-color:#e0af68; color:#1a1b26;">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button onclick="catalog.deleteItem('${item.id}')" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
             `;
+
+            modal.classList.add('active');
+        } catch (e) {
+            console.error("Error opening detail modal:", e);
+            alert("Failed to open item details. See console for error.");
         }
-
-        // Breadcrumb category
-        const catBreadcrumb = item.category ? item.category.split('/').map(c => `<span class="tag">${c}</span>`).join(' ') : '<span class="tag">General</span>';
-
-        // Tags
-        let tagHtml = '';
-        if(item.tags && item.tags.length > 0) {
-            tagHtml = item.tags.map(t => `<span class="tag tag-secure" style="border-color:#7aa2f7; color:#7aa2f7;">${t}</span>`).join(' ');
-        }
-
-        content.innerHTML = `
-            <div class="catalog-hero">
-                <div class="catalog-poster">
-                    ${posterHtml}
-                </div>
-                <div class="catalog-info">
-                    <h1>${item.title}</h1>
-                    <div class="catalog-tags">
-                        ${catBreadcrumb}
-                        <span class="tag">${item.size_human}</span>
-                        <span class="tag">${item.created_at.substring(0, 10)}</span>
-                        ${item.is_encrypted ? '<span class="tag tag-secure">Encrypted</span>' : ''}
-                        ${tagHtml}
-                    </div>
-
-                    <p class="catalog-desc">
-                        Securely archived in your private library.
-                        <br>${fileInfo}
-                    </p>
-
-                    <div class="catalog-actions">
-                        <a href="${item.release_url}" target="_blank" class="btn btn-primary btn-lg">
-                            <i class="fas fa-download"></i> Open Release
-                        </a>
-                        ${extraActions}
-                        <button onclick="catalog.openEditModal('${item.id}')" class="btn btn-info btn-lg" style="background-color:#e0af68; color:#1a1b26;">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <button onclick="catalog.deleteItem('${item.id}')" class="btn btn-danger">
-                            <i class="fas fa-trash"></i> Remove
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        modal.classList.add('active');
     },
 
     copyLinks: (id) => {
@@ -441,7 +447,7 @@ const catalog = {
         try {
             await fetch(`/api/catalog/${id}`, { method: 'DELETE' });
             catalog.closeDetail();
-            catalog.load(); // Refresh
+            catalog.reload(); // Refresh
         } catch (e) {
             alert("Failed to delete: " + e);
         }
@@ -459,7 +465,7 @@ const catalog = {
             const result = await res.json();
             if (result.status === 'success') {
                 showToast("Added to Catalog!");
-                catalog.load(); // Refresh background
+                catalog.reload(); // Refresh background
             } else {
                 alert("Error: " + result.message);
             }
