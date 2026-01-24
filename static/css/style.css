@@ -520,6 +520,38 @@ button.icon-btn {
     padding-bottom: 40px;
 }
 
+.catalog-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.filter-pill {
+    background-color: #24283b;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 5px 12px;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s;
+}
+
+.filter-pill:hover {
+    border-color: var(--accent-color);
+    color: #c0caf5;
+}
+
+.filter-pill.active {
+    background-color: var(--accent-color);
+    color: #1a1b26;
+    border-color: var(--accent-color);
+    font-weight: bold;
+}
+
 .catalog-card {
     background-color: #24283b;
     border-radius: 6px;

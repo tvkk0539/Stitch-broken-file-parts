@@ -3,12 +3,12 @@
 const catalog = {
     state: {
         items: [],
-        currentFilter: 'all'
+        activeTags: new Set(),
+        searchQuery: ''
     },
 
     init: async () => {
         await catalog.load();
-        catalog.setupEvents();
     },
 
     load: async () => {
@@ -16,35 +16,101 @@ const catalog = {
             const res = await fetch('/api/catalog');
             const data = await res.json();
             catalog.state.items = data;
-            catalog.render();
+            catalog.generateTagCloud();
+            catalog.applyFilters();
         } catch (e) {
             console.error("Failed to load catalog:", e);
         }
     },
 
-    setupEvents: () => {
-        // Add Filter listeners if we add filter UI later
-    },
+    generateTagCloud: () => {
+        const container = document.getElementById('catalog-filters');
+        if(!container) return;
 
-    filter: (query) => {
-        const term = query.toLowerCase();
-        catalog.render(item => {
-            if(!term) return true;
-            return item.title.toLowerCase().includes(term) ||
-                   (item.category && item.category.toLowerCase().includes(term));
+        const allTags = new Set();
+        catalog.state.items.forEach(item => {
+            if(item.tags) item.tags.forEach(t => allTags.add(t));
+        });
+
+        if (allTags.size === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'flex';
+        container.innerHTML = ''; // Clear
+
+        // Sort tags alphabetically
+        Array.from(allTags).sort().forEach(tag => {
+            const pill = document.createElement('div');
+            pill.className = `filter-pill ${catalog.state.activeTags.has(tag) ? 'active' : ''}`;
+            pill.textContent = tag;
+            pill.onclick = () => catalog.toggleTagFilter(tag);
+            container.appendChild(pill);
         });
     },
 
-    render: (filterFn = null) => {
+    toggleTagFilter: (tag) => {
+        if(catalog.state.activeTags.has(tag)) {
+            catalog.state.activeTags.delete(tag);
+        } else {
+            catalog.state.activeTags.add(tag);
+        }
+        catalog.generateTagCloud(); // Re-render to update active state
+        catalog.applyFilters();
+    },
+
+    filter: (query) => {
+        catalog.state.searchQuery = query.toLowerCase();
+        catalog.applyFilters();
+    },
+
+    applyFilters: () => {
+        const term = catalog.state.searchQuery;
+        const tags = catalog.state.activeTags;
+
+        const filtered = catalog.state.items.filter(item => {
+            // 1. Text Search
+            const matchesText = !term ||
+                item.title.toLowerCase().includes(term) ||
+                (item.category && item.category.toLowerCase().includes(term));
+
+            // 2. Tag Filter (AND logic: Item must have ALL selected tags? OR logic: Item must have ANY?)
+            // Usually "OR" is friendlier for "Action" OR "Comedy".
+            // But let's do "AND" for strict drill-down.
+            // Actually, let's do "Item must have at least one of the selected tags" if tags are selected.
+            // If tags are selected, item must match AT LEAST ONE.
+            // Wait, standard e-commerce is usually AND (drill down).
+            // Let's go with: If tags selected, item MUST have ALL selected tags.
+
+            let matchesTags = true;
+            if(tags.size > 0) {
+                if(!item.tags || item.tags.length === 0) {
+                    matchesTags = false;
+                } else {
+                    // Check if item.tags contains ALL activeTags
+                    for(let t of tags) {
+                        if(!item.tags.includes(t)) {
+                            matchesTags = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return matchesText && matchesTags;
+        });
+
+        catalog.render(filtered);
+    },
+
+    render: (items) => {
         const container = document.getElementById('catalog-grid');
         if (!container) return;
 
         container.innerHTML = '';
 
-        // Apply filter if provided, otherwise show all
-        const itemsToShow = filterFn ? catalog.state.items.filter(filterFn) : catalog.state.items;
-
-        if (itemsToShow.length === 0) {
+        if (items.length === 0) {
             const msg = catalog.state.items.length === 0
                 ? 'No items in library. Import items from Files view.'
                 : 'No matches found.';
@@ -52,12 +118,15 @@ const catalog = {
             return;
         }
 
-        itemsToShow.forEach(item => {
+        items.forEach(item => {
             const card = document.createElement('div');
             card.className = 'catalog-card';
 
             // Placeholder for image (using First Letter)
             const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
+
+            // Format Category Breadcrumbs
+            const catDisplay = item.category ? item.category.replace(/\//g, ' › ') : 'Uncategorized';
 
             card.innerHTML = `
                 <div class="catalog-card-image">
@@ -65,7 +134,7 @@ const catalog = {
                 </div>
                 <div class="catalog-card-content">
                     <div class="catalog-card-title">${item.title}</div>
-                    <div class="catalog-card-meta">${item.size_human} • ${item.category}</div>
+                    <div class="catalog-card-meta">${item.size_human} • ${catDisplay}</div>
                 </div>
             `;
 
@@ -95,6 +164,15 @@ const catalog = {
             `;
         }
 
+        // Breadcrumb category
+        const catBreadcrumb = item.category ? item.category.split('/').map(c => `<span class="tag">${c}</span>`).join(' ') : '<span class="tag">General</span>';
+
+        // Tags
+        let tagHtml = '';
+        if(item.tags && item.tags.length > 0) {
+            tagHtml = item.tags.map(t => `<span class="tag tag-secure" style="border-color:#7aa2f7; color:#7aa2f7;">${t}</span>`).join(' ');
+        }
+
         content.innerHTML = `
             <div class="catalog-hero">
                 <div class="catalog-poster">
@@ -103,10 +181,11 @@ const catalog = {
                 <div class="catalog-info">
                     <h1>${item.title}</h1>
                     <div class="catalog-tags">
-                        <span class="tag">${item.category}</span>
+                        ${catBreadcrumb}
                         <span class="tag">${item.size_human}</span>
                         <span class="tag">${item.created_at.substring(0, 10)}</span>
                         ${item.is_encrypted ? '<span class="tag tag-secure">Encrypted</span>' : ''}
+                        ${tagHtml}
                     </div>
 
                     <p class="catalog-desc">
@@ -147,6 +226,8 @@ const catalog = {
     openAddModal: () => {
         document.getElementById('catalog-add-modal').style.display = 'block';
         document.getElementById('cat-add-title').value = '';
+        document.getElementById('cat-add-category').value = '';
+        document.getElementById('cat-add-tags').value = '';
         document.getElementById('cat-add-url').value = '';
         document.getElementById('cat-add-filename').value = '';
         document.getElementById('cat-add-size').value = '0';
@@ -192,8 +273,12 @@ const catalog = {
         const title = document.getElementById('cat-add-title').value;
         const url = document.getElementById('cat-add-url').value;
         const cat = document.getElementById('cat-add-category').value || 'General';
+        const tagsRaw = document.getElementById('cat-add-tags').value;
         const filename = document.getElementById('cat-add-filename').value || 'Unknown';
         const size = parseInt(document.getElementById('cat-add-size').value) || 0;
+
+        // Parse Tags
+        const tags = tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0);
 
         // Parse hidden assets
         let assets = [];
@@ -211,6 +296,7 @@ const catalog = {
             title: title,
             url: url,
             category: cat,
+            tags: tags,
             file_name: filename,
             size_bytes: size,
             assets: assets
