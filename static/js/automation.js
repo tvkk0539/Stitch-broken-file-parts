@@ -91,16 +91,63 @@ function updateStepConfigUI(select) {
 
     c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
 
+    // Create Select for Split Size if Pack
+    if (type === 'pack' && c1.tagName !== 'SELECT') {
+        // Replace Input with Select
+        const sel = document.createElement('select');
+        sel.className = 'wf-conf-1';
+        sel.innerHTML = `
+            <option value="100M">100MB</option>
+            <option value="500M">500MB</option>
+            <option value="1024M" selected>1GB</option>
+            <option value="2048M">2GB</option>
+            <option value="5120M">5GB</option>
+        `;
+        c1.replaceWith(sel);
+        // Need to re-query to get the new element for subsequent logic
+        // But c1 reference is stale.
+        // We will just return here and let the user select.
+    }
+    // Re-query in case we replaced it
+    const c1_new = container.querySelector('.wf-conf-1');
+
     if (type === 'analyze_source') {
-        c1.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none';
+        c1_new.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none';
         desc.textContent = "Scans folder, builds file tree, calculates original sizes.";
     } else if (type === 'pack') {
-        c1.placeholder = "Split (e.g. 1024M)";
+        c1_new.style.display = 'block'; // Ensure select is visible
         c2.placeholder = "Naming (part001)";
         c3.placeholder = "Obfuscate Filename? (true/false)";
         c3.style.display = 'block';
         desc.textContent = "Creates split RAR archives. Obfuscation uses Base64 filenames.";
     } else if (type === 'github_publish') {
+        // If coming from pack, we need to revert Select to Input?
+        if (c1_new.tagName === 'SELECT') {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'wf-conf-1';
+            c1_new.replaceWith(inp);
+        }
+        const c1_final = container.querySelector('.wf-conf-1');
+
+        c1_final.placeholder = "Repo (user/repo)";
+        c2.placeholder = "Account ID";
+        c3.placeholder = "Obfuscate Title? (true/false)";
+        desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
+    } else if (type === 'catalog_add') {
+        if (c1_new.tagName === 'SELECT') {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'wf-conf-1';
+            c1_new.replaceWith(inp);
+        }
+        const c1_final = container.querySelector('.wf-conf-1');
+
+        c1_final.placeholder = "Category (Movies/4K)";
+        c2.placeholder = "Priority (2=High, 1=Normal)";
+        c3.style.display = 'none';
+        desc.textContent = "Adds to local index with download links and syncs to bridge.";
+    }
         c1.placeholder = "Repo (user/repo)";
         c2.placeholder = "Account ID";
         c3.placeholder = "Obfuscate Title? (true/false)";

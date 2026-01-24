@@ -9,6 +9,7 @@ import shutil
 from datetime import datetime
 from app.managers.sync import SyncManager
 from app.core.job_manager import job_manager, log
+from werkzeug.utils import secure_filename
 
 # Import Managers for execution
 from app.managers.archive import ArchiveManager
@@ -98,7 +99,11 @@ class WorkflowManager:
                 job_manager.update_job_details({'action': f"Step {i+1}: {step_type}"})
 
                 if step_type == 'analyze_source':
-                    context['meta'] = WorkflowManager._step_analyze(context['files'])
+                    res = WorkflowManager._step_analyze(context['files'])
+                    context['meta'] = res
+                    if 'new_files_list' in res:
+                        context['files'] = res['new_files_list']
+                        log(f"📍 Context updated: Target is now {context['files'][0]}")
                 elif step_type == 'pack':
                     context['files'] = WorkflowManager._step_pack(context['files'], conf)
                 elif step_type == 'github_publish':
@@ -106,7 +111,7 @@ class WorkflowManager:
                 elif step_type == 'catalog_add':
                     WorkflowManager._step_catalog(context, conf)
 
-                time.sleep(1) # Small breathe
+                time.sleep(1)
 
             log(f"✅ Workflow '{wf_data['name']}' Completed Successfully!")
             job_manager.update_job_details({'action': 'Completed', 'progress': '100%'})
@@ -124,25 +129,39 @@ class WorkflowManager:
         Scans source folder for Pre-Indexing metadata (Tree, Size, Count).
         Enforces 'Folder First' condition.
         Scans Root for Cover Images.
+        Creates a 'Workflow_Runs' sandbox for organization.
         """
         if not files: raise Exception("No input files for Analysis")
 
-        # Enforce Folder
-        target_path = files[0]
-        if not os.path.isdir(target_path):
-            log(f"⚠️ Input '{os.path.basename(target_path)}' is a file. Creating wrapper folder...")
-            # Auto-wrap file in folder
+        target_path = os.path.abspath(files[0]) # Absolute path is crucial
+
+        # 1. Create Sandbox
+        # Use simple name+timestamp
+        safe_name = secure_filename(os.path.basename(target_path)) or "Workflow_Item"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        sandbox_dir = os.path.join(os.path.dirname(target_path), "Workflow_Runs", f"{safe_name}_{timestamp}")
+
+        if not os.path.exists(sandbox_dir):
+            os.makedirs(sandbox_dir)
+
+        # 2. Move Input to Sandbox
+        new_target_path = os.path.join(sandbox_dir, os.path.basename(target_path))
+
+        log(f"📦 Moving {target_path} to Sandbox: {sandbox_dir}")
+        shutil.move(target_path, new_target_path)
+        target_path = new_target_path # Update reference
+
+        # If it was a file, we wrap it in a folder INSIDE the sandbox?
+        # User said: "Even if single file it should be in folder"
+        if os.path.isfile(target_path):
             folder_name = os.path.splitext(os.path.basename(target_path))[0]
-            parent = os.path.dirname(target_path)
-            new_folder = os.path.join(parent, folder_name)
+            wrapper_dir = os.path.join(sandbox_dir, folder_name)
+            os.makedirs(wrapper_dir, exist_ok=True)
 
-            if not os.path.exists(new_folder):
-                os.makedirs(new_folder)
-
-            new_file_path = os.path.join(new_folder, os.path.basename(target_path))
-            shutil.move(target_path, new_file_path)
-            target_path = new_folder
-            log(f"✅ Wrapped in: {new_folder}")
+            final_file_path = os.path.join(wrapper_dir, os.path.basename(target_path))
+            shutil.move(target_path, final_file_path)
+            target_path = wrapper_dir
+            log(f"✅ Wrapped file in folder: {target_path}")
 
         # Build Tree & Stats
         tree_lines = []
@@ -151,14 +170,13 @@ class WorkflowManager:
         dir_count = 0
         cover_image = None
 
-        # Scan Root for Cover Image (jpg, png, webp, jpeg)
-        # Only in ROOT of target_path, not subfolders.
+        # Scan Root for Cover Image
         for f in os.listdir(target_path):
             fp = os.path.join(target_path, f)
             if os.path.isfile(fp):
                 ext = os.path.splitext(f)[1].lower()
                 if ext in ['.jpg', '.jpeg', '.png', '.webp']:
-                    if not cover_image: # Take first found
+                    if not cover_image:
                         cover_image = fp
                         log(f"📸 Found Cover Image: {f}")
 
@@ -178,6 +196,13 @@ class WorkflowManager:
 
         log(f"Analysis Complete: {file_count} files, {WorkflowManager._human_size(total_size)}")
 
+        # Update context files so next steps use the sandboxed path
+        # But we can't return 'files' list here directly, we return a meta dict.
+        # WorkflowManager.execute_workflow_job needs to be smart enough to pick up the new path?
+        # Actually, execute_workflow_job does: context['files'] = WorkflowManager._step_pack(context['files']...)
+        # But _step_analyze updates context['meta'].
+        # We need to hack it: return the new path in meta, and update context['files'] in the loop.
+
         return {
             'title': os.path.basename(target_path),
             'tree_text': tree_text,
@@ -185,7 +210,8 @@ class WorkflowManager:
             'file_count': file_count,
             'folder_path': target_path,
             'cover_image': cover_image,
-            'missing_cover': (cover_image is None)
+            'missing_cover': (cover_image is None),
+            'new_files_list': [target_path] # Special key to update context['files']
         }
 
     @staticmethod
@@ -200,19 +226,25 @@ class WorkflowManager:
         # Obfuscation Logic
         obfuscate = conf.get('obfuscate', False)
         if obfuscate:
-            # Base64 Encode Filename (URL Safe)
             name_b64 = base64.urlsafe_b64encode(original_name.encode('utf-8')).decode('utf-8')
-            name = name_b64.rstrip('=') # Remove padding for cleaner filenames
+            name = name_b64.rstrip('=')
             log(f"🕵️ Obfuscating Filename: {original_name} -> {name}")
+
+        # Split Size Logic (Fix for 1024 -> 1024M)
+        split = conf.get('split', '1024M')
+        if split and split.isdigit():
+            split = f"{split}M"
+
+        log(f"📦 Packing '{target_path}' with Split: {split}, Recovery: -rr5p")
 
         ArchiveManager.run_archive_job(
             target_path,
             name,
-            conf.get('split', '1024M'),
+            split,
             conf.get('password'),
             conf.get('format', 'rar'),
             True, # Create Par2
-            False, # No auto-upload in manager
+            False,
             None, "",
             conf.get('naming', 'part1'),
             conf.get('recovery', True)
@@ -223,6 +255,7 @@ class WorkflowManager:
         output_files = []
 
         for f in os.listdir(parent):
+            # Strict check: must start with name AND have rar/par2 extension
             if f.startswith(name) and (f.endswith('.rar') or f.endswith('.par2')):
                 output_files.append(os.path.join(parent, f))
 
