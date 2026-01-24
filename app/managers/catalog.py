@@ -478,9 +478,14 @@ class CatalogManager:
             logger.error(f"Failed to delete image {filename}: {e}")
 
     def get_image_path(self, filename):
+        # Ensure we use the project root, not relative to CWD if it changes
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+        target_dir = "data"
         if SyncManager.is_configured():
-            return os.path.join(SyncManager.DATA_DIR, "assets", "images", filename)
-        return os.path.join("data", "assets", "images", filename)
+            target_dir = SyncManager.DATA_DIR
+
+        return os.path.join(base_dir, target_dir, "assets", "images", filename)
 
     def _human_readable_size(self, size, decimal_places=2):
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
