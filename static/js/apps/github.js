@@ -748,7 +748,6 @@ async function fetchGhReleases() {
             releaseCard.style.background = 'var(--panel-bg)';
             releaseCard.style.border = '1px solid var(--border-color)';
             releaseCard.style.marginBottom = '10px';
-            releaseCard.style.borderRadius = '6px';
             releaseCard.style.overflow = 'hidden';
 
             const isLatest = index === 0;
@@ -831,14 +830,14 @@ async function fetchGhReleases() {
                     row.dataset.filename = asset.name.toLowerCase();
                     row.style.marginBottom = '5px';
                     row.innerHTML = `
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#565f89"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                        <div style="display:flex; align-items:center; gap:10px; overflow-x:auto; white-space:nowrap; flex:1; margin-right:10px; padding-bottom:2px;" class="gh-asset-info">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#565f89; flex-shrink:0;"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
                             <div>
                                 <div style="color:#a9b1d6; font-size:0.95em;">${asset.name}</div>
                                 <div style="font-size:0.75em; color:var(--text-muted);">${formatBytes(asset.size)}</div>
                             </div>
                         </div>
-                        <div style="display:flex; gap:5px;">
+                        <div style="display:flex; gap:5px; flex-shrink:0;">
                             <button class="icon-btn dl-btn" style="color:var(--success-color); border:1px solid #2f3549; padding:4px 8px; border-radius:4px;" title="Download">⬇️</button>
                             <button class="icon-btn del-btn" style="color:var(--error-color); border:1px solid #2f3549; padding:4px 8px; border-radius:4px;" title="Delete">🗑️</button>
                         </div>

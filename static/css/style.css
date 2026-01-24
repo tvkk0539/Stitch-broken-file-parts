@@ -1,18 +1,18 @@
 :root {
-    --bg-color: #1a1b26;
-    --sidebar-bg: #16161e;
-    --panel-bg: #24283b;
+    --bg-color: #000000;
+    --sidebar-bg: #050505;
+    --panel-bg: #111111;
     --text-color: #a9b1d6;
     --text-muted: #565f89;
     --accent-color: #7aa2f7;
     --success-color: #9ece6a;
     --error-color: #f7768e;
     --warning-color: #e0af68;
-    --border-color: #414868;
+    --border-color: #333333;
 }
 
 body {
-    font-family: 'Consolas', 'Monaco', monospace;
+    font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
     background-color: var(--bg-color);
     color: var(--text-color);
     margin: 0;
@@ -131,7 +131,7 @@ body {
     width: 80px;
     height: 6px;
     background: #2f3549;
-    border-radius: 3px;
+    border-radius: 0;
     overflow: hidden;
 }
 
@@ -147,7 +147,7 @@ body {
     flex: 1;
     position: relative;
     overflow: hidden;
-    background-color: #1a1b26;
+    background-color: var(--bg-color);
 }
 
 .view-section {
@@ -203,7 +203,7 @@ body {
     flex: 1;
     background-color: var(--panel-bg);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -238,7 +238,7 @@ body {
     margin-top: 15px;
     padding: 15px;
     background-color: var(--panel-bg);
-    border-radius: 6px;
+    border-radius: 0;
     border: 1px solid var(--border-color);
 }
 
@@ -254,7 +254,7 @@ button {
     color: #15161e;
     border: none;
     padding: 10px 20px;
-    border-radius: 4px;
+    border-radius: 0;
     cursor: pointer;
     font-weight: bold;
     font-family: inherit;
@@ -299,7 +299,7 @@ button.icon-btn {
 .job-card {
     background-color: var(--panel-bg);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 0;
     padding: 15px;
     margin-bottom: 15px;
     cursor: pointer;
@@ -329,7 +329,7 @@ button.icon-btn {
     color: #15161e;
     padding: 5px 10px;
     font-size: 0.8em;
-    border-radius: 4px;
+    border-radius: 0;
     margin-left: 10px;
 }
 
@@ -342,7 +342,7 @@ button.icon-btn {
     height: 100%;
     overflow-y: auto;
     white-space: pre-wrap;
-    border-radius: 6px;
+    border-radius: 0;
     border: 1px solid var(--border-color);
 }
 
@@ -356,7 +356,7 @@ button.icon-btn {
 .app-card {
     background-color: var(--panel-bg);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 0;
     padding: 25px;
     text-align: center;
     cursor: pointer;
@@ -395,7 +395,7 @@ button.icon-btn {
     background: #15161e;
     padding: 15px;
     margin-bottom: 10px;
-    border-radius: 6px;
+    border-radius: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -411,7 +411,7 @@ button.icon-btn {
     width: 100%;
     background-color: var(--panel-bg);
     padding: 30px;
-    border-radius: 8px;
+    border-radius: 0;
     border: 1px solid var(--border-color);
 }
 
@@ -429,10 +429,10 @@ button.icon-btn {
     width: 100%;
     padding: 10px;
     box-sizing: border-box;
-    background: #1a1b26;
+    background: var(--bg-color);
     border: 1px solid var(--border-color);
     color: #c0caf5;
-    border-radius: 4px;
+    border-radius: 0;
     font-family: inherit;
 }
 .form-group input:focus { outline: none; border-color: var(--accent-color); }
@@ -460,7 +460,7 @@ button.icon-btn {
     padding: 25px;
     border: 1px solid var(--border-color);
     width: 500px;
-    border-radius: 8px;
+    border-radius: 0;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }
 
@@ -474,7 +474,7 @@ button.icon-btn {
     border-left: 5px solid var(--accent-color);
     color: #fff;
     padding: 15px 20px;
-    border-radius: 4px;
+    border-radius: 0;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     min-width: 250px;
     opacity: 0;
@@ -496,7 +496,7 @@ button.icon-btn {
     color: var(--text-muted);
     border: 1px solid var(--border-color);
     padding: 8px 15px;
-    border-radius: 4px;
+    border-radius: 0;
     cursor: pointer;
     font-size: 0.9em;
     white-space: nowrap;
@@ -510,7 +510,7 @@ button.icon-btn {
 
 .log-tab.active {
     background: var(--accent-color);
-    color: #1a1b26;
+    color: var(--bg-color);
     border-color: var(--accent-color);
     font-weight: bold;
 }
@@ -529,15 +529,15 @@ button.icon-btn {
 }
 #catalog-header-filters::-webkit-scrollbar-thumb {
     background: var(--border-color);
-    border-radius: 2px;
+    border-radius: 0;
 }
 
 .filter-pill {
-    background-color: #24283b;
+    background-color: var(--panel-bg);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
     padding: 4px 10px;
-    border-radius: 15px;
+    border-radius: 0;
     cursor: pointer;
     font-size: 0.85em;
     white-space: nowrap;
@@ -552,18 +552,18 @@ button.icon-btn {
 
 .filter-pill.active {
     background-color: var(--accent-color);
-    color: #1a1b26;
+    color: var(--bg-color);
     border-color: var(--accent-color);
     font-weight: bold;
 }
 
 .catalog-card {
-    background-color: #24283b;
-    border-radius: 6px;
+    background-color: var(--panel-bg);
+    border-radius: 0;
     overflow: hidden;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
-    border: 1px solid #1a1b26;
+    border: 1px solid var(--bg-color);
 }
 
 .catalog-card:hover {
@@ -608,12 +608,12 @@ button.icon-btn {
     display: flex;
     height: 600px;
     position: relative;
-    background-color: #1a1b26;
+    background-color: var(--bg-color);
 }
 
 .catalog-poster {
     width: 400px;
-    background: #16161e;
+    background: var(--sidebar-bg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -628,7 +628,7 @@ button.icon-btn {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    background: linear-gradient(to right, #1a1b26 0%, #1f2335 100%);
+    background: linear-gradient(to right, var(--bg-color) 0%, #1f2335 100%);
 }
 
 .catalog-info h1 {
@@ -646,7 +646,7 @@ button.icon-btn {
 .catalog-tags .tag {
     background: rgba(255,255,255,0.1);
     padding: 5px 10px;
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 0.9em;
     color: #c0caf5;
 }
@@ -665,9 +665,9 @@ button.icon-btn {
 }
 
 .catalog-desc code {
-    background: #16161e;
+    background: var(--sidebar-bg);
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: 0;
     color: var(--accent-color);
 }
 
@@ -690,7 +690,7 @@ button.icon-btn {
     color: var(--text-muted);
     font-size: 1.2em;
     border: 2px dashed var(--border-color);
-    border-radius: 8px;
+    border-radius: 0;
 }
 
 /* Catalog Sidebar */
@@ -698,33 +698,33 @@ button.icon-btn {
     padding: 10px 15px;
     cursor: pointer;
     color: var(--text-muted);
-    border-radius: 4px;
+    border-radius: 0;
     margin-bottom: 5px;
     transition: all 0.2s;
 }
 
 .cat-sidebar-item:hover {
-    background: #24283b;
+    background: var(--panel-bg);
     color: #c0caf5;
 }
 
 .cat-sidebar-item.active {
     background: var(--accent-color);
-    color: #1a1b26;
+    color: var(--bg-color);
     font-weight: bold;
 }
 
 /* Catalog Tree View */
 .catalog-contents-section {
     padding: 30px 60px;
-    background: #1a1b26;
+    background: var(--bg-color);
     border-top: 1px solid var(--border-color);
 }
 
 .catalog-tree-view {
-    background: #16161e;
+    background: var(--sidebar-bg);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 0;
     padding: 20px;
 }
 
@@ -742,7 +742,7 @@ button.icon-btn {
 }
 
 .tree-row:hover {
-    background: #24283b;
+    background: var(--panel-bg);
     color: #fff;
 }
 /* New Styles for Catalog Links */
@@ -751,9 +751,9 @@ button.icon-btn {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.4s ease-in-out, margin-top 0.4s;
-    background: #1a1b26;
+    background: var(--bg-color);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 0;
     margin-top: 0;
     opacity: 0;
 }
@@ -777,7 +777,7 @@ button.icon-btn {
 }
 .links-scroll-area::-webkit-scrollbar-thumb {
     background: var(--border-color);
-    border-radius: 3px;
+    border-radius: 0;
 }
 
 .link-row {
@@ -788,11 +788,11 @@ button.icon-btn {
     border-bottom: 1px solid #2f3549;
     cursor: pointer;
     transition: background 0.2s;
-    border-radius: 4px;
+    border-radius: 0;
 }
 
 .link-row:hover {
-    background: #24283b;
+    background: var(--panel-bg);
 }
 
 .link-name {
@@ -830,7 +830,7 @@ button.icon-btn {
 }
 .tree-container::-webkit-scrollbar-thumb {
     background: var(--border-color);
-    border-radius: 4px;
+    border-radius: 0;
 }
 .tree-container::-webkit-scrollbar-corner {
     background: transparent;
