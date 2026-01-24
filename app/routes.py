@@ -60,8 +60,14 @@ def list_files():
 
 @bp.route('/api/catalog', methods=['GET'])
 def list_catalog():
-    """List all items in the catalog."""
-    return jsonify(catalog_manager.get_all())
+    """List items with pagination and filtering."""
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 50))
+    search = request.args.get('search', '')
+    tag = request.args.get('tag', '')
+
+    items = catalog_manager.get_all(page, limit, search, tag)
+    return jsonify(items)
 
 @bp.route('/api/catalog', methods=['POST'])
 def add_catalog_item():

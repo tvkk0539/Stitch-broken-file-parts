@@ -1,106 +1,241 @@
-import json
+import sqlite3
 import os
 import uuid
+import json
 import logging
 from datetime import datetime
 from app.managers.sync import SyncManager
-from app.managers.github_tool import GitHubManager # Needed for fetch logic
+from app.managers.github_tool import GitHubManager
 from werkzeug.utils import secure_filename
 
 logger = logging.getLogger(__name__)
 
 class CatalogManager:
     """
-    Manages the catalog database.
-    Now supports "Dual Path" strategy:
-    1. Primary: 'data/catalog.json' (if Sync is enabled)
-    2. Fallback: 'catalog.json' (Root)
+    Manages the catalog database using SQLite for scalability.
+    Supports "Dual Path" strategy via SyncManager.
     """
 
     def __init__(self):
-        self.primary_path = os.path.join(SyncManager.DATA_DIR, "catalog.json")
-        self.fallback_path = "catalog.json"
+        # Paths
+        self.primary_dir = SyncManager.DATA_DIR
+        self.fallback_dir = "."
 
-        # Determine active path
+        self.db_name = "catalog.db"
+        self.json_name = "catalog.json" # Legacy support
+
+        self.db_path = self._resolve_path(self.db_name)
+        self.json_path = self._resolve_path(self.json_name)
+
+        self._init_db()
+        self._migrate_json_to_sqlite()
+
+    def _resolve_path(self, filename):
+        """Returns the path in 'data/' if configured, else root."""
         if SyncManager.is_configured():
-            self.catalog_path = self.primary_path
-        else:
-            self.catalog_path = self.fallback_path
+            path = os.path.join(self.primary_dir, filename)
+            # Ensure dir exists
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            return path
+        return os.path.join(self.fallback_dir, filename)
 
-        self.catalog = self.load_catalog()
+    def _get_conn(self):
+        """Returns a sqlite connection."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_db(self):
+        """Creates the items table if it doesn't exist."""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS items (
+                        id TEXT PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        category TEXT,
+                        file_name TEXT,
+                        size_bytes INTEGER,
+                        size_human TEXT,
+                        release_url TEXT,
+                        created_at TEXT,
+                        tags TEXT,       -- JSON list
+                        is_encrypted INTEGER,
+                        image TEXT,
+                        assets TEXT      -- JSON list of dicts
+                    )
+                """)
+                conn.commit()
+        except Exception as e:
+            logger.error(f"DB Init Error: {e}")
+
+    def _migrate_json_to_sqlite(self):
+        """Imports legacy catalog.json into catalog.db if db is empty."""
+        try:
+            # Check if JSON exists
+            if not os.path.exists(self.json_path):
+                return
+
+            # Check if DB is empty
+            with self._get_conn() as conn:
+                count = conn.execute("SELECT count(*) FROM items").fetchone()[0]
+                if count > 0:
+                    return # DB already populated
+
+            logger.info("Migrating JSON catalog to SQLite...")
+
+            with open(self.json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            with self._get_conn() as conn:
+                for item in data:
+                    conn.execute("""
+                        INSERT INTO items (id, title, category, file_name, size_bytes, size_human,
+                                           release_url, created_at, tags, is_encrypted, image, assets)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        item.get('id'),
+                        item.get('title'),
+                        item.get('category'),
+                        item.get('file_name'),
+                        item.get('size_bytes'),
+                        item.get('size_human'),
+                        item.get('release_url'),
+                        item.get('created_at'),
+                        json.dumps(item.get('tags', [])),
+                        1 if item.get('is_encrypted') else 0,
+                        item.get('image'),
+                        json.dumps(item.get('assets', []))
+                    ))
+                conn.commit()
+
+            # Rename JSON to .bak to avoid confusion
+            os.rename(self.json_path, self.json_path + ".bak")
+            logger.info("Migration complete. JSON renamed to .bak")
+
+            # Trigger Sync
+            self.trigger_sync("Migrated JSON to SQLite")
+
+        except Exception as e:
+            logger.error(f"Migration Error: {e}")
 
     def reload(self):
-        """Re-checks configuration and reloads data (e.g. after Sync Init)."""
-        if SyncManager.is_configured():
-            self.catalog_path = self.primary_path
-        else:
-            self.catalog_path = self.fallback_path
-        self.catalog = self.load_catalog()
+        """Re-initializes paths (e.g. after Sync Init)."""
+        self.db_path = self._resolve_path(self.db_name)
+        self.json_path = self._resolve_path(self.json_name)
+        self._init_db()
+        self._migrate_json_to_sqlite()
 
-    def load_catalog(self):
-        """Loads the catalog from the JSON file."""
-        if not os.path.exists(self.catalog_path):
-            logger.info(f"Catalog file not found at {self.catalog_path}. Creating new.")
-            return []
+    def get_all(self, page=1, limit=50, search=None, tag=None):
+        """
+        Retrieves paginated and filtered items.
+        """
+        offset = (page - 1) * limit
+        query = "SELECT * FROM items WHERE 1=1"
+        params = []
 
+        if search:
+            query += " AND (lower(title) LIKE ? OR lower(category) LIKE ?)"
+            term = f"%{search.lower()}%"
+            params.extend([term, term])
+
+        if tag:
+            # Simple tag search in JSON string
+            query += " AND tags LIKE ?"
+            params.append(f"%{tag}%")
+
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        items = []
         try:
-            with open(self.catalog_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                # Sort by created_at desc
-                return sorted(data, key=lambda x: x.get('created_at', ''), reverse=True)
+            with self._get_conn() as conn:
+                rows = conn.execute(query, params).fetchall()
+                for row in rows:
+                    items.append(self._row_to_dict(row))
         except Exception as e:
-            logger.error(f"Failed to load catalog: {e}")
-            return []
+            logger.error(f"Get All Error: {e}")
 
-    def save_catalog(self, trigger_sync=True):
-        """Saves the current catalog state to the JSON file."""
-        try:
-            # Ensure dir exists if using data path
-            if self.catalog_path == self.primary_path:
-                os.makedirs(os.path.dirname(self.catalog_path), exist_ok=True)
+        return items
 
-            with open(self.catalog_path, 'w', encoding='utf-8') as f:
-                json.dump(self.catalog, f, indent=2, ensure_ascii=False)
-            logger.info(f"Catalog saved to {self.catalog_path}")
+    def _row_to_dict(self, row):
+        """Converts a SQLite Row to a Dictionary."""
+        d = dict(row)
+        # Parse JSON fields
+        if d.get('tags'): d['tags'] = json.loads(d['tags'])
+        else: d['tags'] = []
 
-            # Auto-Push if Configured
-            if trigger_sync and SyncManager.is_configured():
-                SyncManager.push_data("Auto-update catalog.json")
+        if d.get('assets'): d['assets'] = json.loads(d['assets'])
+        else: d['assets'] = []
 
-            return True
-        except Exception as e:
-            logger.error(f"Failed to save catalog: {e}")
-            return False
-
-    def get_all(self):
-        return self.catalog
+        d['is_encrypted'] = bool(d['is_encrypted'])
+        return d
 
     def get_by_id(self, item_id):
-        for item in self.catalog:
-            if item.get("id") == item_id:
-                return item
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+                if row:
+                    return self._row_to_dict(row)
+        except Exception as e:
+            logger.error(f"Get ID Error: {e}")
         return None
 
-    def delete_entry(self, item_id):
-        initial_len = len(self.catalog)
-        self.catalog = [x for x in self.catalog if x.get("id") != item_id]
-        if len(self.catalog) < initial_len:
-            self.save_catalog()
+    def add_entry(self, entry):
+        """Inserts an entry into the DB."""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("""
+                    INSERT INTO items (id, title, category, file_name, size_bytes, size_human,
+                                       release_url, created_at, tags, is_encrypted, image, assets)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    entry['id'],
+                    entry['title'],
+                    entry['category'],
+                    entry['file_name'],
+                    entry['size_bytes'],
+                    entry['size_human'],
+                    entry['release_url'],
+                    entry['created_at'],
+                    json.dumps(entry['tags']),
+                    1 if entry['is_encrypted'] else 0,
+                    entry['image'],
+                    json.dumps(entry['assets'])
+                ))
+                conn.commit()
+
+            self.trigger_sync(f"Added item: {entry['title']}")
             return True
+        except Exception as e:
+            logger.error(f"Add Entry Error: {e}")
+            return False
+
+    def delete_entry(self, item_id):
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+                conn.commit()
+                if cursor.rowcount > 0:
+                    self.trigger_sync(f"Deleted item {item_id}")
+                    return True
+        except Exception as e:
+            logger.error(f"Delete Error: {e}")
         return False
 
-    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None):
-        """
-        Creates a new catalog entry dictionary.
-        Assets: List of {name, size, url}
-        Image: Path to local image (relative to data/ or static/)
-        """
-        if tags is None:
-            tags = []
-        if assets is None:
-            assets = []
+    def trigger_sync(self, message):
+        """Calls SyncManager to push the DB file."""
+        if SyncManager.is_configured():
+            # Ensure we are syncing the DB file
+            SyncManager.push_data(message)
 
-        entry = {
+    # --- Helpers ---
+
+    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None):
+        if tags is None: tags = []
+        if assets is None: assets = []
+
+        return {
             "id": str(uuid.uuid4()),
             "title": title,
             "category": category,
@@ -112,24 +247,12 @@ class CatalogManager:
             "tags": tags,
             "is_encrypted": is_encrypted,
             "assets": assets,
-            "image": image # Path to local image
+            "image": image
         }
-        return entry
-
-    def add_entry(self, entry):
-        """Adds an entry to the catalog and saves."""
-        # Prepend to list so newest is first
-        self.catalog.insert(0, entry)
-        return self.save_catalog()
 
     def fetch_github_metadata(self, url):
-        """
-        Fetches release details from a GitHub Release URL.
-        Returns: { title, total_size, assets_list, release_tag }
-        """
+        """Proxy to GitHubManager to fetch release details."""
         try:
-            # 1. Parse URL to get Repo and Tag
-            # Format: https://github.com/user/repo/releases/tag/v1.0.0
             if "github.com" not in url or "releases" not in url:
                 return {'error': 'Invalid GitHub Release URL'}
 
@@ -142,18 +265,13 @@ class CatalogManager:
                 tag_idx = parts.index("tag")
                 if len(parts) > tag_idx + 1:
                     tag = parts[tag_idx + 1]
-            elif "download" in parts:
-                 # It's a file link? Try to infer release from context or fail
-                 return {'error': 'Please provide the Release page URL (ends with /tag/version)'}
 
-            # 2. Use GitHubManager to fetch releases
             repo_url = f"https://github.com/{owner}/{repo}"
             releases = GitHubManager.get_releases(repo_url)
 
             if isinstance(releases, dict) and 'error' in releases:
                 return releases
 
-            # 3. Find the matching release
             target_release = None
             if tag:
                 for r in releases:
@@ -161,18 +279,13 @@ class CatalogManager:
                         target_release = r
                         break
             else:
-                # If no tag in URL, maybe latest? Assuming user gave releases page?
-                # Safer to require tag or pick first if user gave base releases url
-                if releases:
-                    target_release = releases[0]
+                if releases: target_release = releases[0]
 
             if not target_release:
                 return {'error': 'Release not found'}
 
-            # 4. Process Assets
             total_size = 0
             assets_out = []
-
             for asset in target_release['assets']:
                 size = asset['size']
                 total_size += size
@@ -196,50 +309,34 @@ class CatalogManager:
             return {'error': str(e)}
 
     def save_image(self, file_obj):
-        """
-        Saves an uploaded image to the data/assets/images directory.
-        Returns the relative path to store in catalog.
-        """
+        """Saves image to data/assets/images and returns filename."""
         try:
-            # Determine base dir: 'data/assets/images' if sync enabled, else 'static/images/catalog' ?
-            # User wants Sync enabled assets.
-
             if SyncManager.is_configured():
                 base_dir = os.path.join(SyncManager.DATA_DIR, "assets", "images")
             else:
-                # Fallback to local data folder (ignored by git)
                 base_dir = os.path.join("data", "assets", "images")
 
             os.makedirs(base_dir, exist_ok=True)
 
-            # Generate safe name
             ext = os.path.splitext(file_obj.filename)[1].lower()
-            if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
-                ext = '.jpg'
+            if ext not in ['.jpg', '.jpeg', '.png', '.webp']: ext = '.jpg'
 
             filename = f"{uuid.uuid4()}{ext}"
             file_path = os.path.join(base_dir, filename)
-
             file_obj.save(file_path)
 
-            # Trigger Sync if configured (to back up the image)
             if SyncManager.is_configured():
                 SyncManager.push_data(f"Added image asset: {filename}")
 
-            # Return relative path for API serving
-            # We will serve via /api/catalog/image/<filename> which maps to this dir
             return filename
-
         except Exception as e:
             logger.error(f"Save image error: {e}")
             return None
 
     def get_image_path(self, filename):
-        """Resolves the absolute path for an image filename."""
         if SyncManager.is_configured():
             return os.path.join(SyncManager.DATA_DIR, "assets", "images", filename)
-        else:
-            return os.path.join("data", "assets", "images", filename)
+        return os.path.join("data", "assets", "images", filename)
 
     def _human_readable_size(self, size, decimal_places=2):
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:

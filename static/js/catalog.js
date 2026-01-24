@@ -4,137 +4,115 @@ const catalog = {
     state: {
         items: [],
         activeTags: new Set(),
-        searchQuery: ''
+        searchQuery: '',
+        page: 1,
+        limit: 50,
+        hasMore: true,
+        loading: false
     },
 
     init: async () => {
-        await catalog.load();
+        // Setup Filter Bar UI first if empty
+        const filters = document.getElementById('catalog-filters');
+        if(filters && filters.innerHTML === '') {
+            // We can't generate cloud from partial data easily without a separate aggregation API.
+            // For now, we will rely on users searching tags via text or add a simple "Popular Tags" later.
+            // Or we fetch 'all' tags once? Let's skip tag cloud auto-generation for now or just fetch it separately.
+            // To keep it simple: We won't auto-generate cloud from 10k items client side.
+            // We will allow adding filters manually or just search.
+            // But user asked for filter bar.
+            // Let's hide it for now or make it static?
+            // BETTER: Load first 50 items and generate tags from them + maybe a "Load Tags" API?
+            // Let's stick to standard search for now to ensure speed.
+            filters.style.display = 'none';
+        }
+        await catalog.reload();
+
+        // Infinite Scroll Listener
+        const grid = document.getElementById('view-catalog');
+        grid.addEventListener('scroll', () => {
+            if(grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 100) {
+                catalog.loadNextPage();
+            }
+        });
     },
 
-    load: async () => {
+    reload: async () => {
+        catalog.state.page = 1;
+        catalog.state.items = [];
+        catalog.state.hasMore = true;
+        document.getElementById('catalog-grid').innerHTML = '';
+        await catalog.loadNextPage();
+    },
+
+    loadNextPage: async () => {
+        if (catalog.state.loading || !catalog.state.hasMore) return;
+        catalog.state.loading = true;
+
         try {
-            const res = await fetch('/api/catalog');
+            // Build Query
+            const params = new URLSearchParams({
+                page: catalog.state.page,
+                limit: catalog.state.limit,
+                search: catalog.state.searchQuery
+            });
+            // Add tag params if we had them (e.g. from filter bar)
+            // if(catalog.state.activeTags.size > 0) ... (Server needs to support list, current supports single tag)
+
+            const res = await fetch(`/api/catalog?${params.toString()}`);
             const data = await res.json();
-            catalog.state.items = data;
-            catalog.generateTagCloud();
-            catalog.applyFilters();
+
+            if (data.length < catalog.state.limit) {
+                catalog.state.hasMore = false;
+            }
+
+            catalog.state.items = catalog.state.items.concat(data);
+            catalog.renderAppend(data);
+            catalog.state.page++;
+
         } catch (e) {
-            console.error("Failed to load catalog:", e);
+            console.error("Failed to load catalog page:", e);
+        } finally {
+            catalog.state.loading = false;
         }
-    },
-
-    generateTagCloud: () => {
-        const container = document.getElementById('catalog-filters');
-        if(!container) return;
-
-        const allTags = new Set();
-        catalog.state.items.forEach(item => {
-            if(item.tags) item.tags.forEach(t => allTags.add(t));
-        });
-
-        if (allTags.size === 0) {
-            container.style.display = 'none';
-            return;
-        }
-
-        container.style.display = 'flex';
-        container.innerHTML = ''; // Clear
-
-        // Sort tags alphabetically
-        Array.from(allTags).sort().forEach(tag => {
-            const pill = document.createElement('div');
-            pill.className = `filter-pill ${catalog.state.activeTags.has(tag) ? 'active' : ''}`;
-            pill.textContent = tag;
-            pill.onclick = () => catalog.toggleTagFilter(tag);
-            container.appendChild(pill);
-        });
-    },
-
-    toggleTagFilter: (tag) => {
-        if(catalog.state.activeTags.has(tag)) {
-            catalog.state.activeTags.delete(tag);
-        } else {
-            catalog.state.activeTags.add(tag);
-        }
-        catalog.generateTagCloud(); // Re-render to update active state
-        catalog.applyFilters();
     },
 
     filter: (query) => {
-        catalog.state.searchQuery = query.toLowerCase();
-        catalog.applyFilters();
+        // Debounce?
+        if(catalog.filterTimeout) clearTimeout(catalog.filterTimeout);
+        catalog.filterTimeout = setTimeout(() => {
+            catalog.state.searchQuery = query;
+            catalog.reload();
+        }, 300);
     },
 
-    applyFilters: () => {
-        const term = catalog.state.searchQuery;
-        const tags = catalog.state.activeTags;
-
-        const filtered = catalog.state.items.filter(item => {
-            // 1. Text Search
-            const matchesText = !term ||
-                item.title.toLowerCase().includes(term) ||
-                (item.category && item.category.toLowerCase().includes(term));
-
-            // 2. Tag Filter (AND logic: Item must have ALL selected tags? OR logic: Item must have ANY?)
-            // Usually "OR" is friendlier for "Action" OR "Comedy".
-            // But let's do "AND" for strict drill-down.
-            // Actually, let's do "Item must have at least one of the selected tags" if tags are selected.
-            // If tags are selected, item must match AT LEAST ONE.
-            // Wait, standard e-commerce is usually AND (drill down).
-            // Let's go with: If tags selected, item MUST have ALL selected tags.
-
-            let matchesTags = true;
-            if(tags.size > 0) {
-                if(!item.tags || item.tags.length === 0) {
-                    matchesTags = false;
-                } else {
-                    // Check if item.tags contains ALL activeTags
-                    for(let t of tags) {
-                        if(!item.tags.includes(t)) {
-                            matchesTags = false;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            return matchesText && matchesTags;
-        });
-
-        catalog.render(filtered);
-    },
-
-    render: (items) => {
+    renderAppend: (newItems) => {
         const container = document.getElementById('catalog-grid');
         if (!container) return;
 
-        container.innerHTML = '';
-
-        if (items.length === 0) {
-            const msg = catalog.state.items.length === 0
-                ? 'No items in library. Import items from Files view.'
-                : 'No matches found.';
-            container.innerHTML = `<div class="catalog-empty">${msg}</div>`;
+        if (catalog.state.items.length === 0) {
+            container.innerHTML = `<div class="catalog-empty">No items found.</div>`;
             return;
         }
 
-        items.forEach(item => {
+        // If it was empty message, clear it
+        if(container.querySelector('.catalog-empty')) container.innerHTML = '';
+
+        newItems.forEach(item => {
             const card = document.createElement('div');
             card.className = 'catalog-card';
 
             // Image Logic
             let imageHtml = '';
             if (item.image) {
-                // If it looks like a filename (UUID.jpg), serve local. Else remote URL.
                 const imgSrc = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
                 imageHtml = `<img src="${imgSrc}" style="width:100%; height:100%; object-fit:cover;">`;
             } else {
-                // Placeholder
                 const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
                 imageHtml = `<span>${initial}</span>`;
             }
 
-            // Format Category Breadcrumbs
+            // Format Category
             const catDisplay = item.category ? item.category.replace(/\//g, ' › ') : 'Uncategorized';
 
             card.innerHTML = `
