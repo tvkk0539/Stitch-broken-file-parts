@@ -351,20 +351,36 @@ class WorkflowManager:
                     })
 
         log(f"Published {len(assets_out)} assets.")
-        return assets_out
+        return {
+            'assets': assets_out,
+            'release_url': release_data.get('html_url', f"https://github.com/{repo}")
+        }
 
     @staticmethod
     def _step_catalog(context, conf):
         """
         Adds entry to catalog using context data.
         Handles Smart Cover Image and No-Cover tags.
+        Verifies index integrity before sync.
         """
         cm = CatalogManager()
 
-        assets = context.get('github_assets', [])
+        gh_data = context.get('github_assets', {})
+        # Handle backward compatibility or different structure
+        if isinstance(gh_data, list):
+            assets = gh_data
+            release_url = f"https://github.com/{conf.get('repo')}"
+        else:
+            assets = gh_data.get('assets', [])
+            release_url = gh_data.get('release_url', f"https://github.com/{conf.get('repo')}")
+
         meta = context.get('meta', {})
 
-        log(f"Cataloging {len(assets)} assets...")
+        # --- Pre-Sync Validation ---
+        if not assets:
+            log("⚠️ WARNING: No assets found in workflow context. Catalog entry will have no download links.")
+        else:
+            log(f"✅ Verifying Index: Found {len(assets)} assets from Release.")
 
         # Calculate compressed size
         comp_size = sum(a['size'] for a in assets)
@@ -389,13 +405,15 @@ class WorkflowManager:
             title=meta.get('title', 'Unknown'),
             file_name=f"{len(assets)} Archives",
             file_size=comp_size,
-            url=f"https://github.com/{conf.get('repo')}",
+            url=release_url,
             category=conf.get('category', 'General'),
             tags=tags,
             assets=assets,
             image=image_path,
             priority=int(conf.get('priority', 1))
         )
+
+        # Sync happens inside add_entry
         cm.add_entry(entry)
         log(f"Added to Catalog: {entry['title']}")
 

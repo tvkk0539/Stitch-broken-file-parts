@@ -218,7 +218,7 @@ const catalog = {
                 fileInfo = `Contains <strong>${item.assets.length}</strong> files. Total Size: <strong>${item.size_human || '0 B'}</strong>`;
                 // Add Copy Links button
                 extraActions = `
-                    <button onclick="catalog.copyLinks('${item.id}')" class="btn btn-info btn-lg" title="Copy all links for JDownloader">
+                    <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4;" title="Copy all links for JDownloader">
                         📋 Copy Links (JD)
                     </button>
                 `;
@@ -257,9 +257,10 @@ const catalog = {
                         </p>
 
                         <div class="catalog-actions">
-                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg"><i class="fas fa-download"></i> Open Release</a>` : ''}
+                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg" style="margin-right: 15px;"><i class="fas fa-download"></i> Open Release</a>` : ''}
                             ${extraActions}
-                            <button onclick="catalog.openEditModal('${item.id}')" class="warning-btn btn-lg" style="color:#1a1b26;">
+                            <div style="flex: 1;"></div> <!-- Spacer -->
+                            <button onclick="catalog.openEditModal('${item.id}')" class="warning-btn btn-lg" style="color:#1a1b26; margin-right: 15px;">
                                 <i class="fas fa-edit"></i> Edit
                             </button>
                             <button onclick="catalog.deleteItem('${item.id}')" class="danger btn-lg">
