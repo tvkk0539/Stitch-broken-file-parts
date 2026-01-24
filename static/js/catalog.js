@@ -311,32 +311,74 @@ const catalog = {
             let rawDesc = item.description || '';
             const b64Marker = "**Original Structure (Base64):**";
 
+            // Split rawDesc into two parts: Tree (if any) and Rest
+            let treeHtml = '';
+            let restDesc = rawDesc;
+
             if (rawDesc.includes(b64Marker)) {
                 try {
-                    // Extract B64: It usually follows the marker inside backticks
-                    // Format: ... **Original Structure (Base64):**\n`{B64}`...
                     let parts = rawDesc.split(b64Marker);
+                    // part[0] is header/intro, part[1] is tree + rest
                     if (parts.length > 1) {
                         let afterMarker = parts[1];
-                        // Find content between backticks
-                        let b64 = afterMarker.split('`')[1];
-                        if (b64) {
-                            const decoded = atob(b64.trim());
-                            const lines = decoded.split('\n');
+                        // We expect tree in backticks `...`
+                        // Format: ...\n`{B64}`\n...
+                        let subParts = afterMarker.split('`');
+                        if (subParts.length >= 3) {
+                            // subParts[0] = newline before tree
+                            // subParts[1] = b64
+                            // subParts[2] = newline + rest of description
+                            let b64 = subParts[1];
+                            let extra = subParts[2];
 
-                            contentsHtml = `<div class="catalog-contents-section"><div class="catalog-tree-view"><h3 style="margin-top:0; color:var(--accent-color);">📁 Archive Contents</h3><div class="tree-container">`;
-                            lines.forEach(line => {
-                                // Escape HTML
-                                const cleanLine = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                                contentsHtml += `<div class="tree-row">${cleanLine}</div>`;
-                            });
-                            contentsHtml += `</div></div></div>`;
+                            restDesc = parts[0] + extra; // Remove the tree part from text description
+
+                            if (b64) {
+                                const decoded = atob(b64.trim());
+                                const lines = decoded.split('\n');
+                                treeHtml = `<div class="catalog-contents-section"><div class="catalog-tree-view"><h3 style="margin-top:0; color:var(--accent-color);">📁 Archive Contents</h3><div class="tree-container">`;
+                                lines.forEach(line => {
+                                    const cleanLine = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                                    treeHtml += `<div class="tree-row">${cleanLine}</div>`;
+                                });
+                                treeHtml += `</div></div></div>`;
+                            }
                         }
                     }
                 } catch(e) { console.error("Tree parse error", e); }
-            } else if (rawDesc) {
-                // Show standard description if exists
-                contentsHtml = `<div class="catalog-contents-section"><h3 style="color:var(--accent-color);">📝 Release Notes</h3><div style="background:#16161e; padding:20px; border-radius:8px; border:1px solid var(--border-color); white-space:pre-wrap;">${rawDesc}</div></div>`;
+            }
+
+            // Build Description Section (Rich Text)
+            // If tree exists, we show it separately.
+            // We use restDesc for the text block.
+
+            if (restDesc && restDesc.trim().length > 0) {
+                contentsHtml = `<div class="catalog-contents-section"><h3 style="color:var(--accent-color);">📝 Release Notes & Details</h3><div style="background:#16161e; padding:20px; border-radius:8px; border:1px solid var(--border-color); white-space:pre-wrap;">${restDesc.trim()}</div></div>`;
+            }
+
+            // Combine
+            contentsHtml = treeHtml + contentsHtml;
+
+            // --- Parse & Display Enriched Metadata (Reference URL) ---
+            // We look for **Reference:** in the description and turn it into a clickable link
+            if (contentsHtml.includes("**Reference:**")) {
+                // This is a simple regex replace to make the link clickable in the rendered HTML
+                // Note: The `contentsHtml` already contains `rawDesc` inside a div.
+                // We will enhance `contentsHtml` to parse links.
+
+                // Safer approach: Re-process `contentsHtml` string? No, messy.
+                // Better: If we have contentsHtml (the standard description block), we inject linkify logic.
+
+                // Let's replace the raw text link with an anchor tag.
+                // Regex matches: **Reference:**\n(http...)
+                // We use [^\\s<]+ to stop before HTML tags or whitespace
+                contentsHtml = contentsHtml.replace(
+                    /\*\*Reference:\*\*\s*(https?:\/\/[^\s<]+)/g,
+                    '<strong style="color:#7dcfff;">Reference:</strong> <a href="$1" target="_blank" style="color:#bb9af7; text-decoration:underline;">$1</a>'
+                );
+
+                // Make "Details" bold header
+                contentsHtml = contentsHtml.replace(/\*\*Details:\*\*/g, '<h4 style="color:#e0af68; margin-bottom:5px;">Details</h4>');
             }
 
             content.innerHTML = `

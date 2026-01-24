@@ -63,14 +63,16 @@ function addWorkflowStepUI() {
                 <option value="analyze_source">1. Analyze Source (Pre-Index)</option>
                 <option value="pack">2. Pack (Archive)</option>
                 <option value="github_publish">3. GitHub Publish</option>
+                <option value="enrich_metadata">3b. Enrich Metadata (Text/URL)</option>
                 <option value="catalog_add">4. Add to Catalog</option>
             </select>
             <button class="danger" onclick="this.parentElement.parentElement.remove()" style="padding:2px 8px; font-size:0.8em; flex:0;">X</button>
         </div>
-        <div class="wf-step-config" style="display:flex; gap:5px;">
-            <input type="text" class="wf-conf-1" placeholder="Config 1">
-            <input type="text" class="wf-conf-2" placeholder="Config 2">
-            <input type="text" class="wf-conf-3" placeholder="Config 3">
+        <div class="wf-step-config" style="display:flex; gap:5px; flex-wrap:wrap;">
+            <input type="text" class="wf-conf-1" placeholder="Config 1" style="flex:1;">
+            <input type="text" class="wf-conf-2" placeholder="Config 2" style="flex:1;">
+            <input type="text" class="wf-conf-3" placeholder="Config 3" style="flex:1;">
+            <textarea class="wf-conf-long" placeholder="Description/Content" style="display:none; width:100%; height:100px; margin-top:5px; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; padding:10px;"></textarea>
         </div>
         <div class="wf-step-desc" style="font-size:0.8em; color:gray; margin-top:5px;">
             Select a step type to see details.
@@ -87,9 +89,11 @@ function updateStepConfigUI(select) {
     const c1 = container.querySelector('.wf-conf-1');
     const c2 = container.querySelector('.wf-conf-2');
     const c3 = container.querySelector('.wf-conf-3');
+    const cLong = container.querySelector('.wf-conf-long');
     const desc = container.querySelector('.wf-step-desc');
 
     c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
+    if(cLong) cLong.style.display = 'none';
 
     // Create Select for Split Size if Pack
     if (type === 'pack' && c1.tagName !== 'SELECT') {
@@ -132,6 +136,22 @@ function updateStepConfigUI(select) {
         c2.placeholder = "Account ID (Number from GitHub App)";
         c3.placeholder = "Obfuscate Title? (true/false)";
         desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
+    } else if (type === 'enrich_metadata') {
+        if (c1_new.tagName === 'SELECT') {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'wf-conf-1';
+            c1_new.replaceWith(inp);
+        }
+        const c1_final = container.querySelector('.wf-conf-1');
+
+        c1_final.placeholder = "Reference URL (e.g. IMDB/Wikipedia)";
+        c2.style.display = 'none';
+        c3.style.display = 'none';
+        if(cLong) cLong.style.display = 'block';
+
+        desc.textContent = "Injects custom URL and Long Description into the catalog entry.";
+
     } else if (type === 'catalog_add') {
         if (c1_new.tagName === 'SELECT') {
             const inp = document.createElement('input');
@@ -158,6 +178,7 @@ async function saveWorkflow() {
         const conf1 = div.querySelector('.wf-conf-1').value;
         const conf2 = div.querySelector('.wf-conf-2').value;
         const conf3 = div.querySelector('.wf-conf-3').value;
+        const confLong = div.querySelector('.wf-conf-long') ? div.querySelector('.wf-conf-long').value : '';
 
         let config = {};
         if(type === 'pack') {
@@ -174,6 +195,11 @@ async function saveWorkflow() {
                 account_id: conf2,
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
                 tag_template: 'v{date}_{name}'
+            };
+        } else if(type === 'enrich_metadata') {
+            config = {
+                reference_url: conf1,
+                description: confLong
             };
         } else if(type === 'catalog_add') {
             config = { category: conf1 || 'General', priority: parseInt(conf2) || 1 };

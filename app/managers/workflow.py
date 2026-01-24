@@ -88,7 +88,8 @@ class WorkflowManager:
             'initial_files': input_paths,
             'github_assets': [], # To collect upload URLs
             'catalog_entry': None,
-            'meta': {} # For pre-indexing data
+            'meta': {}, # For pre-indexing data
+            'user_metadata': {} # For custom URL/Description
         }
 
         try:
@@ -108,6 +109,13 @@ class WorkflowManager:
                     context['files'] = WorkflowManager._step_pack(context['files'], conf)
                 elif step_type == 'github_publish':
                     context['github_assets'] = WorkflowManager._step_gh_publish(context['files'], conf, context['meta'])
+                elif step_type == 'enrich_metadata':
+                    # Store user inputs in context
+                    context['user_metadata'] = {
+                        'reference_url': conf.get('reference_url', ''),
+                        'description': conf.get('description', '')
+                    }
+                    log("✅ Metadata Enriched")
                 elif step_type == 'catalog_add':
                     WorkflowManager._step_catalog(context, conf)
 
@@ -402,6 +410,24 @@ class WorkflowManager:
         if meta.get('missing_cover'):
             tags.append('No-Cover')
 
+        # Combine Description Sources
+        # 1. GitHub Release Body (Auto - includes Tree)
+        # 2. User Description (Manual - "Detailed explanation")
+        # 3. Reference URL (Manual)
+
+        gh_body = gh_data.get('body', '') if isinstance(gh_data, dict) else ''
+        user_meta = context.get('user_metadata', {})
+        user_desc = user_meta.get('description', '')
+        ref_url = user_meta.get('reference_url', '')
+
+        final_desc = gh_body
+
+        if user_desc:
+            final_desc += f"\n\n**Details:**\n{user_desc}"
+
+        if ref_url:
+            final_desc += f"\n\n**Reference:**\n{ref_url}"
+
         entry = cm.create_entry(
             title=meta.get('title', 'Unknown'),
             file_name=f"{len(assets)} Archives",
@@ -412,7 +438,7 @@ class WorkflowManager:
             assets=assets,
             image=image_path,
             priority=int(conf.get('priority', 1)),
-            description=gh_data.get('body', '') if isinstance(gh_data, dict) else ''
+            description=final_desc
         )
 
         # Sync happens inside add_entry
