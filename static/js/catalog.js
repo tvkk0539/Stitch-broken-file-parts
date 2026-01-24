@@ -236,6 +236,39 @@ const catalog = {
             // Date Safe Check
             const dateStr = item.created_at ? item.created_at.substring(0, 10) : 'Unknown Date';
 
+            // --- Parse Description / Tree ---
+            let contentsHtml = '';
+            let rawDesc = item.description || '';
+            const b64Marker = "**Original Structure (Base64):**";
+
+            if (rawDesc.includes(b64Marker)) {
+                try {
+                    // Extract B64: It usually follows the marker inside backticks
+                    // Format: ... **Original Structure (Base64):**\n`{B64}`...
+                    let parts = rawDesc.split(b64Marker);
+                    if (parts.length > 1) {
+                        let afterMarker = parts[1];
+                        // Find content between backticks
+                        let b64 = afterMarker.split('`')[1];
+                        if (b64) {
+                            const decoded = atob(b64.trim());
+                            const lines = decoded.split('\n');
+
+                            contentsHtml = `<div class="catalog-contents-section"><div class="catalog-tree-view"><h3 style="margin-top:0; color:var(--accent-color);">📁 Archive Contents</h3><div class="tree-container">`;
+                            lines.forEach(line => {
+                                // Escape HTML
+                                const cleanLine = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                                contentsHtml += `<div class="tree-row">${cleanLine}</div>`;
+                            });
+                            contentsHtml += `</div></div></div>`;
+                        }
+                    }
+                } catch(e) { console.error("Tree parse error", e); }
+            } else if (rawDesc) {
+                // Show standard description if exists
+                contentsHtml = `<div class="catalog-contents-section"><h3 style="color:var(--accent-color);">📝 Release Notes</h3><div style="background:#16161e; padding:20px; border-radius:8px; border:1px solid var(--border-color); white-space:pre-wrap;">${rawDesc}</div></div>`;
+            }
+
             content.innerHTML = `
                 <div class="catalog-hero">
                     <div class="catalog-poster">
@@ -251,24 +284,25 @@ const catalog = {
                             ${tagHtml}
                         </div>
 
-                        <p class="catalog-desc">
+                        <div class="catalog-desc">
                             Securely archived in your private library.
                             <br>${fileInfo}
-                        </p>
+                        </div>
 
                         <div class="catalog-actions">
-                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg" style="margin-right: 15px;"><i class="fas fa-download"></i> Open Release</a>` : ''}
+                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg" style="margin-right: 15px;">🌍 Open Release</a>` : ''}
                             ${extraActions}
                             <div style="flex: 1;"></div> <!-- Spacer -->
                             <button onclick="catalog.openEditModal('${item.id}')" class="warning-btn btn-lg" style="color:#1a1b26; margin-right: 15px;">
-                                <i class="fas fa-edit"></i> Edit
+                                ✏️ Edit
                             </button>
                             <button onclick="catalog.deleteItem('${item.id}')" class="danger btn-lg">
-                                <i class="fas fa-trash"></i> Remove
+                                🗑️ Remove
                             </button>
                         </div>
                     </div>
                 </div>
+                ${contentsHtml}
             `;
 
             // Switch View Manually (Simulate SwitchView but custom logic)

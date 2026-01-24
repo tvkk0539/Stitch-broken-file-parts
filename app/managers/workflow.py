@@ -353,7 +353,8 @@ class WorkflowManager:
         log(f"Published {len(assets_out)} assets.")
         return {
             'assets': assets_out,
-            'release_url': release_data.get('html_url', f"https://github.com/{repo}")
+            'release_url': release_data.get('html_url', f"https://github.com/{repo}"),
+            'body': body
         }
 
     @staticmethod
@@ -410,7 +411,8 @@ class WorkflowManager:
             tags=tags,
             assets=assets,
             image=image_path,
-            priority=int(conf.get('priority', 1))
+            priority=int(conf.get('priority', 1)),
+            description=gh_data.get('body', '') if isinstance(gh_data, dict) else ''
         )
 
         # Sync happens inside add_entry

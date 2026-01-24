@@ -713,3 +713,35 @@ button.icon-btn {
     color: #1a1b26;
     font-weight: bold;
 }
+
+/* Catalog Tree View */
+.catalog-contents-section {
+    padding: 30px 60px;
+    background: #1a1b26;
+    border-top: 1px solid var(--border-color);
+}
+
+.catalog-tree-view {
+    background: #16161e;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.tree-container {
+    font-family: 'Consolas', monospace;
+    font-size: 0.9em;
+    color: #c0caf5;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.tree-row {
+    padding: 2px 0;
+    white-space: pre;
+}
+
+.tree-row:hover {
+    background: #24283b;
+    color: #fff;
+}
