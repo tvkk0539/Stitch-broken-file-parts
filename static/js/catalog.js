@@ -212,14 +212,39 @@ const catalog = {
 
             // Check for assets
             let extraActions = '';
+            let linksContainerHtml = '';
             let fileInfo = `Filename: <code>${item.file_name || 'Unknown'}</code>`;
 
             if (item.assets && item.assets.length > 0) {
                 fileInfo = `Contains <strong>${item.assets.length}</strong> files. Total Size: <strong>${item.size_human || '0 B'}</strong>`;
-                // Add Copy Links button
+
+                // Build Hidden Links Container
+                let linksList = item.assets.map(a => `
+                    <div class="link-row" onclick="navigator.clipboard.writeText('${a.url}'); showToast('Link Copied!')">
+                        <div style="display:flex;align-items:center;gap:10px; overflow:hidden;">
+                            <span style="font-size:1.2em;">📦</span>
+                            <span class="link-name">${a.name}</span>
+                        </div>
+                        <span class="link-meta">${catalog._formatBytes(a.size)}</span>
+                    </div>
+                `).join('');
+
+                linksContainerHtml = `
+                    <div id="catalog-links-${item.id}" class="catalog-links-dropdown">
+                        <h4 style="margin:0 0 10px 0; color:#7dcfff;">Direct Download Links</h4>
+                        <div class="links-scroll-area">
+                            ${linksList}
+                        </div>
+                    </div>
+                `;
+
+                // Add Buttons
                 extraActions = `
-                    <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4;" title="Copy all links for JDownloader">
-                        📋 Copy Links (JD)
+                    <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4; margin-right:10px;" title="Copy all links for JDownloader">
+                        📋 Copy All
+                    </button>
+                    <button onclick="catalog.toggleLinks('${item.id}')" class="btn-lg secondary" style="background-color: #2f3549; border: 1px solid #414868;">
+                        ⬇️ Show Links
                     </button>
                 `;
             }
@@ -300,6 +325,7 @@ const catalog = {
                                 🗑️ Remove
                             </button>
                         </div>
+                        ${linksContainerHtml}
                     </div>
                 </div>
                 ${contentsHtml}
@@ -321,8 +347,26 @@ const catalog = {
 
         const links = item.assets.map(a => a.url).join('\n');
         navigator.clipboard.writeText(links).then(() => {
-            alert(`Copied ${item.assets.length} links to clipboard! Paste into JDownloader.`);
+            showToast(`Copied ${item.assets.length} links!`, 'success');
         });
+    },
+
+    toggleLinks: (id) => {
+        const el = document.getElementById(`catalog-links-${id}`);
+        if(el.classList.contains('active')) {
+            el.classList.remove('active');
+        } else {
+            el.classList.add('active');
+            // Auto scroll to it
+            setTimeout(() => el.scrollIntoView({behavior: 'smooth', block: 'center'}), 100);
+        }
+    },
+
+    _formatBytes: (bytes) => {
+        if(bytes===0) return '0 B';
+        const k=1024, sizes=['B','KB','MB','GB','TB'];
+        const i=Math.floor(Math.log(bytes)/Math.log(k));
+        return parseFloat((bytes/Math.pow(k,i)).toFixed(2))+' '+sizes[i];
     },
 
     closeDetail: () => {

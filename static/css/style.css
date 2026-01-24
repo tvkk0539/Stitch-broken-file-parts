@@ -745,3 +745,93 @@ button.icon-btn {
     background: #24283b;
     color: #fff;
 }
+/* New Styles for Catalog Links */
+
+.catalog-links-dropdown {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-in-out, margin-top 0.4s;
+    background: #1a1b26;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-top: 0;
+    opacity: 0;
+}
+
+.catalog-links-dropdown.active {
+    max-height: 400px;
+    margin-top: 20px;
+    padding: 20px;
+    opacity: 1;
+}
+
+.links-scroll-area {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+/* Custom Scrollbar for Links */
+.links-scroll-area::-webkit-scrollbar {
+    width: 6px;
+}
+.links-scroll-area::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.link-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #2f3549;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 4px;
+}
+
+.link-row:hover {
+    background: #24283b;
+}
+
+.link-name {
+    font-family: 'Consolas', monospace;
+    color: #c0caf5;
+    font-size: 0.95em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
+}
+
+.link-meta {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+/* Enhancing the Tree View for Horizontal Scroll */
+.tree-container {
+    font-family: 'Consolas', monospace;
+    font-size: 0.9em;
+    color: #c0caf5;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: auto; /* Enable horizontal scroll */
+    white-space: pre; /* Force no wrap */
+    padding-bottom: 10px;
+}
+
+/* Tree Scrollbar */
+.tree-container::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+.tree-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+.tree-container::-webkit-scrollbar-corner {
+    background: transparent;
+}
