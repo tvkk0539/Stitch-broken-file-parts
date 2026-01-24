@@ -104,10 +104,8 @@ function updateStepConfigUI(select) {
             <option value="5120M">5GB</option>
         `;
         c1.replaceWith(sel);
-        // Need to re-query to get the new element for subsequent logic
-        // But c1 reference is stale.
-        // We will just return here and let the user select.
     }
+
     // Re-query in case we replaced it
     const c1_new = container.querySelector('.wf-conf-1');
 
@@ -144,16 +142,6 @@ function updateStepConfigUI(select) {
         const c1_final = container.querySelector('.wf-conf-1');
 
         c1_final.placeholder = "Category (Movies/4K)";
-        c2.placeholder = "Priority (2=High, 1=Normal)";
-        c3.style.display = 'none';
-        desc.textContent = "Adds to local index with download links and syncs to bridge.";
-    }
-        c1.placeholder = "Repo (user/repo)";
-        c2.placeholder = "Account ID";
-        c3.placeholder = "Obfuscate Title? (true/false)";
-        desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
-    } else if (type === 'catalog_add') {
-        c1.placeholder = "Category (Movies/4K)";
         c2.placeholder = "Priority (2=High, 1=Normal)";
         c3.style.display = 'none';
         desc.textContent = "Adds to local index with download links and syncs to bridge.";
@@ -261,3 +249,9 @@ async function deleteWorkflow(id) {
 
 // Global Exposure
 window.initAutomation = initAutomation;
+window.openWorkflowModal = openWorkflowModal;
+window.addWorkflowStepUI = addWorkflowStepUI;
+window.saveWorkflow = saveWorkflow;
+window.runWorkflow = runWorkflow;
+window.deleteWorkflow = deleteWorkflow;
+window.updateStepConfigUI = updateStepConfigUI;
