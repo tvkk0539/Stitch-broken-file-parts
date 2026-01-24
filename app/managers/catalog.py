@@ -349,7 +349,11 @@ class CatalogManager:
         """Calls SyncManager to push the DB file."""
         if SyncManager.is_configured():
             # Ensure we are syncing the DB file
-            SyncManager.push_data(message)
+            ok, msg = SyncManager.push_data(message)
+            if ok:
+                logger.info(f"Sync Success: {msg}")
+            else:
+                logger.error(f"Sync Failed: {msg}")
 
     def fetch_github_metadata(self, url):
         """Proxy to GitHubManager to fetch release details."""

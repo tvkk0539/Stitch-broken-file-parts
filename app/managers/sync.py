@@ -87,26 +87,41 @@ class SyncManager:
 
     @staticmethod
     def push_data(message="Auto-update catalog"):
-        """Commits and pushes changes."""
+        """Commits and pushes changes. Pulls first to avoid conflicts."""
         if not SyncManager.is_configured():
             return False, "Sync not configured."
 
-        # Add
+        # 1. Pull latest changes (Fast-forward if possible)
+        # We ignore errors here because if we have local changes, pull might complain,
+        # but we need to try to be up to date.
+        SyncManager._run_git(["pull"], cwd=SyncManager.DATA_DIR)
+
+        # 2. Add
         SyncManager._run_git(["add", "."], cwd=SyncManager.DATA_DIR)
 
-        # Check if anything to commit
+        # 3. Check if anything to commit
         status_ok, status_out = SyncManager._run_git(["status", "--porcelain"], cwd=SyncManager.DATA_DIR)
         if not status_out:
+            # Try pushing anyway, in case we have unpushed commits
+            push_ok, push_msg = SyncManager._run_git(["push"], cwd=SyncManager.DATA_DIR)
+            if push_ok: return True, "Synced (No new changes, just pushed)"
             return True, "Nothing to sync."
 
-        # Commit
+        # 4. Commit
         commit_ok, commit_msg = SyncManager._run_git(["commit", "-m", message], cwd=SyncManager.DATA_DIR)
         if not commit_ok:
             return False, f"Commit failed: {commit_msg}"
 
-        # Push
+        # 5. Push
         push_ok, push_msg = SyncManager._run_git(["push"], cwd=SyncManager.DATA_DIR)
         if push_ok:
             return True, "Synced to cloud."
         else:
+            # If push failed (e.g. non-fast-forward), try pulling again and then pushing
+            logger.warning(f"Push failed ({push_msg}), retrying with pull...")
+            SyncManager._run_git(["pull"], cwd=SyncManager.DATA_DIR)
+            push_ok_2, push_msg_2 = SyncManager._run_git(["push"], cwd=SyncManager.DATA_DIR)
+            if push_ok_2:
+                return True, "Synced to cloud (after retry)."
+
             return False, f"Push failed: {push_msg}"

@@ -341,15 +341,16 @@ class WorkflowManager:
                 h['Content-Type'] = 'application/octet-stream'
                 ru = requests.post(upload_url, data=f, headers=h)
                 if ru.status_code not in [200, 201]:
-                    log(f"Failed to upload {fname}")
+                    log(f"Failed to upload {fname}: {ru.text}")
                 else:
                     adata = ru.json()
                     assets_out.append({
                         'name': fname,
                         'size': os.path.getsize(file_path),
-                        'url': adata['browser_download_url'] # Or api url? For JDownloader browser url is better
+                        'url': adata.get('browser_download_url', '')
                     })
 
+        log(f"Published {len(assets_out)} assets.")
         return assets_out
 
     @staticmethod
@@ -362,6 +363,8 @@ class WorkflowManager:
 
         assets = context.get('github_assets', [])
         meta = context.get('meta', {})
+
+        log(f"Cataloging {len(assets)} assets...")
 
         # Calculate compressed size
         comp_size = sum(a['size'] for a in assets)
