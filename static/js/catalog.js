@@ -1,9 +1,10 @@
-/* catalog.js - Manages the 'Netflix-style' Catalog View */
+/* catalog.js - Manages the 'Netflix-style' Catalog View with Sidebar */
 
 const catalog = {
     state: {
         items: [],
-        activeTags: new Set(),
+        currentCategory: null,
+        currentTag: null,
         searchQuery: '',
         page: 1,
         limit: 50,
@@ -12,61 +13,100 @@ const catalog = {
     },
 
     init: async () => {
+        await catalog.loadCategories();
         await catalog.loadTags();
         await catalog.reload();
 
         // Infinite Scroll Listener
-        const grid = document.getElementById('catalog-grid').parentNode; // view-catalog
-        grid.addEventListener('scroll', () => {
-            if(grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 100) {
-                catalog.loadNextPage();
+        const grid = document.getElementById('catalog-grid');
+        if(grid) {
+            grid.addEventListener('scroll', () => {
+                if(grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 100) {
+                    catalog.loadNextPage();
+                }
+            });
+        }
+    },
+
+    loadCategories: async () => {
+        try {
+            const res = await fetch('/api/catalog/categories');
+            const cats = await res.json();
+            const list = document.getElementById('catalog-categories-list');
+            if(!list) return;
+
+            list.innerHTML = '';
+            cats.forEach(cat => {
+                const item = document.createElement('div');
+                item.className = 'cat-sidebar-item';
+                item.textContent = cat;
+                item.onclick = () => catalog.filterCategory(cat);
+                if (catalog.state.currentCategory === cat) item.classList.add('active');
+                list.appendChild(item);
+            });
+        } catch(e) { console.error("Load categories failed", e); }
+    },
+
+    filterCategory: (cat) => {
+        catalog.state.currentCategory = cat;
+
+        // Update UI highlighting
+        document.querySelectorAll('.cat-sidebar-item').forEach(el => {
+            el.classList.remove('active');
+            if (el.textContent === cat || (cat === null && el.textContent.trim() === 'All Categories')) {
+                el.classList.add('active');
             }
         });
+
+        // Special check for "All Categories" div which might be separate
+        if (cat === null) {
+             const allBtn = document.querySelector('.cat-sidebar-item[onclick="catalog.filterCategory(null)"]');
+             if(allBtn) allBtn.classList.add('active');
+        }
+
+        catalog.reload();
     },
 
     loadTags: async () => {
         try {
             const res = await fetch('/api/catalog/tags');
             const tags = await res.json();
-            const container = document.getElementById('catalog-header-filters');
-            if(!container) return;
+            const select = document.getElementById('catalog-tag-filter');
+            if(!select) return;
 
-            container.innerHTML = '';
+            // Keep the first "All Tags" option
+            select.innerHTML = '<option value="">All Tags</option>';
 
-            // Add "All" pill? Or just list tags.
-            // Let's list tags.
             tags.forEach(tag => {
-                const pill = document.createElement('div');
-                pill.className = 'filter-pill';
-                pill.textContent = tag;
-                pill.onclick = () => catalog.toggleTag(tag, pill);
-                container.appendChild(pill);
+                const opt = document.createElement('option');
+                opt.value = tag;
+                opt.textContent = tag;
+                select.appendChild(opt);
             });
         } catch (e) { console.error("Load tags failed", e); }
     },
 
-    toggleTag: (tag, el) => {
-        if(catalog.state.activeTags.has(tag)) {
-            catalog.state.activeTags.delete(tag);
-            el.classList.remove('active');
-        } else {
-            // Single tag mode for now if backend only supports ?tag=X
-            // Or support multiple? The backend `query += " AND tags LIKE ?"` supports one.
-            // So we clear others.
-            catalog.state.activeTags.clear();
-            document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-
-            catalog.state.activeTags.add(tag);
-            el.classList.add('active');
-        }
+    filterTag: (tag) => {
+        catalog.state.currentTag = tag || null;
         catalog.reload();
+    },
+
+    filter: (query) => {
+        if(catalog.filterTimeout) clearTimeout(catalog.filterTimeout);
+        catalog.filterTimeout = setTimeout(() => {
+            catalog.state.searchQuery = query;
+            catalog.reload();
+        }, 300);
     },
 
     reload: async () => {
         catalog.state.page = 1;
         catalog.state.items = [];
         catalog.state.hasMore = true;
-        document.getElementById('catalog-grid').innerHTML = '';
+
+        const grid = document.getElementById('catalog-grid');
+        if(grid) grid.innerHTML = '';
+
         await catalog.loadNextPage();
     },
 
@@ -78,16 +118,12 @@ const catalog = {
             // Build Query
             const params = new URLSearchParams({
                 page: catalog.state.page,
-                limit: catalog.state.limit,
-                search: catalog.state.searchQuery
+                limit: catalog.state.limit
             });
 
-            // Add tag param
-            if(catalog.state.activeTags.size > 0) {
-                // Get first one
-                const tag = Array.from(catalog.state.activeTags)[0];
-                params.append('tag', tag);
-            }
+            if (catalog.state.searchQuery) params.append('search', catalog.state.searchQuery);
+            if (catalog.state.currentCategory) params.append('category', catalog.state.currentCategory);
+            if (catalog.state.currentTag) params.append('tag', catalog.state.currentTag);
 
             const res = await fetch(`/api/catalog?${params.toString()}`);
             const data = await res.json();
@@ -107,21 +143,12 @@ const catalog = {
         }
     },
 
-    filter: (query) => {
-        // Debounce?
-        if(catalog.filterTimeout) clearTimeout(catalog.filterTimeout);
-        catalog.filterTimeout = setTimeout(() => {
-            catalog.state.searchQuery = query;
-            catalog.reload();
-        }, 300);
-    },
-
     renderAppend: (newItems) => {
         const container = document.getElementById('catalog-grid');
         if (!container) return;
 
         if (catalog.state.items.length === 0) {
-            container.innerHTML = `<div class="catalog-empty">No items found.</div>`;
+            container.innerHTML = `<div class="catalog-empty">No items found matching your filters.</div>`;
             return;
         }
 
@@ -144,7 +171,7 @@ const catalog = {
             let imageHtml = '';
             if (item.image) {
                 const imgSrc = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
-                imageHtml = `<img src="${imgSrc}" style="width:100%; height:100%; object-fit:cover;">`;
+                imageHtml = `<img src="${imgSrc}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src=''; this.parentElement.innerHTML='<span>?</span>'">`;
             } else {
                 const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
                 imageHtml = `<span>${initial}</span>`;
@@ -230,12 +257,12 @@ const catalog = {
                         </p>
 
                         <div class="catalog-actions">
-                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="btn btn-primary btn-lg"><i class="fas fa-download"></i> Open Release</a>` : ''}
+                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg"><i class="fas fa-download"></i> Open Release</a>` : ''}
                             ${extraActions}
-                            <button onclick="catalog.openEditModal('${item.id}')" class="btn btn-info btn-lg" style="background-color:#e0af68; color:#1a1b26;">
+                            <button onclick="catalog.openEditModal('${item.id}')" class="warning-btn btn-lg" style="color:#1a1b26;">
                                 <i class="fas fa-edit"></i> Edit
                             </button>
-                            <button onclick="catalog.deleteItem('${item.id}')" class="btn btn-danger">
+                            <button onclick="catalog.deleteItem('${item.id}')" class="danger btn-lg">
                                 <i class="fas fa-trash"></i> Remove
                             </button>
                         </div>
@@ -500,6 +527,8 @@ const catalog = {
             if (result.status === 'success') {
                 showToast("Added to Catalog!");
                 catalog.reload(); // Refresh background
+                // Also reload categories in case a new one was added
+                catalog.loadCategories();
             } else {
                 alert("Error: " + result.message);
             }

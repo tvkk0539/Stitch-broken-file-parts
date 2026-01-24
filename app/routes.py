@@ -66,8 +66,9 @@ def list_catalog():
     limit = int(request.args.get('limit', 50))
     search = request.args.get('search', '')
     tag = request.args.get('tag', '')
+    category = request.args.get('category', '')
 
-    items = catalog_manager.get_all(page, limit, search, tag)
+    items = catalog_manager.get_all(page, limit, search, tag, category)
     return jsonify(items)
 
 @bp.route('/api/catalog', methods=['POST'])
@@ -142,6 +143,11 @@ def catalog_serve_image(filename):
 def catalog_get_tags():
     """Returns all unique tags for the filter cloud."""
     return jsonify(catalog_manager.get_all_tags())
+
+@bp.route('/api/catalog/categories', methods=['GET'])
+def catalog_get_categories():
+    """Returns all unique categories."""
+    return jsonify(catalog_manager.get_all_categories())
 
 @bp.route('/api/catalog/<item_id>', methods=['PUT'])
 def update_catalog_item(item_id):

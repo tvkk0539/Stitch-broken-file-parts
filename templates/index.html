@@ -134,26 +134,51 @@
             </div>
 
             <!-- VIEW: CATALOG -->
-            <div id="view-catalog" class="view-section">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap: wrap; gap: 15px;">
-                    <h2 style="margin:0; border:none;">Private Catalog</h2>
+            <div id="view-catalog" class="view-section" style="padding: 0;">
+                <div style="display: flex; height: 100%;">
 
-                    <div style="display:flex; gap:10px; align-items: center; flex: 1; justify-content: flex-end;">
-                        <!-- Filters Container injected here -->
-                        <div id="catalog-header-filters" style="display:flex; gap:5px; overflow-x:auto; max-width: 400px; padding-bottom:2px;">
-                            <!-- JS Injected Pills -->
+                    <!-- Catalog Sidebar -->
+                    <div id="catalog-sidebar" style="width: 250px; background: var(--bg-dark); border-right: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                        <div style="padding: 20px; border-bottom: 1px solid var(--border-color);">
+                            <h3 style="margin: 0;">Library</h3>
+                        </div>
+                        <div style="padding: 10px; overflow-y: auto; flex: 1;">
+                             <div class="cat-sidebar-item active" onclick="catalog.filterCategory(null)">
+                                All Categories
+                             </div>
+                             <div id="catalog-categories-list">
+                                <!-- JS Injected -->
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Catalog Main Content -->
+                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+
+                        <!-- Header (Search & Actions) -->
+                        <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                             <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
+                                <input type="text" id="catalog-search" placeholder="Search..."
+                                   onkeyup="catalog.filter(this.value)"
+                                   style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:300px;">
+
+                                <select id="catalog-tag-filter" onchange="catalog.filterTag(this.value)" style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px; border-radius:4px; width: 150px;">
+                                    <option value="">All Tags</option>
+                                    <!-- JS Injected -->
+                                </select>
+                             </div>
+
+                             <div style="display: flex; gap: 10px;">
+                                <button class="purple-btn" onclick="catalog.openAddModal()">+ Add Item</button>
+                                <button class="secondary" onclick="catalog.reload()">Refresh</button>
+                             </div>
                         </div>
 
-                        <input type="text" id="catalog-search" placeholder="Search library..."
-                               onkeyup="catalog.filter(this.value)"
-                               style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:200px;">
-                        <button class="purple-btn" onclick="catalog.openAddModal()">+ Add Item</button>
-                        <button class="secondary" onclick="catalog.reload()">Refresh</button>
+                        <!-- Content Grid -->
+                        <div id="catalog-grid" class="catalog-grid" style="padding: 20px; overflow-y: auto; flex: 1;">
+                            <!-- JS Injected -->
+                        </div>
                     </div>
-                </div>
-
-                <div id="catalog-grid" class="catalog-grid">
-                    <!-- JS Injected -->
                 </div>
             </div>
 

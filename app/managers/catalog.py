@@ -145,7 +145,7 @@ class CatalogManager:
         self._init_db()
         self._migrate_json_to_sqlite()
 
-    def get_all(self, page=1, limit=50, search=None, tag=None):
+    def get_all(self, page=1, limit=50, search=None, tag=None, category=None):
         """
         Retrieves paginated and filtered items.
         Sorted by Priority DESC, then CreatedAt DESC.
@@ -153,6 +153,10 @@ class CatalogManager:
         offset = (page - 1) * limit
         query = "SELECT * FROM items WHERE 1=1"
         params = []
+
+        if category:
+            query += " AND lower(category) = ?"
+            params.append(category.lower())
 
         if search:
             query += " AND (lower(title) LIKE ? OR lower(category) LIKE ?)"
@@ -271,6 +275,18 @@ class CatalogManager:
             return sorted(list(all_tags))
         except Exception as e:
             logger.error(f"Get Tags Error: {e}")
+            return []
+
+    def get_all_categories(self):
+        """Returns a list of all unique categories used in the library."""
+        try:
+            with self._get_conn() as conn:
+                rows = conn.execute("SELECT DISTINCT category FROM items WHERE category IS NOT NULL AND category != ''").fetchall()
+
+            cats = [row['category'] for row in rows]
+            return sorted(cats)
+        except Exception as e:
+            logger.error(f"Get Categories Error: {e}")
             return []
 
     def update_entry(self, item_id, data):

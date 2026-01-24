@@ -692,3 +692,24 @@ button.icon-btn {
     border: 2px dashed var(--border-color);
     border-radius: 8px;
 }
+
+/* Catalog Sidebar */
+.cat-sidebar-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 4px;
+    margin-bottom: 5px;
+    transition: all 0.2s;
+}
+
+.cat-sidebar-item:hover {
+    background: #24283b;
+    color: #c0caf5;
+}
+
+.cat-sidebar-item.active {
+    background: var(--accent-color);
+    color: #1a1b26;
+    font-weight: bold;
+}
