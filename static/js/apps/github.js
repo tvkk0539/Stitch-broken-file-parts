@@ -35,6 +35,7 @@ async function loadGhAccounts() {
                     <div style="text-align:left;">
                         <div style="font-weight:bold; color:#c0caf5;">${acc.username}</div>
                         <div style="font-size:0.8em; color:var(--text-muted);">${acc.name || ''}</div>
+                        <div style="font-size:0.7em; color:var(--accent-color); margin-top:3px; cursor:pointer;" onclick="navigator.clipboard.writeText('${acc.id}'); showToast('ID Copied!');" title="Click to Copy ID">ID: ${acc.id} 📋</div>
                     </div>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:5px;">
