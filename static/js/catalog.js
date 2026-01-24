@@ -102,6 +102,14 @@ const catalog = {
             const card = document.createElement('div');
             card.className = 'catalog-card';
 
+            // Visual Priority Indicator
+            if (item.priority == 2) {
+                card.style.border = '1px solid #e0af68'; // Gold border for High
+                card.style.boxShadow = '0 0 10px rgba(224, 175, 104, 0.2)';
+            } else if (item.priority == 0) {
+                card.style.opacity = '0.6'; // Dim for Low
+            }
+
             // Image Logic
             let imageHtml = '';
             if (item.image) {
@@ -224,6 +232,7 @@ const catalog = {
         document.getElementById('catalog-add-modal').style.display = 'block';
         document.getElementById('cat-add-title').value = '';
         document.getElementById('cat-add-category').value = '';
+        document.getElementById('cat-add-priority').value = '1';
         document.getElementById('cat-add-tags').value = '';
         document.getElementById('cat-add-image-text').value = '';
         document.getElementById('cat-add-image-file').value = ''; // Reset file input
@@ -272,6 +281,7 @@ const catalog = {
         const title = document.getElementById('cat-add-title').value;
         const url = document.getElementById('cat-add-url').value;
         const cat = document.getElementById('cat-add-category').value || 'General';
+        const priority = parseInt(document.getElementById('cat-add-priority').value) || 1;
         const tagsRaw = document.getElementById('cat-add-tags').value;
         const filename = document.getElementById('cat-add-filename').value || 'Unknown';
         const size = parseInt(document.getElementById('cat-add-size').value) || 0;
@@ -323,6 +333,7 @@ const catalog = {
             title: title,
             url: url,
             category: cat,
+            priority: priority,
             tags: tags,
             file_name: filename,
             size_bytes: size,
@@ -340,6 +351,7 @@ const catalog = {
         document.getElementById('cat-edit-id').value = id;
         document.getElementById('cat-edit-title').value = item.title;
         document.getElementById('cat-edit-category').value = item.category || '';
+        document.getElementById('cat-edit-priority').value = item.priority !== undefined ? item.priority : 1;
         document.getElementById('cat-edit-tags').value = (item.tags || []).join(', ');
         document.getElementById('cat-edit-url').value = item.release_url || '';
 
@@ -365,6 +377,7 @@ const catalog = {
         const id = document.getElementById('cat-edit-id').value;
         const title = document.getElementById('cat-edit-title').value;
         const category = document.getElementById('cat-edit-category').value;
+        const priority = parseInt(document.getElementById('cat-edit-priority').value) || 1;
         const tagsRaw = document.getElementById('cat-edit-tags').value;
         const url = document.getElementById('cat-edit-url').value;
 
@@ -396,6 +409,7 @@ const catalog = {
         const payload = {
             title: title,
             category: category,
+            priority: priority,
             tags: tags,
             release_url: url
         };

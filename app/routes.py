@@ -126,12 +126,21 @@ def catalog_upload_image():
 @bp.route('/api/catalog/image/<filename>')
 def catalog_serve_image(filename):
     """Serves the image from the secure data directory."""
-    abs_path = catalog_manager.get_image_path(filename)
+    from werkzeug.utils import secure_filename
+
+    safe_name = secure_filename(filename)
+    abs_path = catalog_manager.get_image_path(safe_name)
+
     if os.path.exists(abs_path):
         from flask import send_file
         return send_file(abs_path)
     else:
         return jsonify({'error': 'Image not found'}), 404
+
+@bp.route('/api/catalog/tags', methods=['GET'])
+def catalog_get_tags():
+    """Returns all unique tags for the filter cloud."""
+    return jsonify(catalog_manager.get_all_tags())
 
 @bp.route('/api/catalog/<item_id>', methods=['PUT'])
 def update_catalog_item(item_id):
