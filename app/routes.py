@@ -8,6 +8,7 @@ from app.managers.inspector import InspectorManager
 from app.managers.github_tool import GitHubManager
 from app.managers.catalog import CatalogManager
 from app.managers.sync import SyncManager
+from app.managers.workflow import WorkflowManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -158,6 +159,41 @@ def delete_catalog_item(item_id):
         return jsonify({'status': 'success'})
     else:
         return jsonify({'status': 'error', 'message': 'Item not found'}), 404
+
+# --- Automation API ---
+
+workflow_manager = WorkflowManager()
+
+@bp.route('/api/automation/workflows', methods=['GET'])
+def list_workflows():
+    return jsonify(workflow_manager.get_all())
+
+@bp.route('/api/automation/workflows', methods=['POST'])
+def create_workflow():
+    data = request.json
+    wf = workflow_manager.create_workflow(data['name'], data['steps'])
+    return jsonify(wf)
+
+@bp.route('/api/automation/workflows/<wf_id>', methods=['DELETE'])
+def delete_workflow(wf_id):
+    workflow_manager.delete_workflow(wf_id)
+    return jsonify({'status': 'deleted'})
+
+@bp.route('/api/automation/run/<wf_id>', methods=['POST'])
+def run_workflow(wf_id):
+    data = request.json
+    paths = data.get('files', [])
+    wf_data = next((w for w in workflow_manager.get_all() if w['id'] == wf_id), None)
+
+    if not wf_data: return jsonify({'error': 'Workflow not found'}), 404
+
+    # We pass wf_data to job so it doesn't need to read file (thread safety)
+    job_id = job_manager.add_job(
+        f"Workflow: {wf_data['name']}",
+        WorkflowManager.execute_workflow_job,
+        args=(wf_id, paths, wf_data)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
 
 # --- Sync API ---
 

@@ -339,21 +339,10 @@ class WorkflowManager:
         image_path = None
         if meta.get('cover_image'):
             # Copy/Optimize image to Catalog Assets
-            # We assume cover_image is a local path
             try:
-                # We need to open it as a file object for CatalogManager.save_image
-                # CatalogManager expects a FileStorage-like object usually (from Flask)
-                # OR we can modify save_image to accept a path?
-                # Actually save_image calls .save(path) or Image.open(file_obj).
-                # Image.open(path) works fine!
-                # But save_image calls file_obj.filename to get extension.
-                # Let's create a dummy object wrapper or just pass the path if we overload save_image?
-                # No, simpler: Open it in binary mode.
-                with open(meta['cover_image'], 'rb') as f:
-                    # Mock Flask FileStorage attribute
-                    f.filename = os.path.basename(meta['cover_image'])
-                    image_path = cm.save_image(f, optimize=True)
-                    log(f"✅ Processed Cover Image: {image_path}")
+                # Use new is_local_path capability
+                image_path = cm.save_image(meta['cover_image'], optimize=True, is_local_path=True)
+                log(f"✅ Processed Cover Image: {image_path}")
             except Exception as e:
                 log(f"❌ Failed to process cover image: {e}")
 

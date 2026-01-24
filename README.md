@@ -1,7 +1,7 @@
 # ParFix & Archive Utility
 
 A lightweight web utility for **Repairing** and **Creating** archives, managing
-files, and syncing to the cloud. Now features a professional **Media Catalog** and **Data Bridge**.
+files, and syncing to the cloud. Now features a professional **Media Catalog**, **Data Bridge**, and **Automation Engine**.
 
 ## Features
 
@@ -40,6 +40,14 @@ A built-in "Personal Netflix" to organize your archived media.
 - **JDownloader Ready:** "Copy Links (JD)" button copies all asset URLs to clipboard for easy downloading.
 - **Poster Images:** Upload poster images or paste URLs. Images are securely stored and synced.
 - **Data Sync Bridge:** Securely backup your private catalog and images to a **Private GitHub Repository** while keeping the application code public.
+
+### 🤖 Automation Engine (New!)
+A powerful workflow system for "One-Click DevOps".
+- **Visual Pipelines:** Create custom workflows like "Pack -> Upload -> Catalog".
+- **Intelligent Analysis:** Scans source folders for cover images (`cover.jpg`) and builds a detailed file tree for indexing.
+- **Stealth Mode:** Obfuscate filenames and release titles with **Base64 Encoding** for privacy.
+- **Smart Cataloging:** Automatically adds processed items to your library, tagging them as "No-Cover" if artwork is missing.
+- **Pre-Flight Checks:** Blocks execution if Data Sync is not configured, ensuring data safety.
 
 ### ☁️ Cloud File Manager (Professional)
 Transform your VPS into a Cloud Manager. No FUSE required.
@@ -279,6 +287,13 @@ Protect your private data (`catalog.db` and images) without exposing it in the p
 3. Select Format (e.g., **ISO**, **7z**, **Zip**).
 4. Select Compression Level (Store to Ultra).
 5. Click **"Start Compression"**.
+
+### Running Automation Workflows
+1. Click **Automation** in the sidebar.
+2. **Create Workflow:** Define a pipeline (e.g., Analyze -> Pack -> Publish -> Catalog).
+3. **Configure:** Set Repo, Tag Format (`v{date}`), and Obfuscation (Base64) options.
+4. Go to **Files**, select a folder, and click **Run Automation**.
+5. ParFix handles the rest, including smart cover detection and syncing.
 
 ### Cloud Upload
 1. Select the file(s) or folder(s) you want to upload.

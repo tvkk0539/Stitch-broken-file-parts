@@ -409,8 +409,11 @@ class CatalogManager:
             logger.error(f"Fetch metadata error: {e}")
             return {'error': str(e)}
 
-    def save_image(self, file_obj, optimize=True):
-        """Saves image to data/assets/images and returns filename."""
+    def save_image(self, file_obj, optimize=True, is_local_path=False):
+        """
+        Saves image to data/assets/images and returns filename.
+        file_obj: FileStorage object OR path string (if is_local_path=True)
+        """
         try:
             if SyncManager.is_configured():
                 base_dir = os.path.join(SyncManager.DATA_DIR, "assets", "images")
@@ -419,7 +422,14 @@ class CatalogManager:
 
             os.makedirs(base_dir, exist_ok=True)
 
-            ext = os.path.splitext(file_obj.filename)[1].lower()
+            # Determine extension and input source
+            if is_local_path:
+                original_filename = os.path.basename(file_obj)
+                source_path = file_obj
+            else:
+                original_filename = file_obj.filename
+
+            ext = os.path.splitext(original_filename)[1].lower()
             if optimize:
                 ext = '.jpg'
             elif ext not in ['.jpg', '.jpeg', '.png', '.webp']:
@@ -429,7 +439,7 @@ class CatalogManager:
             file_path = os.path.join(base_dir, filename)
 
             if optimize:
-                img = Image.open(file_obj)
+                img = Image.open(source_path if is_local_path else file_obj)
                 if img.mode in ("RGBA", "P"): img = img.convert("RGB")
 
                 max_width = 800
@@ -440,7 +450,11 @@ class CatalogManager:
 
                 img.save(file_path, "JPEG", quality=90)
             else:
-                file_obj.save(file_path)
+                if is_local_path:
+                    import shutil
+                    shutil.copy2(source_path, file_path)
+                else:
+                    file_obj.save(file_path)
 
             if SyncManager.is_configured():
                 SyncManager.push_data(f"Added image asset: {filename}")
