@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from app.managers.sync import SyncManager
 from app.managers.github_tool import GitHubManager # Needed for fetch logic
+from werkzeug.utils import secure_filename
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +89,11 @@ class CatalogManager:
             return True
         return False
 
-    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None):
+    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None):
         """
         Creates a new catalog entry dictionary.
         Assets: List of {name, size, url}
+        Image: Path to local image (relative to data/ or static/)
         """
         if tags is None:
             tags = []
@@ -109,7 +111,8 @@ class CatalogManager:
             "created_at": datetime.utcnow().isoformat() + "Z",
             "tags": tags,
             "is_encrypted": is_encrypted,
-            "assets": assets # New field
+            "assets": assets,
+            "image": image # Path to local image
         }
         return entry
 
@@ -191,6 +194,52 @@ class CatalogManager:
         except Exception as e:
             logger.error(f"Fetch metadata error: {e}")
             return {'error': str(e)}
+
+    def save_image(self, file_obj):
+        """
+        Saves an uploaded image to the data/assets/images directory.
+        Returns the relative path to store in catalog.
+        """
+        try:
+            # Determine base dir: 'data/assets/images' if sync enabled, else 'static/images/catalog' ?
+            # User wants Sync enabled assets.
+
+            if SyncManager.is_configured():
+                base_dir = os.path.join(SyncManager.DATA_DIR, "assets", "images")
+            else:
+                # Fallback to local data folder (ignored by git)
+                base_dir = os.path.join("data", "assets", "images")
+
+            os.makedirs(base_dir, exist_ok=True)
+
+            # Generate safe name
+            ext = os.path.splitext(file_obj.filename)[1].lower()
+            if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
+                ext = '.jpg'
+
+            filename = f"{uuid.uuid4()}{ext}"
+            file_path = os.path.join(base_dir, filename)
+
+            file_obj.save(file_path)
+
+            # Trigger Sync if configured (to back up the image)
+            if SyncManager.is_configured():
+                SyncManager.push_data(f"Added image asset: {filename}")
+
+            # Return relative path for API serving
+            # We will serve via /api/catalog/image/<filename> which maps to this dir
+            return filename
+
+        except Exception as e:
+            logger.error(f"Save image error: {e}")
+            return None
+
+    def get_image_path(self, filename):
+        """Resolves the absolute path for an image filename."""
+        if SyncManager.is_configured():
+            return os.path.join(SyncManager.DATA_DIR, "assets", "images", filename)
+        else:
+            return os.path.join("data", "assets", "images", filename)
 
     def _human_readable_size(self, size, decimal_places=2):
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:

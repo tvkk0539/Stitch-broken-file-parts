@@ -122,15 +122,24 @@ const catalog = {
             const card = document.createElement('div');
             card.className = 'catalog-card';
 
-            // Placeholder for image (using First Letter)
-            const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
+            // Image Logic
+            let imageHtml = '';
+            if (item.image) {
+                // If it looks like a filename (UUID.jpg), serve local. Else remote URL.
+                const imgSrc = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
+                imageHtml = `<img src="${imgSrc}" style="width:100%; height:100%; object-fit:cover;">`;
+            } else {
+                // Placeholder
+                const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
+                imageHtml = `<span>${initial}</span>`;
+            }
 
             // Format Category Breadcrumbs
             const catDisplay = item.category ? item.category.replace(/\//g, ' › ') : 'Uncategorized';
 
             card.innerHTML = `
                 <div class="catalog-card-image">
-                    <span>${initial}</span>
+                    ${imageHtml}
                 </div>
                 <div class="catalog-card-content">
                     <div class="catalog-card-title">${item.title}</div>
@@ -147,8 +156,15 @@ const catalog = {
         const modal = document.getElementById('catalog-detail-modal');
         const content = document.getElementById('catalog-detail-content');
 
-        // Initial for poster
-        const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
+        // Image Logic for Detail
+        let posterHtml = '';
+        if (item.image) {
+            const imgSrc = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
+            posterHtml = `<img src="${imgSrc}" style="width:100%; height:100%; object-fit:cover;">`;
+        } else {
+            const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
+            posterHtml = `<span>${initial}</span>`;
+        }
 
         // Check for assets
         let extraActions = '';
@@ -176,7 +192,7 @@ const catalog = {
         content.innerHTML = `
             <div class="catalog-hero">
                 <div class="catalog-poster">
-                    <span>${initial}</span>
+                    ${posterHtml}
                 </div>
                 <div class="catalog-info">
                     <h1>${item.title}</h1>
@@ -228,6 +244,8 @@ const catalog = {
         document.getElementById('cat-add-title').value = '';
         document.getElementById('cat-add-category').value = '';
         document.getElementById('cat-add-tags').value = '';
+        document.getElementById('cat-add-image-text').value = '';
+        document.getElementById('cat-add-image-file').value = ''; // Reset file input
         document.getElementById('cat-add-url').value = '';
         document.getElementById('cat-add-filename').value = '';
         document.getElementById('cat-add-size').value = '0';
@@ -269,13 +287,43 @@ const catalog = {
         }
     },
 
-    submitAdd: () => {
+    submitAdd: async () => {
         const title = document.getElementById('cat-add-title').value;
         const url = document.getElementById('cat-add-url').value;
         const cat = document.getElementById('cat-add-category').value || 'General';
         const tagsRaw = document.getElementById('cat-add-tags').value;
         const filename = document.getElementById('cat-add-filename').value || 'Unknown';
         const size = parseInt(document.getElementById('cat-add-size').value) || 0;
+
+        // Image Handling
+        const imgText = document.getElementById('cat-add-image-text').value;
+        const imgFile = document.getElementById('cat-add-image-file').files[0];
+        let imagePath = imgText; // Default to text/url
+
+        if (!title || !url) {
+            alert("Title and URL are required.");
+            return;
+        }
+
+        // Upload Image if File Selected
+        if(imgFile) {
+            try {
+                const fd = new FormData();
+                fd.append('file', imgFile);
+                showToast("Uploading Image...");
+                const res = await fetch('/api/catalog/upload-image', {method:'POST', body:fd});
+                const d = await res.json();
+                if(d.status === 'success') {
+                    imagePath = d.filename;
+                } else {
+                    alert("Image Upload Failed: " + d.error);
+                    return;
+                }
+            } catch(e) {
+                alert("Image Upload Error: " + e);
+                return;
+            }
+        }
 
         // Parse Tags
         const tags = tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0);
@@ -287,11 +335,6 @@ const catalog = {
             if(raw) assets = JSON.parse(raw);
         } catch(e) {}
 
-        if (!title || !url) {
-            alert("Title and URL are required.");
-            return;
-        }
-
         catalog.manualAdd({
             title: title,
             url: url,
@@ -299,7 +342,8 @@ const catalog = {
             tags: tags,
             file_name: filename,
             size_bytes: size,
-            assets: assets
+            assets: assets,
+            image: imagePath
         });
 
         document.getElementById('catalog-add-modal').style.display = 'none';

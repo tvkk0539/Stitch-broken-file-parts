@@ -100,6 +100,30 @@ def catalog_fetch_metadata():
 
     return jsonify(catalog_manager.fetch_github_metadata(url))
 
+@bp.route('/api/catalog/upload-image', methods=['POST'])
+def catalog_upload_image():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    filename = catalog_manager.save_image(file)
+    if filename:
+        return jsonify({'status': 'success', 'filename': filename})
+    else:
+        return jsonify({'error': 'Failed to save image'}), 500
+
+@bp.route('/api/catalog/image/<filename>')
+def catalog_serve_image(filename):
+    """Serves the image from the secure data directory."""
+    abs_path = catalog_manager.get_image_path(filename)
+    if os.path.exists(abs_path):
+        from flask import send_file
+        return send_file(abs_path)
+    else:
+        return jsonify({'error': 'Image not found'}), 404
+
 @bp.route('/api/catalog/<item_id>', methods=['DELETE'])
 def delete_catalog_item(item_id):
     """Delete an item from the catalog."""

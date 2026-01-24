@@ -570,6 +570,15 @@
                 <input type="text" id="cat-add-tags" placeholder="4K, HDR, Lossless, 2024">
             </div>
             <div class="form-group">
+                <label>Poster Image (Optional)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="file" id="cat-add-image-file" style="display:none;" onchange="document.getElementById('cat-add-image-text').value = this.files[0].name">
+                    <button onclick="document.getElementById('cat-add-image-file').click()" class="secondary" style="flex:0; white-space:nowrap;">📁 Upload</button>
+                    <input type="text" id="cat-add-image-text" placeholder="Or paste URL here..." style="flex:1;">
+                </div>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Upload a file to store securely, or paste a public URL.</div>
+            </div>
+            <div class="form-group">
                 <label>Download URL (GitHub Release)</label>
                 <div style="display:flex; gap:10px;">
                     <input type="text" id="cat-add-url" placeholder="https://github.com/user/repo/releases/tag/v1.0">
