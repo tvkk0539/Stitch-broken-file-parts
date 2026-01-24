@@ -561,17 +561,22 @@
                 <input type="text" id="cat-add-category" placeholder="Movies, Games, Archives...">
             </div>
             <div class="form-group">
-                <label>Download URL</label>
-                <input type="text" id="cat-add-url" placeholder="https://github.com/...">
+                <label>Download URL (GitHub Release)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="cat-add-url" placeholder="https://github.com/user/repo/releases/tag/v1.0">
+                    <button class="secondary" onclick="catalog.fetchMetadata()" style="flex:0; white-space:nowrap;">Fetch Details</button>
+                </div>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Click Fetch to auto-fill Size, Name and gather all file links.</div>
             </div>
             <div class="form-group">
-                <label>Filename (Optional)</label>
+                <label>Filename (Auto)</label>
                 <input type="text" id="cat-add-filename" placeholder="Data_01.rar">
             </div>
              <div class="form-group">
-                <label>Size (Bytes) (Optional)</label>
+                <label>Size (Bytes) (Auto)</label>
                 <input type="number" id="cat-add-size" value="0">
             </div>
+            <input type="hidden" id="cat-add-assets">
             <div class="modal-actions">
                 <button onclick="document.getElementById('catalog-add-modal').style.display='none'" class="danger">Cancel</button>
                 <button onclick="catalog.submitAdd()" class="secondary">Add Item</button>

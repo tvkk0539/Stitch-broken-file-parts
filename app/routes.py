@@ -83,13 +83,22 @@ def add_catalog_item():
         url=data.get('url'),
         category=data.get('category', 'General'),
         tags=data.get('tags', []),
-        is_encrypted=data.get('is_encrypted', True)
+        is_encrypted=data.get('is_encrypted', True),
+        assets=data.get('assets', [])
     )
 
     if catalog_manager.add_entry(entry):
         return jsonify({'status': 'success', 'entry': entry})
     else:
         return jsonify({'status': 'error', 'message': 'Failed to save'}), 500
+
+@bp.route('/api/catalog/fetch-metadata', methods=['POST'])
+def catalog_fetch_metadata():
+    data = request.json
+    url = data.get('url')
+    if not url: return jsonify({'error': 'URL required'}), 400
+
+    return jsonify(catalog_manager.fetch_github_metadata(url))
 
 @bp.route('/api/catalog/<item_id>', methods=['DELETE'])
 def delete_catalog_item(item_id):

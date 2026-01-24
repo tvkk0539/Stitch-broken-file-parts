@@ -81,6 +81,20 @@ const catalog = {
         // Initial for poster
         const initial = item.title ? item.title.charAt(0).toUpperCase() : '?';
 
+        // Check for assets
+        let extraActions = '';
+        let fileInfo = `Filename: <code>${item.file_name}</code>`;
+
+        if (item.assets && item.assets.length > 0) {
+            fileInfo = `Contains <strong>${item.assets.length}</strong> files. Total Size: <strong>${item.size_human}</strong>`;
+            // Add Copy Links button
+            extraActions = `
+                <button onclick="catalog.copyLinks('${item.id}')" class="btn btn-info btn-lg" title="Copy all links for JDownloader">
+                    📋 Copy Links (JD)
+                </button>
+            `;
+        }
+
         content.innerHTML = `
             <div class="catalog-hero">
                 <div class="catalog-poster">
@@ -97,15 +111,16 @@ const catalog = {
 
                     <p class="catalog-desc">
                         Securely archived in your private library.
-                        Filename: <code>${item.file_name}</code>
+                        <br>${fileInfo}
                     </p>
 
                     <div class="catalog-actions">
                         <a href="${item.release_url}" target="_blank" class="btn btn-primary btn-lg">
-                            <i class="fas fa-download"></i> Download Archive
+                            <i class="fas fa-download"></i> Open Release
                         </a>
+                        ${extraActions}
                         <button onclick="catalog.deleteItem('${item.id}')" class="btn btn-danger">
-                            <i class="fas fa-trash"></i> Remove from Catalog
+                            <i class="fas fa-trash"></i> Remove
                         </button>
                     </div>
                 </div>
@@ -113,6 +128,16 @@ const catalog = {
         `;
 
         modal.classList.add('active');
+    },
+
+    copyLinks: (id) => {
+        const item = catalog.state.items.find(x => x.id === id);
+        if(!item || !item.assets) return;
+
+        const links = item.assets.map(a => a.url).join('\n');
+        navigator.clipboard.writeText(links).then(() => {
+            alert(`Copied ${item.assets.length} links to clipboard! Paste into JDownloader.`);
+        });
     },
 
     closeDetail: () => {
@@ -125,6 +150,42 @@ const catalog = {
         document.getElementById('cat-add-url').value = '';
         document.getElementById('cat-add-filename').value = '';
         document.getElementById('cat-add-size').value = '0';
+        document.getElementById('cat-add-assets').value = ''; // Clear hidden assets
+    },
+
+    fetchMetadata: async () => {
+        const url = document.getElementById('cat-add-url').value;
+        if(!url) { alert("Please enter a GitHub Release URL first."); return; }
+
+        const btn = document.querySelector('#catalog-add-modal button.secondary'); // fetch btn
+        const originalText = btn.textContent;
+        btn.textContent = "Fetching...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/catalog/fetch-metadata', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ url: url })
+            });
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                document.getElementById('cat-add-title').value = data.title;
+                document.getElementById('cat-add-size').value = data.total_size;
+                document.getElementById('cat-add-filename').value = `${data.file_count} Files`;
+                // Store assets JSON in hidden field
+                document.getElementById('cat-add-assets').value = JSON.stringify(data.assets);
+                showToast(`Fetched ${data.file_count} files!`);
+            } else {
+                alert("Fetch Error: " + data.error);
+            }
+        } catch(e) {
+            alert("Fetch Failed: " + e);
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
     },
 
     submitAdd: () => {
@@ -133,6 +194,13 @@ const catalog = {
         const cat = document.getElementById('cat-add-category').value || 'General';
         const filename = document.getElementById('cat-add-filename').value || 'Unknown';
         const size = parseInt(document.getElementById('cat-add-size').value) || 0;
+
+        // Parse hidden assets
+        let assets = [];
+        try {
+            const raw = document.getElementById('cat-add-assets').value;
+            if(raw) assets = JSON.parse(raw);
+        } catch(e) {}
 
         if (!title || !url) {
             alert("Title and URL are required.");
@@ -144,7 +212,8 @@ const catalog = {
             url: url,
             category: cat,
             file_name: filename,
-            size_bytes: size
+            size_bytes: size,
+            assets: assets
         });
 
         document.getElementById('catalog-add-modal').style.display = 'none';

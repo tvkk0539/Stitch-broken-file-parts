@@ -4,6 +4,7 @@ import uuid
 import logging
 from datetime import datetime
 from app.managers.sync import SyncManager
+from app.managers.github_tool import GitHubManager # Needed for fetch logic
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +88,15 @@ class CatalogManager:
             return True
         return False
 
-    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True):
+    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None):
         """
         Creates a new catalog entry dictionary.
+        Assets: List of {name, size, url}
         """
         if tags is None:
             tags = []
+        if assets is None:
+            assets = []
 
         entry = {
             "id": str(uuid.uuid4()),
@@ -104,7 +108,8 @@ class CatalogManager:
             "release_url": url,
             "created_at": datetime.utcnow().isoformat() + "Z",
             "tags": tags,
-            "is_encrypted": is_encrypted
+            "is_encrypted": is_encrypted,
+            "assets": assets # New field
         }
         return entry
 
@@ -113,6 +118,79 @@ class CatalogManager:
         # Prepend to list so newest is first
         self.catalog.insert(0, entry)
         return self.save_catalog()
+
+    def fetch_github_metadata(self, url):
+        """
+        Fetches release details from a GitHub Release URL.
+        Returns: { title, total_size, assets_list, release_tag }
+        """
+        try:
+            # 1. Parse URL to get Repo and Tag
+            # Format: https://github.com/user/repo/releases/tag/v1.0.0
+            if "github.com" not in url or "releases" not in url:
+                return {'error': 'Invalid GitHub Release URL'}
+
+            parts = url.replace("https://github.com/", "").split('/')
+            owner, repo = parts[0], parts[1]
+
+            # Find tag
+            tag = None
+            if "tag" in parts:
+                tag_idx = parts.index("tag")
+                if len(parts) > tag_idx + 1:
+                    tag = parts[tag_idx + 1]
+            elif "download" in parts:
+                 # It's a file link? Try to infer release from context or fail
+                 return {'error': 'Please provide the Release page URL (ends with /tag/version)'}
+
+            # 2. Use GitHubManager to fetch releases
+            repo_url = f"https://github.com/{owner}/{repo}"
+            releases = GitHubManager.get_releases(repo_url)
+
+            if isinstance(releases, dict) and 'error' in releases:
+                return releases
+
+            # 3. Find the matching release
+            target_release = None
+            if tag:
+                for r in releases:
+                    if r['tag'] == tag:
+                        target_release = r
+                        break
+            else:
+                # If no tag in URL, maybe latest? Assuming user gave releases page?
+                # Safer to require tag or pick first if user gave base releases url
+                if releases:
+                    target_release = releases[0]
+
+            if not target_release:
+                return {'error': 'Release not found'}
+
+            # 4. Process Assets
+            total_size = 0
+            assets_out = []
+
+            for asset in target_release['assets']:
+                size = asset['size']
+                total_size += size
+                assets_out.append({
+                    'name': asset['name'],
+                    'size': size,
+                    'url': asset['download_url']
+                })
+
+            return {
+                'status': 'success',
+                'title': f"{repo} - {target_release['name'] or target_release['tag']}",
+                'total_size': total_size,
+                'file_count': len(assets_out),
+                'assets': assets_out,
+                'tag': target_release['tag']
+            }
+
+        except Exception as e:
+            logger.error(f"Fetch metadata error: {e}")
+            return {'error': str(e)}
 
     def _human_readable_size(self, size, decimal_places=2):
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
