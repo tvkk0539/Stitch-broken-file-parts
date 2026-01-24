@@ -53,22 +53,63 @@ function addWorkflowStepUI() {
     stepDiv.style.marginBottom = '10px';
     stepDiv.style.border = '1px solid var(--border-color)';
 
+    // We only support the specific "Gh Uploads to Index" pipeline for now
+    // So we pre-fill or simplify. But flexibility is better.
+    // Let's allow selecting "Analyze Source" which is crucial.
+
     stepDiv.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-            <select class="wf-step-type" style="width:auto;">
-                <option value="pack">Pack (Archive)</option>
-                <option value="github_publish">GitHub Publish</option>
-                <option value="catalog_add">Add to Catalog</option>
+            <select class="wf-step-type" style="width:auto;" onchange="updateStepConfigUI(this)">
+                <option value="analyze_source">1. Analyze Source (Pre-Index)</option>
+                <option value="pack">2. Pack (Archive)</option>
+                <option value="github_publish">3. GitHub Publish</option>
+                <option value="catalog_add">4. Add to Catalog</option>
             </select>
             <button class="danger" onclick="this.parentElement.parentElement.remove()" style="padding:2px 8px; font-size:0.8em; flex:0;">X</button>
         </div>
-        <div class="wf-step-config">
-            <!-- Config fields based on type -->
-            <input type="text" class="wf-conf-1" placeholder="Config 1 (e.g. Split Size)">
-            <input type="text" class="wf-conf-2" placeholder="Config 2 (e.g. Repo)">
+        <div class="wf-step-config" style="display:flex; gap:5px;">
+            <input type="text" class="wf-conf-1" placeholder="Config 1">
+            <input type="text" class="wf-conf-2" placeholder="Config 2">
+            <input type="text" class="wf-conf-3" placeholder="Config 3">
+        </div>
+        <div class="wf-step-desc" style="font-size:0.8em; color:gray; margin-top:5px;">
+            Select a step type to see details.
         </div>
     `;
     container.appendChild(stepDiv);
+    // Trigger update to show correct placeholders
+    updateStepConfigUI(stepDiv.querySelector('.wf-step-type'));
+}
+
+function updateStepConfigUI(select) {
+    const type = select.value;
+    const container = select.closest('.wf-step');
+    const c1 = container.querySelector('.wf-conf-1');
+    const c2 = container.querySelector('.wf-conf-2');
+    const c3 = container.querySelector('.wf-conf-3');
+    const desc = container.querySelector('.wf-step-desc');
+
+    c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
+
+    if (type === 'analyze_source') {
+        c1.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none';
+        desc.textContent = "Scans folder, builds file tree, calculates original sizes.";
+    } else if (type === 'pack') {
+        c1.placeholder = "Split (e.g. 1024M)";
+        c2.placeholder = "Naming (part001)";
+        c3.style.display = 'none';
+        desc.textContent = "Creates split RAR archives with Recovery Record.";
+    } else if (type === 'github_publish') {
+        c1.placeholder = "Repo (user/repo)";
+        c2.placeholder = "Account ID (See GitHub App)";
+        c3.placeholder = "Tag (v{date}_{name})";
+        desc.textContent = "Uploads archives to Release. Embeds Analysis Tree in Body.";
+    } else if (type === 'catalog_add') {
+        c1.placeholder = "Category (Movies/4K)";
+        c2.placeholder = "Priority (2=High, 1=Normal)";
+        c3.style.display = 'none';
+        desc.textContent = "Adds to local index with download links and syncs to bridge.";
+    }
 }
 
 async function saveWorkflow() {
@@ -80,14 +121,15 @@ async function saveWorkflow() {
         const type = div.querySelector('.wf-step-type').value;
         const conf1 = div.querySelector('.wf-conf-1').value;
         const conf2 = div.querySelector('.wf-conf-2').value;
+        const conf3 = div.querySelector('.wf-conf-3').value;
 
         let config = {};
         if(type === 'pack') {
-            config = { split: conf1 || '1024M', naming: 'part001', format: 'rar' };
+            config = { split: conf1 || '1024M', naming: conf2 || 'part001', format: 'rar', recovery: true };
         } else if(type === 'github_publish') {
-            config = { repo: conf1, tag_template: conf2 };
+            config = { repo: conf1, account_id: conf2, tag_template: conf3 || 'v{date}_{name}' };
         } else if(type === 'catalog_add') {
-            config = { category: conf1, priority: 1 };
+            config = { category: conf1 || 'General', priority: parseInt(conf2) || 1 };
         }
 
         steps.push({ type: type, config: config });
