@@ -63,8 +63,8 @@ function addWorkflowStepUI() {
                 <option value="analyze_source">1. Analyze Source (Pre-Index)</option>
                 <option value="pack">2. Pack (Archive)</option>
                 <option value="github_publish">3. GitHub Publish</option>
-                <option value="enrich_metadata">3b. Enrich Metadata (Text/URL)</option>
-                <option value="catalog_add">4. Add to Catalog</option>
+                <option value="enrich_metadata">4. Enrich Metadata (Text/URL)</option>
+                <option value="catalog_add">5. Add to Catalog</option>
             </select>
             <button class="danger" onclick="this.parentElement.parentElement.remove()" style="padding:2px 8px; font-size:0.8em; flex:0;">X</button>
         </div>

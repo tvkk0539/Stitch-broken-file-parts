@@ -138,17 +138,20 @@
                 <div style="display: flex; height: 100%;">
 
                     <!-- Catalog Sidebar -->
-                    <div id="catalog-sidebar" style="width: 250px; background: var(--bg-dark); border-right: 1px solid var(--border-color); display: flex; flex-direction: column;">
-                        <div style="padding: 20px; border-bottom: 1px solid var(--border-color);">
-                            <h3 style="margin: 0;">Library</h3>
-                        </div>
-                        <div style="padding: 10px; overflow-y: auto; flex: 1;">
-                             <div class="cat-sidebar-item active" onclick="catalog.filterCategory(null)">
-                                All Categories
-                             </div>
-                             <div id="catalog-categories-list">
-                                <!-- JS Injected -->
-                             </div>
+                    <div id="catalog-sidebar" style="width: 0px; background: var(--bg-dark); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transition: width 0.3s ease; overflow: hidden;">
+                        <div style="min-width: 250px; display: flex; flex-direction: column; height: 100%;">
+                            <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                                <h3 style="margin: 0;">Library</h3>
+                                <button class="icon-btn" onclick="catalog.toggleSidebar()" title="Close">✖</button>
+                            </div>
+                            <div style="padding: 10px; overflow-y: auto; flex: 1;">
+                                 <div class="cat-sidebar-item active" onclick="catalog.filterCategory(null)">
+                                    All Categories
+                                 </div>
+                                 <div id="catalog-categories-list">
+                                    <!-- JS Injected -->
+                                 </div>
+                            </div>
                         </div>
                     </div>
 
@@ -158,6 +161,7 @@
                         <!-- Header (Search & Actions) -->
                         <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
                              <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
+                                <button class="secondary" onclick="catalog.toggleSidebar()" title="Toggle Library" style="padding: 8px 12px;">📚 Library</button>
                                 <input type="text" id="catalog-search" placeholder="Search..."
                                    onkeyup="catalog.filter(this.value)"
                                    style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:300px;">

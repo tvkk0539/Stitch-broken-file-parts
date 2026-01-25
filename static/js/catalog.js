@@ -701,6 +701,17 @@ const catalog = {
         } catch (e) {
             alert("Add failed: " + e);
         }
+    },
+
+    toggleSidebar: () => {
+        const sb = document.getElementById('catalog-sidebar');
+        if (!sb) return;
+
+        if (sb.style.width === '0px' || sb.style.width === '') {
+            sb.style.width = '250px';
+        } else {
+            sb.style.width = '0px';
+        }
     }
 };
 
