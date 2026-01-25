@@ -541,6 +541,31 @@ button.icon-btn {
     padding-bottom: 40px;
 }
 
+/* Updated Scrollable Header for Catalog */
+#catalog-header-container {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    overflow-x: auto; /* Enable horizontal scrolling */
+    white-space: nowrap; /* Prevent wrapping */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) var(--sidebar-bg);
+}
+
+/* Webkit Scrollbar for Header */
+#catalog-header-container::-webkit-scrollbar {
+    height: 6px;
+}
+#catalog-header-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+#catalog-header-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 #catalog-header-filters::-webkit-scrollbar {
     height: 4px;
 }
