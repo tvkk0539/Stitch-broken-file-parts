@@ -76,10 +76,10 @@ function editWorkflow(id) {
         const cLong = stepDiv.querySelector('.wf-conf-long');
 
         if (step.type === 'pack') {
-             c1.value = conf.split.replace('M',''); // 1024M -> 1024 (Select uses values like 1024M though)
-             if(c1.tagName === 'SELECT') c1.value = conf.split;
-             c2.value = conf.naming || '';
-             c3.value = conf.obfuscate || '';
+             c1.value = conf.split || '1024M';
+             c2.value = conf.naming || 'part001';
+             // Convert boolean/string to select string
+             c3.value = (conf.obfuscate === true || conf.obfuscate === 'true') ? 'true' : 'false';
         } else if (step.type === 'github_publish') {
              c1.value = conf.repo || '';
              c2.value = conf.account_id || '';
@@ -102,10 +102,6 @@ function addWorkflowStepUI() {
     stepDiv.style.padding = '10px';
     stepDiv.style.marginBottom = '10px';
     stepDiv.style.border = '1px solid var(--border-color)';
-
-    // We only support the specific "Gh Uploads to Index" pipeline for now
-    // So we pre-fill or simplify. But flexibility is better.
-    // Let's allow selecting "Analyze Source" which is crucial.
 
     stepDiv.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
@@ -137,66 +133,103 @@ function addWorkflowStepUI() {
 function updateStepConfigUI(select) {
     const type = select.value;
     const container = select.closest('.wf-step');
-    const c1 = container.querySelector('.wf-conf-1');
-    const c2 = container.querySelector('.wf-conf-2');
-    const c3 = container.querySelector('.wf-conf-3');
+    let c1 = container.querySelector('.wf-conf-1');
+    let c2 = container.querySelector('.wf-conf-2');
+    let c3 = container.querySelector('.wf-conf-3');
     const cLong = container.querySelector('.wf-conf-long');
     const desc = container.querySelector('.wf-step-desc');
 
     c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
     if(cLong) cLong.style.display = 'none';
 
-    // Create Select for Split Size if Pack
-    if (type === 'pack' && c1.tagName !== 'SELECT') {
-        // Replace Input with Select
-        const sel = document.createElement('select');
-        sel.className = 'wf-conf-1';
-        sel.innerHTML = `
-            <option value="100M">100MB</option>
-            <option value="500M">500MB</option>
-            <option value="1024M" selected>1GB</option>
-            <option value="2048M">2GB</option>
-            <option value="5120M">5GB</option>
-        `;
-        c1.replaceWith(sel);
-    }
-
-    // Re-query in case we replaced it
-    const c1_new = container.querySelector('.wf-conf-1');
-
-    if (type === 'analyze_source') {
-        c1_new.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none';
-        desc.textContent = "Scans folder, builds file tree, calculates original sizes.";
-    } else if (type === 'pack') {
-        c1_new.style.display = 'block'; // Ensure select is visible
-        c2.placeholder = "Naming (part001)";
-        c3.placeholder = "Obfuscate Filename? (true/false)";
-        c3.style.display = 'block';
-        desc.textContent = "Creates split RAR archives. Obfuscation uses Base64 filenames.";
-    } else if (type === 'github_publish') {
-        // If coming from pack, we need to revert Select to Input?
-        if (c1_new.tagName === 'SELECT') {
+    // --- Helpers for Dynamic UI Swapping ---
+    const ensureInput = (el) => {
+        if (el.tagName === 'SELECT') {
             const inp = document.createElement('input');
             inp.type = 'text';
-            inp.className = 'wf-conf-1';
-            c1_new.replaceWith(inp);
+            inp.className = el.className;
+            el.replaceWith(inp);
+            return inp;
         }
-        const c1_final = container.querySelector('.wf-conf-1');
+        return el;
+    };
 
-        c1_final.placeholder = "Repo (user/repo)";
+    const ensureSelect = (el, optionsHTML) => {
+        // Always replace to ensure correct options for the selected type
+        const sel = document.createElement('select');
+        sel.className = el.className;
+        sel.innerHTML = optionsHTML;
+        // Basic style fix for selects
+        sel.style.background = '#1a1b26';
+        sel.style.color = '#c0caf5';
+        sel.style.border = '1px solid #414868';
+        sel.style.padding = '5px';
+        sel.style.flex = '1';
+        el.replaceWith(sel);
+        return sel;
+    };
+
+    if (type === 'analyze_source') {
+        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
+        c1.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none';
+        desc.textContent = "Scans folder, builds file tree, calculates original sizes.";
+
+    } else if (type === 'pack') {
+        // Config 1: Split Size
+        // NOTE: We convert fractional GBs to MB for safe backend compatibility
+        const sizeOpts = `
+            <option value="1024M" selected>1 GB (Standard)</option>
+            <option value="1536M">1.5 GB</option>
+            <option value="2048M">2 GB</option>
+            <option value="2560M">2.5 GB</option>
+            <option value="3072M">3 GB</option>
+            <option value="3584M">3.5 GB</option>
+            <option value="4096M">4 GB</option>
+            <option value="4608M">4.5 GB</option>
+            <option value="5120M">5 GB</option>
+            <option disabled>--- Small ---</option>
+            <option value="200M">200 MB</option>
+            <option value="300M">300 MB</option>
+            <option value="400M">400 MB</option>
+            <option value="500M">500 MB</option>
+            <option value="600M">600 MB</option>
+            <option value="700M">700 MB</option>
+            <option value="800M">800 MB</option>
+            <option value="900M">900 MB</option>
+            <option disabled>--- Other ---</option>
+            <option value="0">No Split</option>
+        `;
+        c1 = ensureSelect(c1, sizeOpts);
+
+        // Config 2: Naming Scheme
+        const namingOpts = `
+            <option value="part1">part1.rar</option>
+            <option value="part01">part01.rar</option>
+            <option value="part001" selected>part001.rar (Scene)</option>
+        `;
+        c2 = ensureSelect(c2, namingOpts);
+
+        // Config 3: Obfuscation
+        const obfOpts = `
+            <option value="false" selected>No Obfuscation</option>
+            <option value="true">Base64 Scramble</option>
+        `;
+        c3 = ensureSelect(c3, obfOpts);
+
+        desc.textContent = "Creates split RAR archives. Select naming and obfuscation options.";
+
+    } else if (type === 'github_publish') {
+        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
+
+        c1.placeholder = "Repo (user/repo)";
         c2.placeholder = "Account ID (Number from GitHub App)";
         c3.placeholder = "Obfuscate Title? (true/false)";
         desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
-    } else if (type === 'enrich_metadata') {
-        if (c1_new.tagName === 'SELECT') {
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'wf-conf-1';
-            c1_new.replaceWith(inp);
-        }
-        const c1_final = container.querySelector('.wf-conf-1');
 
-        c1_final.placeholder = "Reference URL (e.g. IMDB/Wikipedia)";
+    } else if (type === 'enrich_metadata') {
+        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
+
+        c1.placeholder = "Reference URL (e.g. IMDB/Wikipedia)";
         c2.style.display = 'none';
         c3.style.display = 'none';
         if(cLong) cLong.style.display = 'block';
@@ -204,15 +237,9 @@ function updateStepConfigUI(select) {
         desc.textContent = "Injects custom URL and Long Description into the catalog entry.";
 
     } else if (type === 'catalog_add') {
-        if (c1_new.tagName === 'SELECT') {
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'wf-conf-1';
-            c1_new.replaceWith(inp);
-        }
-        const c1_final = container.querySelector('.wf-conf-1');
+        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
 
-        c1_final.placeholder = "Category (Movies/4K)";
+        c1.placeholder = "Category (Movies/4K)";
         c2.placeholder = "Priority (2=High, 1=Normal)";
         c3.style.display = 'none';
         desc.textContent = "Adds to local index with download links and syncs to bridge.";
