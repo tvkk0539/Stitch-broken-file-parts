@@ -320,14 +320,16 @@ class WorkflowManager:
         tree_b64 = base64.b64encode(meta.get('tree_text', '').encode('utf-8')).decode('utf-8')
 
         # Default Full Body (used for internal Catalog reference)
-        private_body = f"Auto-Upload via ParFix.\n\n**Original Structure (Base64):**\n`{tree_b64}`\n\n**Stats:**\nSize: {WorkflowManager._human_size(meta.get('total_size', 0))}\nFiles: {meta.get('file_count', 0)}"
+        stats_block = f"\n\n**Stats:**\nSize: {WorkflowManager._human_size(meta.get('total_size', 0))}\nFiles: {meta.get('file_count', 0)}"
+        private_body = f"Auto-Upload via ParFix.\n\n**Original Structure (Base64):**\n`{tree_b64}`{stats_block}"
 
         if content_mode == 'clean':
             body = ""
             log("📝 Release Content: Clean (Empty Body)")
         elif content_mode == 'tree_only':
-            body = tree_b64
-            log("📝 Release Content: Tree Only (Base64)")
+            # Raw Base64 + Stats
+            body = f"{tree_b64}{stats_block}"
+            log("📝 Release Content: Tree Only (Base64 + Stats)")
         else:
             # Standard
             body = private_body
