@@ -66,6 +66,26 @@ function openWorkflowModal() {
                 dl.appendChild(opt);
             });
         }).catch(e => console.error("Failed to load categories for modal", e));
+
+    // Inject Datalist for Tags if not exists
+    if(!document.getElementById('tag-datalist')) {
+        const dl = document.createElement('datalist');
+        dl.id = 'tag-datalist';
+        document.body.appendChild(dl);
+    }
+
+    // Fetch Tags for Datalist
+    fetch('/api/catalog/tags')
+        .then(r => r.json())
+        .then(tags => {
+            const dl = document.getElementById('tag-datalist');
+            dl.innerHTML = '';
+            tags.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                dl.appendChild(opt);
+            });
+        }).catch(e => console.error("Failed to load tags for modal", e));
 }
 
 function editWorkflow(id) {
@@ -111,6 +131,7 @@ function editWorkflow(id) {
         } else if (step.type === 'catalog_add') {
              c1.value = conf.category || '';
              c2.value = conf.priority || '1';
+             c3.value = conf.tags || ''; // Populate Tags
         }
     });
 }
@@ -170,6 +191,7 @@ function updateStepConfigUI(select) {
             inp.type = 'text';
             inp.className = el.className;
             if(listId) inp.setAttribute('list', listId);
+            else inp.removeAttribute('list');
             el.replaceWith(inp);
             return inp;
         }
@@ -265,7 +287,11 @@ function updateStepConfigUI(select) {
         `;
         c2 = ensureSelect(c2, priOpts);
 
-        c3.style.display = 'none';
+        // Config 3: Tags (Hybrid Datalist) - NEW
+        c3 = ensureInput(c3, 'tag-datalist');
+        c3.style.display = 'block';
+        c3.placeholder = "Tags (e.g. 4K, HDR)";
+
         desc.textContent = "Adds to local index with download links and syncs to bridge.";
     }
 }
@@ -304,7 +330,12 @@ async function saveWorkflow() {
                 description: confLong
             };
         } else if(type === 'catalog_add') {
-            config = { category: conf1 || 'General', priority: parseInt(conf2) || 1 };
+            // Include tags in config
+            config = {
+                category: conf1 || 'General',
+                priority: parseInt(conf2) || 1,
+                tags: conf3 // Capture tags string
+            };
         }
 
         steps.push({ type: type, config: config });

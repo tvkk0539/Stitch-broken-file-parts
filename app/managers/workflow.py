@@ -419,6 +419,12 @@ class WorkflowManager:
         if meta.get('missing_cover'):
             tags.append('No-Cover')
 
+        # Add User Defined Tags
+        user_tags_str = conf.get('tags', '')
+        if user_tags_str:
+            user_tags = [t.strip() for t in user_tags_str.split(',') if t.strip()]
+            tags.extend(user_tags)
+
         # Combine Description Sources
         # 1. GitHub Release Body (Auto - includes Tree)
         # 2. User Description (Manual - "Detailed explanation")
