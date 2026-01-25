@@ -541,6 +541,31 @@ button.icon-btn {
     padding-bottom: 40px;
 }
 
+/* Updated Scrollable Header for Catalog */
+#catalog-header-container {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    overflow-x: auto; /* Enable horizontal scrolling */
+    white-space: nowrap; /* Prevent wrapping */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) var(--sidebar-bg);
+}
+
+/* Webkit Scrollbar for Header */
+#catalog-header-container::-webkit-scrollbar {
+    height: 6px;
+}
+#catalog-header-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+#catalog-header-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 #catalog-header-filters::-webkit-scrollbar {
     height: 4px;
 }
@@ -939,4 +964,56 @@ button.icon-btn {
 
 .hero-btn-secondary:hover {
     background-color: rgba(109, 109, 110, 0.9);
+}
+
+/* --- Tag Tokenizer Styles --- */
+.tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    padding: 5px;
+    min-height: 38px;
+    box-sizing: border-box;
+    align-items: center;
+    flex: 1;
+}
+
+.tag-container:focus-within {
+    border-color: var(--accent-color);
+}
+
+.tag-pill {
+    background: #2f3549;
+    color: #c0caf5;
+    padding: 2px 8px;
+    border-radius: 0; /* Professional sharp edges as per theme */
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9em;
+    border: 1px solid #414868;
+}
+
+.tag-pill span {
+    cursor: pointer;
+    color: var(--error-color);
+    font-weight: bold;
+    padding: 0 2px;
+}
+
+.tag-pill span:hover {
+    color: #ff9e64;
+}
+
+.tag-input {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    color: #fff !important;
+    flex: 1;
+    min-width: 60px;
+    padding: 5px !important;
+    height: auto !important;
 }

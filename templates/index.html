@@ -159,22 +159,22 @@
                     <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
 
                         <!-- Header (Search & Actions) -->
-                        <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                             <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
-                                <button class="secondary" onclick="catalog.toggleSidebar()" title="Toggle Library" style="padding: 8px 12px;">📚 Library</button>
+                        <div id="catalog-header-container">
+                             <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 0;">
+                                <button class="secondary" onclick="catalog.toggleSidebar()" title="Toggle Library" style="padding: 8px 12px; flex-shrink: 0;">📚 Library</button>
                                 <input type="text" id="catalog-search" placeholder="Search..."
                                    onkeyup="catalog.filter(this.value)"
-                                   style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:300px;">
+                                   style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:300px; flex-shrink: 0;">
 
-                                <select id="catalog-tag-filter" onchange="catalog.filterTag(this.value)" style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px; border-radius:4px; width: 150px;">
+                                <select id="catalog-tag-filter" onchange="catalog.filterTag(this.value)" style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px; border-radius:4px; width: 150px; flex-shrink: 0;">
                                     <option value="">All Tags</option>
                                     <!-- JS Injected -->
                                 </select>
                              </div>
 
-                             <div style="display: flex; gap: 10px;">
-                                <button class="purple-btn" onclick="catalog.openAddModal()">+ Add Item</button>
-                                <button class="secondary" onclick="catalog.reload()">Refresh</button>
+                             <div style="display: flex; gap: 10px; margin-left: 20px;">
+                                <button class="purple-btn" onclick="catalog.openAddModal()" style="white-space:nowrap; flex-shrink: 0;">+ Add Item</button>
+                                <button class="secondary" onclick="catalog.reload()" style="flex-shrink: 0;">Refresh</button>
                              </div>
                         </div>
 

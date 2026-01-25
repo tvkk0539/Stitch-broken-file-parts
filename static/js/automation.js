@@ -46,14 +46,87 @@ function openWorkflowModal() {
     document.getElementById('wf-name').value = '';
     document.getElementById('wf-steps-container').innerHTML = '';
     document.querySelector('#workflow-modal h3').textContent = "Create Workflow";
+
+    // Inject Datalist for Categories if not exists
+    if(!document.getElementById('cat-datalist')) {
+        const dl = document.createElement('datalist');
+        dl.id = 'cat-datalist';
+        document.body.appendChild(dl);
+    }
+
+    // Fetch Categories for Datalist
+    fetch('/api/catalog/categories')
+        .then(r => r.json())
+        .then(cats => {
+            const dl = document.getElementById('cat-datalist');
+            dl.innerHTML = '';
+            cats.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                dl.appendChild(opt);
+            });
+        }).catch(e => console.error("Failed to load categories for modal", e));
+
+    // Inject Datalist for Tags if not exists
+    if(!document.getElementById('tag-datalist')) {
+        const dl = document.createElement('datalist');
+        dl.id = 'tag-datalist';
+        document.body.appendChild(dl);
+    }
+
+    // Fetch Tags for Datalist
+    fetch('/api/catalog/tags')
+        .then(r => r.json())
+        .then(tags => {
+            const dl = document.getElementById('tag-datalist');
+            dl.innerHTML = '';
+            tags.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                dl.appendChild(opt);
+            });
+        }).catch(e => console.error("Failed to load tags for modal", e));
+
+    // Inject Datalist for Repos if not exists
+    if(!document.getElementById('gh-repo-list')) {
+        const dl = document.createElement('datalist');
+        dl.id = 'gh-repo-list';
+        document.body.appendChild(dl);
+    }
+
+    // Inject Datalist for Accounts if not exists
+    if(!document.getElementById('gh-acc-list')) {
+        const dl = document.createElement('datalist');
+        dl.id = 'gh-acc-list';
+        document.body.appendChild(dl);
+    }
+
+    // Fetch Accounts for Datalist
+    fetch('/api/apps/github/accounts')
+        .then(r => r.json())
+        .then(accs => {
+            const dl = document.getElementById('gh-acc-list');
+            dl.innerHTML = '';
+            accs.forEach(a => {
+                // Option value is ID, but show Name for context
+                const opt = document.createElement('option');
+                // Standard Datalist: Value is what goes in box.
+                // We want ID in box.
+                opt.value = a.id;
+                opt.label = a.username;
+                dl.appendChild(opt);
+            });
+        }).catch(e => console.error("Failed to load accounts for modal", e));
 }
 
 function editWorkflow(id) {
     const wf = workflows.find(w => w.id === id);
     if (!wf) return;
 
+    // Ensure datalist is populated even in edit mode
+    openWorkflowModal(); // Re-use init logic (title/value override below)
+
     currentEditingId = id;
-    document.getElementById('workflow-modal').style.display = 'block';
     document.querySelector('#workflow-modal h3').textContent = "Edit Workflow";
     document.getElementById('wf-name').value = wf.name;
 
@@ -72,24 +145,37 @@ function editWorkflow(id) {
         const conf = step.config;
         const c1 = stepDiv.querySelector('.wf-conf-1');
         const c2 = stepDiv.querySelector('.wf-conf-2');
-        const c3 = stepDiv.querySelector('.wf-conf-3');
+        const c3 = stepDiv.querySelector('.wf-conf-3'); // This might be the tag container
+        const c4 = stepDiv.querySelector('.wf-conf-4');
         const cLong = stepDiv.querySelector('.wf-conf-long');
 
         if (step.type === 'pack') {
-             c1.value = conf.split.replace('M',''); // 1024M -> 1024 (Select uses values like 1024M though)
-             if(c1.tagName === 'SELECT') c1.value = conf.split;
-             c2.value = conf.naming || '';
-             c3.value = conf.obfuscate || '';
+             c1.value = conf.split || '1024M';
+             c2.value = conf.naming || 'part001';
+             c3.value = (conf.obfuscate === true || conf.obfuscate === 'true') ? 'true' : 'false';
         } else if (step.type === 'github_publish') {
              c1.value = conf.repo || '';
              c2.value = conf.account_id || '';
-             c3.value = conf.obfuscate_title || '';
+             c3.value = (conf.obfuscate_title === true || conf.obfuscate_title === 'true') ? 'true' : 'false';
+             if(c4) c4.value = (conf.include_metadata === false || conf.include_metadata === 'false') ? 'false' : 'true';
         } else if (step.type === 'enrich_metadata') {
              c1.value = conf.reference_url || '';
              if(cLong) cLong.value = conf.description || '';
         } else if (step.type === 'catalog_add') {
              c1.value = conf.category || '';
-             c2.value = conf.priority || '';
+             c2.value = conf.priority || '1';
+
+             // Populate Tag Tokenizer
+             // c3 is now a div.tag-container
+             // We need to re-initialize the tags inside it
+             const tags = (conf.tags || '').split(',').filter(t => t.trim());
+             // Clear existing pills except input
+             const input = c3.querySelector('.tag-input');
+             if(input) {
+                 c3.querySelectorAll('.tag-pill').forEach(p => p.remove());
+                 tags.forEach(t => addTagPill(c3, input, t.trim()));
+                 updateHiddenTagValue(c3);
+             }
         }
     });
 }
@@ -102,10 +188,6 @@ function addWorkflowStepUI() {
     stepDiv.style.padding = '10px';
     stepDiv.style.marginBottom = '10px';
     stepDiv.style.border = '1px solid var(--border-color)';
-
-    // We only support the specific "Gh Uploads to Index" pipeline for now
-    // So we pre-fill or simplify. But flexibility is better.
-    // Let's allow selecting "Analyze Source" which is crucial.
 
     stepDiv.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
@@ -122,6 +204,7 @@ function addWorkflowStepUI() {
             <input type="text" class="wf-conf-1" placeholder="Config 1" style="flex:1;">
             <input type="text" class="wf-conf-2" placeholder="Config 2" style="flex:1;">
             <input type="text" class="wf-conf-3" placeholder="Config 3" style="flex:1;">
+            <input type="text" class="wf-conf-4" placeholder="Config 4" style="flex:1; display:none;">
             <textarea class="wf-conf-long" placeholder="Description/Content" style="display:none; width:100%; height:100px; margin-top:5px; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; padding:10px;"></textarea>
         </div>
         <div class="wf-step-desc" style="font-size:0.8em; color:gray; margin-top:5px;">
@@ -134,87 +217,300 @@ function addWorkflowStepUI() {
     return stepDiv;
 }
 
+// --- Tag Tokenizer Helpers ---
+
+function createTagInput(containerElement, datalistId) {
+    // Check if already created
+    if (containerElement.classList.contains('tag-container')) return;
+
+    // Convert input to container
+    const originalInput = containerElement;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tag-container wf-conf-3'; // Keep class for selection
+
+    // Create Hidden Input for Value Storage
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.className = 'tag-value';
+    wrapper.appendChild(hiddenInput);
+
+    // Create Type Input
+    const typeInput = document.createElement('input');
+    typeInput.type = 'text';
+    typeInput.className = 'tag-input';
+    typeInput.setAttribute('list', datalistId);
+    typeInput.placeholder = "Type tags + Enter";
+    wrapper.appendChild(typeInput);
+
+    // Replace original
+    originalInput.replaceWith(wrapper);
+
+    // Event Listeners
+    typeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            const val = typeInput.value.trim().replace(',', '');
+            if (val) {
+                addTagPill(wrapper, typeInput, val);
+                typeInput.value = '';
+                updateHiddenTagValue(wrapper);
+            }
+        } else if (e.key === 'Backspace' && typeInput.value === '') {
+            // Remove last tag
+            const pills = wrapper.querySelectorAll('.tag-pill');
+            if (pills.length > 0) {
+                pills[pills.length - 1].remove();
+                updateHiddenTagValue(wrapper);
+            }
+        }
+    });
+
+    typeInput.addEventListener('blur', () => {
+        const val = typeInput.value.trim().replace(',', '');
+        if (val) {
+            addTagPill(wrapper, typeInput, val);
+            typeInput.value = '';
+            updateHiddenTagValue(wrapper);
+        }
+    });
+
+    return wrapper;
+}
+
+function addTagPill(wrapper, inputInfo, text) {
+    const pill = document.createElement('div');
+    pill.className = 'tag-pill';
+
+    // Create text node
+    pill.appendChild(document.createTextNode(text + " "));
+
+    // Create delete span
+    const closeBtn = document.createElement('span');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cursor = 'pointer';
+
+    // Robust Event Listener
+    closeBtn.onclick = (e) => {
+        e.stopPropagation();
+        pill.remove();
+        updateHiddenTagValue(wrapper);
+    };
+
+    pill.appendChild(closeBtn);
+    wrapper.insertBefore(pill, inputInfo);
+}
+
+function updateHiddenTagValue(wrapper) {
+    const pills = wrapper.querySelectorAll('.tag-pill');
+    // Extract text only (ignore the 'x' button content)
+    const values = Array.from(pills).map(p => {
+        if (p.firstChild && p.firstChild.nodeType === 3) {
+            return p.firstChild.textContent.trim();
+        }
+        return p.textContent.replace('×', '').trim();
+    });
+    const hidden = wrapper.querySelector('.tag-value');
+    if (hidden) hidden.value = values.join(',');
+}
+
+// Global exposure
+window.updateHiddenTagValue = updateHiddenTagValue;
+
+// --- Repo Fetch Helper ---
+window.fetchReposForAccount = function(input) {
+    const accountId = input.value;
+    if(!accountId) return;
+
+    fetch(`/api/apps/github/user/repos?account_id=${accountId}`)
+        .then(r => r.json())
+        .then(repos => {
+            const dl = document.getElementById('gh-repo-list');
+            if(!dl) return;
+            dl.innerHTML = '';
+            repos.forEach(r => {
+                const opt = document.createElement('option');
+                // Assuming repo.name includes owner prefix "user/repo"
+                // Wait, API typically returns full_name: "user/repo", name: "repo"
+                // Let's check API or just use what we have.
+                // list_user_repos returns 'name': item['full_name']
+                opt.value = r.name;
+                dl.appendChild(opt);
+            });
+        })
+        .catch(e => console.error("Repo fetch failed", e));
+};
+
+
 function updateStepConfigUI(select) {
     const type = select.value;
     const container = select.closest('.wf-step');
-    const c1 = container.querySelector('.wf-conf-1');
-    const c2 = container.querySelector('.wf-conf-2');
-    const c3 = container.querySelector('.wf-conf-3');
+    let c1 = container.querySelector('.wf-conf-1');
+    let c2 = container.querySelector('.wf-conf-2');
+    let c3 = container.querySelector('.wf-conf-3');
+    let c4 = container.querySelector('.wf-conf-4');
     const cLong = container.querySelector('.wf-conf-long');
     const desc = container.querySelector('.wf-step-desc');
 
-    c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
+    c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block'; c4.style.display = 'none';
     if(cLong) cLong.style.display = 'none';
 
-    // Create Select for Split Size if Pack
-    if (type === 'pack' && c1.tagName !== 'SELECT') {
-        // Replace Input with Select
-        const sel = document.createElement('select');
-        sel.className = 'wf-conf-1';
-        sel.innerHTML = `
-            <option value="100M">100MB</option>
-            <option value="500M">500MB</option>
-            <option value="1024M" selected>1GB</option>
-            <option value="2048M">2GB</option>
-            <option value="5120M">5GB</option>
-        `;
-        c1.replaceWith(sel);
-    }
+    // --- Helpers ---
+    const ensureInput = (el, listId=null) => {
+        // If it's a TAG CONTAINER (div), revert to input
+        if (el.tagName === 'DIV' && el.classList.contains('tag-container')) {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'wf-conf-3'; // Restore original class
+            el.replaceWith(inp);
+            return inp;
+        }
 
-    // Re-query in case we replaced it
-    const c1_new = container.querySelector('.wf-conf-1');
+        if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && el.getAttribute('list') !== listId)) {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = el.className;
+            if(listId) inp.setAttribute('list', listId);
+            else inp.removeAttribute('list');
+
+            // Clean specific event listeners
+            inp.onchange = null;
+
+            el.replaceWith(inp);
+            return inp;
+        }
+        return el;
+    };
+
+    const ensureSelect = (el, optionsHTML) => {
+        // Revert div to select if needed
+        if (el.tagName === 'DIV' && el.classList.contains('tag-container')) {
+             const sel = document.createElement('select');
+             sel.className = 'wf-conf-3';
+             sel.innerHTML = optionsHTML;
+             // Apply styles
+             sel.style.background = '#1a1b26'; sel.style.color = '#c0caf5'; sel.style.border = '1px solid #414868'; sel.style.padding = '5px'; sel.style.flex = '1';
+             el.replaceWith(sel);
+             return sel;
+        }
+
+        const sel = document.createElement('select');
+        sel.className = el.className;
+        sel.innerHTML = optionsHTML;
+        sel.style.background = '#1a1b26';
+        sel.style.color = '#c0caf5';
+        sel.style.border = '1px solid #414868';
+        sel.style.padding = '5px';
+        sel.style.flex = '1';
+        el.replaceWith(sel);
+        return sel;
+    };
 
     if (type === 'analyze_source') {
-        c1_new.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none';
+        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3); c4 = ensureInput(c4);
+        c1.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none'; c4.style.display = 'none';
         desc.textContent = "Scans folder, builds file tree, calculates original sizes.";
+
     } else if (type === 'pack') {
-        c1_new.style.display = 'block'; // Ensure select is visible
-        c2.placeholder = "Naming (part001)";
-        c3.placeholder = "Obfuscate Filename? (true/false)";
-        c3.style.display = 'block';
-        desc.textContent = "Creates split RAR archives. Obfuscation uses Base64 filenames.";
+        // Config 1: Split Size
+        const sizeOpts = `
+            <option value="1024M" selected>1 GB (Standard)</option>
+            <option value="1536M">1.5 GB</option>
+            <option value="2048M">2 GB</option>
+            <option value="2560M">2.5 GB</option>
+            <option value="3072M">3 GB</option>
+            <option value="3584M">3.5 GB</option>
+            <option value="4096M">4 GB</option>
+            <option value="4608M">4.5 GB</option>
+            <option value="5120M">5 GB</option>
+            <option disabled>--- Small ---</option>
+            <option value="200M">200 MB</option>
+            <option value="300M">300 MB</option>
+            <option value="400M">400 MB</option>
+            <option value="500M">500 MB</option>
+            <option value="600M">600 MB</option>
+            <option value="700M">700 MB</option>
+            <option value="800M">800 MB</option>
+            <option value="900M">900 MB</option>
+            <option disabled>--- Other ---</option>
+            <option value="0">No Split</option>
+        `;
+        c1 = ensureSelect(c1, sizeOpts);
+
+        // Config 2: Naming
+        const namingOpts = `
+            <option value="part1">part1.rar</option>
+            <option value="part01">part01.rar</option>
+            <option value="part001" selected>part001.rar (Scene)</option>
+        `;
+        c2 = ensureSelect(c2, namingOpts);
+
+        // Config 3: Obfuscation
+        const obfOpts = `
+            <option value="false" selected>No Obfuscation</option>
+            <option value="true">Base64 Scramble</option>
+        `;
+        c3 = ensureSelect(c3, obfOpts);
+
+        desc.textContent = "Creates split RAR archives. Select naming and obfuscation options.";
+
     } else if (type === 'github_publish') {
-        // If coming from pack, we need to revert Select to Input?
-        if (c1_new.tagName === 'SELECT') {
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'wf-conf-1';
-            c1_new.replaceWith(inp);
-        }
-        const c1_final = container.querySelector('.wf-conf-1');
+        // Config 1: Repo (Hybrid with Datalist)
+        c1 = ensureInput(c1, 'gh-repo-list');
+        c1.placeholder = "Repo (user/repo)";
 
-        c1_final.placeholder = "Repo (user/repo)";
-        c2.placeholder = "Account ID (Number from GitHub App)";
-        c3.placeholder = "Obfuscate Title? (true/false)";
-        desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
+        // Config 2: Account ID (Hybrid with Datalist + OnChange)
+        c2 = ensureInput(c2, 'gh-acc-list');
+        c2.placeholder = "Account ID";
+        c2.onchange = function() { window.fetchReposForAccount(this); };
+
+        // Config 3: Obfuscate Title (Dropdown)
+        const obfTitleOpts = `
+            <option value="false" selected>No (Original Title)</option>
+            <option value="true">Yes (Base64 Scramble)</option>
+        `;
+        c3 = ensureSelect(c3, obfTitleOpts);
+
+        // Config 4: Include Metadata (Dropdown)
+        const incMetaOpts = `
+            <option value="true" selected>Include Metadata (Tree)</option>
+            <option value="false">Clean Release (Assets Only)</option>
+        `;
+        c4 = ensureSelect(c4, incMetaOpts);
+        c4.style.display = 'block';
+
+        desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles. 'Clean Release' hides file tree from GitHub body.";
+
     } else if (type === 'enrich_metadata') {
-        if (c1_new.tagName === 'SELECT') {
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'wf-conf-1';
-            c1_new.replaceWith(inp);
-        }
-        const c1_final = container.querySelector('.wf-conf-1');
-
-        c1_final.placeholder = "Reference URL (e.g. IMDB/Wikipedia)";
+        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3); c4 = ensureInput(c4);
+        c1.placeholder = "Reference URL (e.g. IMDB/Wikipedia)";
         c2.style.display = 'none';
         c3.style.display = 'none';
+        c4.style.display = 'none';
         if(cLong) cLong.style.display = 'block';
-
         desc.textContent = "Injects custom URL and Long Description into the catalog entry.";
 
     } else if (type === 'catalog_add') {
-        if (c1_new.tagName === 'SELECT') {
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'wf-conf-1';
-            c1_new.replaceWith(inp);
-        }
-        const c1_final = container.querySelector('.wf-conf-1');
+        // Config 1: Category (Hybrid Datalist)
+        c1 = ensureInput(c1, 'cat-datalist');
+        c1.placeholder = "Category (Movies/4K)";
 
-        c1_final.placeholder = "Category (Movies/4K)";
-        c2.placeholder = "Priority (2=High, 1=Normal)";
-        c3.style.display = 'none';
+        // Config 2: Priority (Dropdown)
+        const priOpts = `
+            <option value="2">🔥 Necessary (High)</option>
+            <option value="1" selected>Normal</option>
+            <option value="0">💤 Unnecessary (Low)</option>
+        `;
+        c2 = ensureSelect(c2, priOpts);
+
+        // Config 3: Tags (TOKENIZER)
+        // Check if already tokenizer?
+        if (!c3.classList.contains('tag-container')) {
+            // Convert to tokenizer
+            c3 = createTagInput(c3, 'tag-datalist');
+        }
+        c3.style.display = 'flex'; // Ensure flex for container
+
         desc.textContent = "Adds to local index with download links and syncs to bridge.";
     }
 }
@@ -228,7 +524,19 @@ async function saveWorkflow() {
         const type = div.querySelector('.wf-step-type').value;
         const conf1 = div.querySelector('.wf-conf-1').value;
         const conf2 = div.querySelector('.wf-conf-2').value;
-        const conf3 = div.querySelector('.wf-conf-3').value;
+        const conf4 = div.querySelector('.wf-conf-4') ? div.querySelector('.wf-conf-4').value : '';
+        let conf3Value = ''; // Handle special value for tags
+
+        // Get conf3 element
+        const c3El = div.querySelector('.wf-conf-3');
+        if (c3El.classList.contains('tag-container')) {
+            // It's a tokenizer, get value from hidden input
+            conf3Value = c3El.querySelector('.tag-value').value;
+        } else {
+            conf3Value = c3El.value;
+        }
+
+        const conf3 = conf3Value;
         const confLong = div.querySelector('.wf-conf-long') ? div.querySelector('.wf-conf-long').value : '';
 
         let config = {};
@@ -245,6 +553,7 @@ async function saveWorkflow() {
                 repo: conf1,
                 account_id: conf2,
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
+                include_metadata: (conf4 !== 'false'), // Default true
                 tag_template: 'v{date}_{name}'
             };
         } else if(type === 'enrich_metadata') {
@@ -253,7 +562,12 @@ async function saveWorkflow() {
                 description: confLong
             };
         } else if(type === 'catalog_add') {
-            config = { category: conf1 || 'General', priority: parseInt(conf2) || 1 };
+            // Include tags in config
+            config = {
+                category: conf1 || 'General',
+                priority: parseInt(conf2) || 1,
+                tags: conf3 // Capture tags string
+            };
         }
 
         steps.push({ type: type, config: config });
