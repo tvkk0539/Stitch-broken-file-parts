@@ -114,7 +114,7 @@ function editWorkflow(id) {
         const conf = step.config;
         const c1 = stepDiv.querySelector('.wf-conf-1');
         const c2 = stepDiv.querySelector('.wf-conf-2');
-        const c3 = stepDiv.querySelector('.wf-conf-3');
+        const c3 = stepDiv.querySelector('.wf-conf-3'); // This might be the tag container
         const cLong = stepDiv.querySelector('.wf-conf-long');
 
         if (step.type === 'pack') {
@@ -131,7 +131,18 @@ function editWorkflow(id) {
         } else if (step.type === 'catalog_add') {
              c1.value = conf.category || '';
              c2.value = conf.priority || '1';
-             c3.value = conf.tags || ''; // Populate Tags
+
+             // Populate Tag Tokenizer
+             // c3 is now a div.tag-container
+             // We need to re-initialize the tags inside it
+             const tags = (conf.tags || '').split(',').filter(t => t.trim());
+             // Clear existing pills except input
+             const input = c3.querySelector('.tag-input');
+             if(input) {
+                 c3.querySelectorAll('.tag-pill').forEach(p => p.remove());
+                 tags.forEach(t => addTagPill(c3, input, t.trim()));
+                 updateHiddenTagValue(c3);
+             }
         }
     });
 }
@@ -172,6 +183,110 @@ function addWorkflowStepUI() {
     return stepDiv;
 }
 
+// --- Tag Tokenizer Helpers ---
+
+function createTagInput(containerElement, datalistId) {
+    // Check if already created
+    if (containerElement.classList.contains('tag-container')) return;
+
+    // Convert input to container
+    const originalInput = containerElement;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tag-container wf-conf-3'; // Keep class for selection
+
+    // Create Hidden Input for Value Storage
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.className = 'tag-value';
+    wrapper.appendChild(hiddenInput);
+
+    // Create Type Input
+    const typeInput = document.createElement('input');
+    typeInput.type = 'text';
+    typeInput.className = 'tag-input';
+    typeInput.setAttribute('list', datalistId);
+    typeInput.placeholder = "Type tags + Enter";
+    wrapper.appendChild(typeInput);
+
+    // Replace original
+    originalInput.replaceWith(wrapper);
+
+    // Event Listeners
+    typeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            const val = typeInput.value.trim().replace(',', '');
+            if (val) {
+                addTagPill(wrapper, typeInput, val);
+                typeInput.value = '';
+                updateHiddenTagValue(wrapper);
+            }
+        } else if (e.key === 'Backspace' && typeInput.value === '') {
+            // Remove last tag
+            const pills = wrapper.querySelectorAll('.tag-pill');
+            if (pills.length > 0) {
+                pills[pills.length - 1].remove();
+                updateHiddenTagValue(wrapper);
+            }
+        }
+    });
+
+    typeInput.addEventListener('blur', () => {
+        const val = typeInput.value.trim().replace(',', '');
+        if (val) {
+            addTagPill(wrapper, typeInput, val);
+            typeInput.value = '';
+            updateHiddenTagValue(wrapper);
+        }
+    });
+
+    return wrapper;
+}
+
+function addTagPill(wrapper, inputInfo, text) {
+    const pill = document.createElement('div');
+    pill.className = 'tag-pill';
+
+    // Create text node
+    pill.appendChild(document.createTextNode(text + " "));
+
+    // Create delete span
+    const closeBtn = document.createElement('span');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cursor = 'pointer';
+
+    // Robust Event Listener
+    closeBtn.onclick = (e) => {
+        e.stopPropagation();
+        pill.remove();
+        updateHiddenTagValue(wrapper);
+    };
+
+    pill.appendChild(closeBtn);
+    wrapper.insertBefore(pill, inputInfo);
+}
+
+function updateHiddenTagValue(wrapper) {
+    const pills = wrapper.querySelectorAll('.tag-pill');
+    // Extract text only (ignore the 'x' button content)
+    const values = Array.from(pills).map(p => {
+        // Clone node to get text without span text if simple replace fails
+        // But simply getting firstChild (text node) is safer if structure is consistent
+        // Our structure: TextNode + Span.
+        if (p.firstChild && p.firstChild.nodeType === 3) {
+            return p.firstChild.textContent.trim();
+        }
+        return p.textContent.replace('×', '').trim();
+    });
+    const hidden = wrapper.querySelector('.tag-value');
+    if (hidden) hidden.value = values.join(',');
+}
+
+// Global exposure
+window.updateHiddenTagValue = updateHiddenTagValue;
+
+
 function updateStepConfigUI(select) {
     const type = select.value;
     const container = select.closest('.wf-step');
@@ -186,6 +301,15 @@ function updateStepConfigUI(select) {
 
     // --- Helpers ---
     const ensureInput = (el, listId=null) => {
+        // If it's a TAG CONTAINER (div), revert to input
+        if (el.tagName === 'DIV' && el.classList.contains('tag-container')) {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'wf-conf-3'; // Restore original class
+            el.replaceWith(inp);
+            return inp;
+        }
+
         if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && el.getAttribute('list') !== listId)) {
             const inp = document.createElement('input');
             inp.type = 'text';
@@ -199,6 +323,17 @@ function updateStepConfigUI(select) {
     };
 
     const ensureSelect = (el, optionsHTML) => {
+        // Revert div to select if needed
+        if (el.tagName === 'DIV' && el.classList.contains('tag-container')) {
+             const sel = document.createElement('select');
+             sel.className = 'wf-conf-3';
+             sel.innerHTML = optionsHTML;
+             // Apply styles
+             sel.style.background = '#1a1b26'; sel.style.color = '#c0caf5'; sel.style.border = '1px solid #414868'; sel.style.padding = '5px'; sel.style.flex = '1';
+             el.replaceWith(sel);
+             return sel;
+        }
+
         const sel = document.createElement('select');
         sel.className = el.className;
         sel.innerHTML = optionsHTML;
@@ -287,10 +422,13 @@ function updateStepConfigUI(select) {
         `;
         c2 = ensureSelect(c2, priOpts);
 
-        // Config 3: Tags (Hybrid Datalist) - NEW
-        c3 = ensureInput(c3, 'tag-datalist');
-        c3.style.display = 'block';
-        c3.placeholder = "Tags (e.g. 4K, HDR)";
+        // Config 3: Tags (TOKENIZER)
+        // Check if already tokenizer?
+        if (!c3.classList.contains('tag-container')) {
+            // Convert to tokenizer
+            c3 = createTagInput(c3, 'tag-datalist');
+        }
+        c3.style.display = 'flex'; // Ensure flex for container
 
         desc.textContent = "Adds to local index with download links and syncs to bridge.";
     }
@@ -305,7 +443,18 @@ async function saveWorkflow() {
         const type = div.querySelector('.wf-step-type').value;
         const conf1 = div.querySelector('.wf-conf-1').value;
         const conf2 = div.querySelector('.wf-conf-2').value;
-        const conf3 = div.querySelector('.wf-conf-3').value;
+        let conf3Value = ''; // Handle special value for tags
+
+        // Get conf3 element
+        const c3El = div.querySelector('.wf-conf-3');
+        if (c3El.classList.contains('tag-container')) {
+            // It's a tokenizer, get value from hidden input
+            conf3Value = c3El.querySelector('.tag-value').value;
+        } else {
+            conf3Value = c3El.value;
+        }
+
+        const conf3 = conf3Value;
         const confLong = div.querySelector('.wf-conf-long') ? div.querySelector('.wf-conf-long').value : '';
 
         let config = {};
