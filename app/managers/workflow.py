@@ -294,6 +294,9 @@ class WorkflowManager:
         # Obfuscation Logic
         obfuscate_title = conf.get('obfuscate_title', False)
 
+        # Body Content Mode (Standard, Tree Only, Clean)
+        content_mode = conf.get('release_content', 'standard')
+
         # Generate Tag
         date_str = datetime.now().strftime("%Y%m%d")
 
@@ -313,9 +316,22 @@ class WorkflowManager:
 
         tag_name = tag_template.replace('{date}', date_str).replace('{name}', tag_slug)
 
-        # Body: Base64 Tree
+        # Build Body
         tree_b64 = base64.b64encode(meta.get('tree_text', '').encode('utf-8')).decode('utf-8')
-        body = f"Auto-Upload via ParFix.\n\n**Original Structure (Base64):**\n`{tree_b64}`\n\n**Stats:**\nSize: {WorkflowManager._human_size(meta.get('total_size', 0))}\nFiles: {meta.get('file_count', 0)}"
+
+        # Default Full Body (used for internal Catalog reference)
+        private_body = f"Auto-Upload via ParFix.\n\n**Original Structure (Base64):**\n`{tree_b64}`\n\n**Stats:**\nSize: {WorkflowManager._human_size(meta.get('total_size', 0))}\nFiles: {meta.get('file_count', 0)}"
+
+        if content_mode == 'clean':
+            body = ""
+            log("📝 Release Content: Clean (Empty Body)")
+        elif content_mode == 'tree_only':
+            body = tree_b64
+            log("📝 Release Content: Tree Only (Base64)")
+        else:
+            # Standard
+            body = private_body
+            log("📝 Release Content: Standard (Full Detail)")
 
         # Use GitHubManager to publish (We need a method that returns assets!)
         # Existing run_publish_job is void. We need to call internal methods.
@@ -371,7 +387,8 @@ class WorkflowManager:
         return {
             'assets': assets_out,
             'release_url': release_data.get('html_url', f"https://github.com/{repo}"),
-            'body': body
+            'body': private_body, # Pass full body internally to Catalog
+            'public_body_mode': content_mode
         }
 
     @staticmethod
@@ -430,7 +447,10 @@ class WorkflowManager:
         # 2. User Description (Manual - "Detailed explanation")
         # 3. Reference URL (Manual)
 
+        # IMPORTANT: Use the internal 'body' from gh_data which is always FULL
+        # even if the public release is clean/empty.
         gh_body = gh_data.get('body', '') if isinstance(gh_data, dict) else ''
+
         user_meta = context.get('user_metadata', {})
         user_desc = user_meta.get('description', '')
         ref_url = user_meta.get('reference_url', '')

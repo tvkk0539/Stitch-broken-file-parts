@@ -146,6 +146,7 @@ function editWorkflow(id) {
         const c1 = stepDiv.querySelector('.wf-conf-1');
         const c2 = stepDiv.querySelector('.wf-conf-2');
         const c3 = stepDiv.querySelector('.wf-conf-3'); // This might be the tag container
+        const c4 = stepDiv.querySelector('.wf-conf-4'); // New Config 4
         const cLong = stepDiv.querySelector('.wf-conf-long');
 
         if (step.type === 'pack') {
@@ -156,6 +157,7 @@ function editWorkflow(id) {
              c1.value = conf.repo || '';
              c2.value = conf.account_id || '';
              c3.value = (conf.obfuscate_title === true || conf.obfuscate_title === 'true') ? 'true' : 'false';
+             c4.value = conf.release_content || 'standard'; // Load release content mode
         } else if (step.type === 'enrich_metadata') {
              c1.value = conf.reference_url || '';
              if(cLong) cLong.value = conf.description || '';
@@ -202,6 +204,7 @@ function addWorkflowStepUI() {
             <input type="text" class="wf-conf-1" placeholder="Config 1" style="flex:1;">
             <input type="text" class="wf-conf-2" placeholder="Config 2" style="flex:1;">
             <input type="text" class="wf-conf-3" placeholder="Config 3" style="flex:1;">
+            <input type="text" class="wf-conf-4" placeholder="Config 4" style="flex:1; display:none;">
             <textarea class="wf-conf-long" placeholder="Description/Content" style="display:none; width:100%; height:100px; margin-top:5px; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; padding:10px;"></textarea>
         </div>
         <div class="wf-step-desc" style="font-size:0.8em; color:gray; margin-top:5px;">
@@ -345,10 +348,12 @@ function updateStepConfigUI(select) {
     let c1 = container.querySelector('.wf-conf-1');
     let c2 = container.querySelector('.wf-conf-2');
     let c3 = container.querySelector('.wf-conf-3');
+    let c4 = container.querySelector('.wf-conf-4');
     const cLong = container.querySelector('.wf-conf-long');
     const desc = container.querySelector('.wf-step-desc');
 
     c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
+    c4.style.display = 'none'; // Default hidden
     if(cLong) cLong.style.display = 'none';
 
     // --- Helpers ---
@@ -467,6 +472,15 @@ function updateStepConfigUI(select) {
         `;
         c3 = ensureSelect(c3, obfTitleOpts);
 
+        // Config 4: Release Content (Dropdown)
+        c4.style.display = 'block';
+        const contentOpts = `
+            <option value="standard" selected>Standard (Default)</option>
+            <option value="tree_only">Tree Only (No Header)</option>
+            <option value="clean">Clean (Assets Only)</option>
+        `;
+        c4 = ensureSelect(c4, contentOpts);
+
         desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
 
     } else if (type === 'enrich_metadata') {
@@ -511,6 +525,7 @@ async function saveWorkflow() {
         const type = div.querySelector('.wf-step-type').value;
         const conf1 = div.querySelector('.wf-conf-1').value;
         const conf2 = div.querySelector('.wf-conf-2').value;
+        const conf4 = div.querySelector('.wf-conf-4').value;
         let conf3Value = ''; // Handle special value for tags
 
         // Get conf3 element
@@ -539,6 +554,7 @@ async function saveWorkflow() {
                 repo: conf1,
                 account_id: conf2,
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
+                release_content: conf4 || 'standard',
                 tag_template: 'v{date}_{name}'
             };
         } else if(type === 'enrich_metadata') {
