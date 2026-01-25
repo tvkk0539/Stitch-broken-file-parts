@@ -324,7 +324,7 @@ class WorkflowManager:
         if include_meta:
             public_body = private_body
         else:
-            public_body = "Auto-Upload via ParFix."
+            public_body = ""
 
         # Use GitHubManager to publish (We need a method that returns assets!)
         # Existing run_publish_job is void. We need to call internal methods.
