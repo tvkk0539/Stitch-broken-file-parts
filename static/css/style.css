@@ -33,6 +33,23 @@ body {
     padding-top: 20px;
     transition: width 0.3s;
     z-index: 10;
+    overflow-y: auto; /* Enable vertical scrolling */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--border-color) var(--sidebar-bg);
+}
+
+/* Sidebar Scrollbar Styling */
+#sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+#sidebar::-webkit-scrollbar-track {
+    background: var(--sidebar-bg);
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 3px;
 }
 
 #sidebar:hover {
