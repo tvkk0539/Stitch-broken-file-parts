@@ -772,20 +772,20 @@ async function fetchGhReleases() {
             const hasAssets = release.assets && release.assets.length > 0;
 
             // Buttons
-            const dlAllBtn = hasAssets ? `<button class="purple-btn gh-btn-action" data-action="dl-all" style="padding:2px 8px; font-size:0.7em; margin-left:10px;">Download All</button>` : '';
-            const delAllBtn = hasAssets ? `<button class="danger gh-btn-action" data-action="del-all" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color);">Trash All</button>` : '';
-            const delRelBtn = `<button class="danger gh-btn-action" data-action="del-rel" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color);">Del Release</button>`;
+            const dlAllBtn = hasAssets ? `<button class="purple-btn gh-btn-action" data-action="dl-all" style="padding:2px 8px; font-size:0.7em; margin-left:10px; flex-shrink:0;">Download All</button>` : '';
+            const delAllBtn = hasAssets ? `<button class="danger gh-btn-action" data-action="del-all" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color); flex-shrink:0;">Trash All</button>` : '';
+            const delRelBtn = `<button class="danger gh-btn-action" data-action="del-rel" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color); flex-shrink:0;">Del Release</button>`;
 
             headerDiv.innerHTML = `
-                <div style="display:flex; align-items:center;">
-                    <div style="font-weight:bold; color:#c0caf5; font-size:1.1em;" class="gh-tag-text">${release.tag}</div>
+                <div style="display:flex; align-items:center; overflow-x:auto; margin-right:15px; padding-bottom:4px; flex:1; scrollbar-width:thin;">
+                    <div style="font-weight:bold; color:#c0caf5; font-size:1.1em; white-space:nowrap;" class="gh-tag-text">${release.tag}</div>
                     ${badge}
                     ${preBadge}
                     ${dlAllBtn}
                     ${delAllBtn}
                     ${delRelBtn}
                 </div>
-                <div style="font-size:0.8em; color:var(--text-muted); display:flex; align-items:center; gap:10px;">
+                <div style="font-size:0.8em; color:var(--text-muted); display:flex; align-items:center; gap:10px; flex-shrink:0;">
                     <span>${dateStr}</span>
                     <span style="transform: rotate(${isLatest?0:-90}deg); transition: transform 0.2s;" class="arrow-icon">▼</span>
                 </div>
