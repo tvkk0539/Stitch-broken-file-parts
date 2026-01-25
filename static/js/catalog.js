@@ -265,12 +265,15 @@ const catalog = {
 
                 // Build Hidden Links Container
                 let linksList = item.assets.map(a => `
-                    <div class="link-row" onclick="navigator.clipboard.writeText('${a.url}'); showToast('Link Copied!')">
-                        <div style="display:flex;align-items:center;gap:10px; overflow:hidden;">
+                    <div class="link-row">
+                        <div style="display:flex;align-items:center;gap:10px; overflow:hidden; flex:1;">
                             <span style="font-size:1.2em;">📦</span>
-                            <span class="link-name">${a.name}</span>
+                            <span class="link-name" title="${a.name}">${a.name}</span>
                         </div>
-                        <span class="link-meta">${catalog._formatBytes(a.size)}</span>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span class="link-meta">${catalog._formatBytes(a.size)}</span>
+                            <button onclick="catalog.copySingleLink('${a.url}')" class="icon-btn" style="padding:4px 8px; font-size:0.9em; background:#2f3549; border:1px solid #414868;" title="Copy Link">📋</button>
+                        </div>
                     </div>
                 `).join('');
 
@@ -283,14 +286,21 @@ const catalog = {
                     </div>
                 `;
 
-                // Add Buttons
+                // Add Buttons (Stacked Layout as requested if applicable, but horizontal fits actions area better)
+                // User asked: "make like this button below add the current button expanded direct download links button"
+                // This implies the Show Links button should be below the Copy button?
+                // Let's use a small vertical flex container for these two specific actions if space permits, or just keep horizontal.
+                // Given the layout is flex-row, keeping them side-by-side is safer, but we use the new text.
+
                 extraActions = `
-                    <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4; margin-right:10px;" title="Copy all links for JDownloader">
-                        📋 Copy All
-                    </button>
-                    <button onclick="catalog.toggleLinks('${item.id}')" class="btn-lg secondary" style="background-color: #2f3549; border: 1px solid #414868;">
-                        ⬇️ Show Links
-                    </button>
+                    <div style="display:flex; flex-direction:column; gap:5px; margin-right:15px;">
+                        <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4; padding: 10px 20px; font-size:1em;" title="Copy all links for JDownloader">
+                            📋 DL Links for JD
+                        </button>
+                        <button onclick="catalog.toggleLinks('${item.id}')" class="secondary" style="background-color: #2f3549; border: 1px solid #414868; padding: 8px; font-size:0.9em;">
+                            ⬇️ Show Links
+                        </button>
+                    </div>
                 `;
             }
 
@@ -433,9 +443,51 @@ const catalog = {
         if(!item || !item.assets) return;
 
         const links = item.assets.map(a => a.url).join('\n');
-        navigator.clipboard.writeText(links).then(() => {
-            showToast(`Copied ${item.assets.length} links!`, 'success');
-        });
+
+        // Robust Copy Logic (Secure & Non-Secure)
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(links).then(() => {
+                showToast(`Copied ${item.assets.length} links!`, 'success');
+            }).catch(err => {
+                console.error("Clipboard API failed, trying fallback", err);
+                catalog._fallbackCopy(links);
+            });
+        } else {
+            catalog._fallbackCopy(links);
+        }
+    },
+
+    copySingleLink: (url) => {
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(url).then(() => showToast('Link Copied!'));
+        } else {
+            catalog._fallbackCopy(url);
+        }
+    },
+
+    _fallbackCopy: (text) => {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+
+        // Ensure it's not visible but part of DOM
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            if(successful) showToast('Copied to clipboard!', 'success');
+            else showToast('Copy failed.', 'error');
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+            showToast('Copy failed (Browser restriction)', 'error');
+        }
+
+        document.body.removeChild(textArea);
     },
 
     toggleLinks: (id) => {
