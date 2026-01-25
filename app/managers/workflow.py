@@ -315,7 +315,16 @@ class WorkflowManager:
 
         # Body: Base64 Tree
         tree_b64 = base64.b64encode(meta.get('tree_text', '').encode('utf-8')).decode('utf-8')
-        body = f"Auto-Upload via ParFix.\n\n**Original Structure (Base64):**\n`{tree_b64}`\n\n**Stats:**\nSize: {WorkflowManager._human_size(meta.get('total_size', 0))}\nFiles: {meta.get('file_count', 0)}"
+
+        # 1. Full Private Body (Always generated for Catalog)
+        private_body = f"Auto-Upload via ParFix.\n\n**Original Structure (Base64):**\n`{tree_b64}`\n\n**Stats:**\nSize: {WorkflowManager._human_size(meta.get('total_size', 0))}\nFiles: {meta.get('file_count', 0)}"
+
+        # 2. Public Body (Dependent on Toggle)
+        include_meta = conf.get('include_metadata', True)
+        if include_meta:
+            public_body = private_body
+        else:
+            public_body = "Auto-Upload via ParFix."
 
         # Use GitHubManager to publish (We need a method that returns assets!)
         # Existing run_publish_job is void. We need to call internal methods.
@@ -337,7 +346,7 @@ class WorkflowManager:
         clean_repo = repo.replace('https://github.com/', '').strip('/')
         create_url = f"https://api.github.com/repos/{clean_repo}/releases"
         headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
-        payload = {"tag_name": tag_name, "name": display_title, "body": body}
+        payload = {"tag_name": tag_name, "name": display_title, "body": public_body}
 
         import requests
         r = requests.post(create_url, json=payload, headers=headers)
@@ -371,7 +380,8 @@ class WorkflowManager:
         return {
             'assets': assets_out,
             'release_url': release_data.get('html_url', f"https://github.com/{repo}"),
-            'body': body
+            'body': public_body,
+            'full_metadata': private_body
         }
 
     @staticmethod
@@ -430,7 +440,9 @@ class WorkflowManager:
         # 2. User Description (Manual - "Detailed explanation")
         # 3. Reference URL (Manual)
 
-        gh_body = gh_data.get('body', '') if isinstance(gh_data, dict) else ''
+        # Prefer full_metadata if available (new logic), else fall back to body (old logic/public)
+        gh_body = gh_data.get('full_metadata') or gh_data.get('body', '') if isinstance(gh_data, dict) else ''
+
         user_meta = context.get('user_metadata', {})
         user_desc = user_meta.get('description', '')
         ref_url = user_meta.get('reference_url', '')

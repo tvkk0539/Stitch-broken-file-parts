@@ -146,6 +146,7 @@ function editWorkflow(id) {
         const c1 = stepDiv.querySelector('.wf-conf-1');
         const c2 = stepDiv.querySelector('.wf-conf-2');
         const c3 = stepDiv.querySelector('.wf-conf-3'); // This might be the tag container
+        const c4 = stepDiv.querySelector('.wf-conf-4');
         const cLong = stepDiv.querySelector('.wf-conf-long');
 
         if (step.type === 'pack') {
@@ -156,6 +157,7 @@ function editWorkflow(id) {
              c1.value = conf.repo || '';
              c2.value = conf.account_id || '';
              c3.value = (conf.obfuscate_title === true || conf.obfuscate_title === 'true') ? 'true' : 'false';
+             if(c4) c4.value = (conf.include_metadata === false || conf.include_metadata === 'false') ? 'false' : 'true';
         } else if (step.type === 'enrich_metadata') {
              c1.value = conf.reference_url || '';
              if(cLong) cLong.value = conf.description || '';
@@ -202,6 +204,7 @@ function addWorkflowStepUI() {
             <input type="text" class="wf-conf-1" placeholder="Config 1" style="flex:1;">
             <input type="text" class="wf-conf-2" placeholder="Config 2" style="flex:1;">
             <input type="text" class="wf-conf-3" placeholder="Config 3" style="flex:1;">
+            <input type="text" class="wf-conf-4" placeholder="Config 4" style="flex:1; display:none;">
             <textarea class="wf-conf-long" placeholder="Description/Content" style="display:none; width:100%; height:100px; margin-top:5px; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; padding:10px;"></textarea>
         </div>
         <div class="wf-step-desc" style="font-size:0.8em; color:gray; margin-top:5px;">
@@ -345,10 +348,11 @@ function updateStepConfigUI(select) {
     let c1 = container.querySelector('.wf-conf-1');
     let c2 = container.querySelector('.wf-conf-2');
     let c3 = container.querySelector('.wf-conf-3');
+    let c4 = container.querySelector('.wf-conf-4');
     const cLong = container.querySelector('.wf-conf-long');
     const desc = container.querySelector('.wf-step-desc');
 
-    c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
+    c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block'; c4.style.display = 'none';
     if(cLong) cLong.style.display = 'none';
 
     // --- Helpers ---
@@ -403,8 +407,8 @@ function updateStepConfigUI(select) {
     };
 
     if (type === 'analyze_source') {
-        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
-        c1.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none';
+        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3); c4 = ensureInput(c4);
+        c1.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none'; c4.style.display = 'none';
         desc.textContent = "Scans folder, builds file tree, calculates original sizes.";
 
     } else if (type === 'pack') {
@@ -467,13 +471,22 @@ function updateStepConfigUI(select) {
         `;
         c3 = ensureSelect(c3, obfTitleOpts);
 
-        desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
+        // Config 4: Include Metadata (Dropdown)
+        const incMetaOpts = `
+            <option value="true" selected>Include Metadata (Tree)</option>
+            <option value="false">Clean Release (Assets Only)</option>
+        `;
+        c4 = ensureSelect(c4, incMetaOpts);
+        c4.style.display = 'block';
+
+        desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles. 'Clean Release' hides file tree from GitHub body.";
 
     } else if (type === 'enrich_metadata') {
-        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
+        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3); c4 = ensureInput(c4);
         c1.placeholder = "Reference URL (e.g. IMDB/Wikipedia)";
         c2.style.display = 'none';
         c3.style.display = 'none';
+        c4.style.display = 'none';
         if(cLong) cLong.style.display = 'block';
         desc.textContent = "Injects custom URL and Long Description into the catalog entry.";
 
@@ -511,6 +524,7 @@ async function saveWorkflow() {
         const type = div.querySelector('.wf-step-type').value;
         const conf1 = div.querySelector('.wf-conf-1').value;
         const conf2 = div.querySelector('.wf-conf-2').value;
+        const conf4 = div.querySelector('.wf-conf-4') ? div.querySelector('.wf-conf-4').value : '';
         let conf3Value = ''; // Handle special value for tags
 
         // Get conf3 element
@@ -539,6 +553,7 @@ async function saveWorkflow() {
                 repo: conf1,
                 account_id: conf2,
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
+                include_metadata: (conf4 !== 'false'), // Default true
                 tag_template: 'v{date}_{name}'
             };
         } else if(type === 'enrich_metadata') {
