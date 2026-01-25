@@ -1,6 +1,7 @@
 // Automation Logic
 
 let workflows = [];
+let currentEditingId = null;
 
 function initAutomation() {
     loadWorkflows();
@@ -31,6 +32,7 @@ function renderWorkflows() {
             <div class="app-desc">${wf.steps.length} Steps</div>
             <div style="margin-top:15px; display:flex; gap:5px;">
                 <button class="secondary" onclick="runWorkflow('${wf.id}')">Run</button>
+                <button class="secondary" onclick="editWorkflow('${wf.id}')" style="flex:0;">✏️</button>
                 <button class="danger" onclick="deleteWorkflow('${wf.id}')" style="flex:0;">🗑️</button>
             </div>
         `;
@@ -39,9 +41,57 @@ function renderWorkflows() {
 }
 
 function openWorkflowModal() {
+    currentEditingId = null; // Reset for new
     document.getElementById('workflow-modal').style.display = 'block';
     document.getElementById('wf-name').value = '';
     document.getElementById('wf-steps-container').innerHTML = '';
+    document.querySelector('#workflow-modal h3').textContent = "Create Workflow";
+}
+
+function editWorkflow(id) {
+    const wf = workflows.find(w => w.id === id);
+    if (!wf) return;
+
+    currentEditingId = id;
+    document.getElementById('workflow-modal').style.display = 'block';
+    document.querySelector('#workflow-modal h3').textContent = "Edit Workflow";
+    document.getElementById('wf-name').value = wf.name;
+
+    const container = document.getElementById('wf-steps-container');
+    container.innerHTML = '';
+
+    wf.steps.forEach(step => {
+        // Create UI
+        const stepDiv = addWorkflowStepUI(); // Modified to return the div
+
+        // Populate Values
+        stepDiv.querySelector('.wf-step-type').value = step.type;
+        updateStepConfigUI(stepDiv.querySelector('.wf-step-type'));
+
+        // Populate Config
+        const conf = step.config;
+        const c1 = stepDiv.querySelector('.wf-conf-1');
+        const c2 = stepDiv.querySelector('.wf-conf-2');
+        const c3 = stepDiv.querySelector('.wf-conf-3');
+        const cLong = stepDiv.querySelector('.wf-conf-long');
+
+        if (step.type === 'pack') {
+             c1.value = conf.split.replace('M',''); // 1024M -> 1024 (Select uses values like 1024M though)
+             if(c1.tagName === 'SELECT') c1.value = conf.split;
+             c2.value = conf.naming || '';
+             c3.value = conf.obfuscate || '';
+        } else if (step.type === 'github_publish') {
+             c1.value = conf.repo || '';
+             c2.value = conf.account_id || '';
+             c3.value = conf.obfuscate_title || '';
+        } else if (step.type === 'enrich_metadata') {
+             c1.value = conf.reference_url || '';
+             if(cLong) cLong.value = conf.description || '';
+        } else if (step.type === 'catalog_add') {
+             c1.value = conf.category || '';
+             c2.value = conf.priority || '';
+        }
+    });
 }
 
 function addWorkflowStepUI() {
@@ -81,6 +131,7 @@ function addWorkflowStepUI() {
     container.appendChild(stepDiv);
     // Trigger update to show correct placeholders
     updateStepConfigUI(stepDiv.querySelector('.wf-step-type'));
+    return stepDiv;
 }
 
 function updateStepConfigUI(select) {
@@ -214,14 +265,25 @@ async function saveWorkflow() {
     }
 
     try {
-        await fetch('/api/automation/workflows', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ name: name, steps: steps })
-        });
+        if (currentEditingId) {
+             await fetch(`/api/automation/workflows/${currentEditingId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name: name, steps: steps })
+            });
+            showToast("Workflow Updated!");
+        } else {
+            await fetch('/api/automation/workflows', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name: name, steps: steps })
+            });
+            showToast("Workflow Saved!");
+        }
+
         document.getElementById('workflow-modal').style.display = 'none';
+        currentEditingId = null;
         loadWorkflows();
-        showToast("Workflow Saved!");
     } catch(e) {
         alert("Save failed: " + e);
     }
@@ -276,6 +338,7 @@ async function deleteWorkflow(id) {
 // Global Exposure
 window.initAutomation = initAutomation;
 window.openWorkflowModal = openWorkflowModal;
+window.editWorkflow = editWorkflow;
 window.addWorkflowStepUI = addWorkflowStepUI;
 window.saveWorkflow = saveWorkflow;
 window.runWorkflow = runWorkflow;

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "2975e74b-bc0e-43d8-b431-7614ad46ac45",
+    "name": "Test Workflow",
+    "steps": [
+      {
+        "type": "pack",
+        "config": {
+          "split": "100M",
+          "naming": "part001"
+        }
+      }
+    ],
+    "created_at": "2026-01-25T01:02:18.136703"
+  },
+  {
+    "id": "e994ef33-cd6d-4b6b-b4be-31f86e1a4c56",
+    "name": "UI Test Workflow",
+    "steps": [
+      {
+        "type": "pack",
+        "config": {
+          "split": "100M"
+        }
+      }
+    ],
+    "created_at": "2026-01-25T01:04:14.197858"
+  }
+]

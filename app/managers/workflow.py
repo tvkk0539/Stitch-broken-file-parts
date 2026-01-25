@@ -72,6 +72,15 @@ class WorkflowManager:
         self.save_workflows()
         return True
 
+    def update_workflow(self, wf_id, name, steps):
+        for w in self.workflows:
+            if w['id'] == wf_id:
+                w['name'] = name
+                w['steps'] = steps
+                self.save_workflows()
+                return w
+        return None
+
     # --- Execution Engine ---
 
     @staticmethod
