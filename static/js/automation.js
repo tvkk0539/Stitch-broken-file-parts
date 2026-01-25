@@ -86,6 +86,37 @@ function openWorkflowModal() {
                 dl.appendChild(opt);
             });
         }).catch(e => console.error("Failed to load tags for modal", e));
+
+    // Inject Datalist for Repos if not exists
+    if(!document.getElementById('gh-repo-list')) {
+        const dl = document.createElement('datalist');
+        dl.id = 'gh-repo-list';
+        document.body.appendChild(dl);
+    }
+
+    // Inject Datalist for Accounts if not exists
+    if(!document.getElementById('gh-acc-list')) {
+        const dl = document.createElement('datalist');
+        dl.id = 'gh-acc-list';
+        document.body.appendChild(dl);
+    }
+
+    // Fetch Accounts for Datalist
+    fetch('/api/apps/github/accounts')
+        .then(r => r.json())
+        .then(accs => {
+            const dl = document.getElementById('gh-acc-list');
+            dl.innerHTML = '';
+            accs.forEach(a => {
+                // Option value is ID, but show Name for context
+                const opt = document.createElement('option');
+                // Standard Datalist: Value is what goes in box.
+                // We want ID in box.
+                opt.value = a.id;
+                opt.label = a.username;
+                dl.appendChild(opt);
+            });
+        }).catch(e => console.error("Failed to load accounts for modal", e));
 }
 
 function editWorkflow(id) {
@@ -124,7 +155,7 @@ function editWorkflow(id) {
         } else if (step.type === 'github_publish') {
              c1.value = conf.repo || '';
              c2.value = conf.account_id || '';
-             c3.value = conf.obfuscate_title || '';
+             c3.value = (conf.obfuscate_title === true || conf.obfuscate_title === 'true') ? 'true' : 'false';
         } else if (step.type === 'enrich_metadata') {
              c1.value = conf.reference_url || '';
              if(cLong) cLong.value = conf.description || '';
@@ -271,9 +302,6 @@ function updateHiddenTagValue(wrapper) {
     const pills = wrapper.querySelectorAll('.tag-pill');
     // Extract text only (ignore the 'x' button content)
     const values = Array.from(pills).map(p => {
-        // Clone node to get text without span text if simple replace fails
-        // But simply getting firstChild (text node) is safer if structure is consistent
-        // Our structure: TextNode + Span.
         if (p.firstChild && p.firstChild.nodeType === 3) {
             return p.firstChild.textContent.trim();
         }
@@ -285,6 +313,30 @@ function updateHiddenTagValue(wrapper) {
 
 // Global exposure
 window.updateHiddenTagValue = updateHiddenTagValue;
+
+// --- Repo Fetch Helper ---
+window.fetchReposForAccount = function(input) {
+    const accountId = input.value;
+    if(!accountId) return;
+
+    fetch(`/api/apps/github/user/repos?account_id=${accountId}`)
+        .then(r => r.json())
+        .then(repos => {
+            const dl = document.getElementById('gh-repo-list');
+            if(!dl) return;
+            dl.innerHTML = '';
+            repos.forEach(r => {
+                const opt = document.createElement('option');
+                // Assuming repo.name includes owner prefix "user/repo"
+                // Wait, API typically returns full_name: "user/repo", name: "repo"
+                // Let's check API or just use what we have.
+                // list_user_repos returns 'name': item['full_name']
+                opt.value = r.name;
+                dl.appendChild(opt);
+            });
+        })
+        .catch(e => console.error("Repo fetch failed", e));
+};
 
 
 function updateStepConfigUI(select) {
@@ -316,6 +368,10 @@ function updateStepConfigUI(select) {
             inp.className = el.className;
             if(listId) inp.setAttribute('list', listId);
             else inp.removeAttribute('list');
+
+            // Clean specific event listeners
+            inp.onchange = null;
+
             el.replaceWith(inp);
             return inp;
         }
@@ -395,10 +451,22 @@ function updateStepConfigUI(select) {
         desc.textContent = "Creates split RAR archives. Select naming and obfuscation options.";
 
     } else if (type === 'github_publish') {
-        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
+        // Config 1: Repo (Hybrid with Datalist)
+        c1 = ensureInput(c1, 'gh-repo-list');
         c1.placeholder = "Repo (user/repo)";
-        c2.placeholder = "Account ID (Number from GitHub App)";
-        c3.placeholder = "Obfuscate Title? (true/false)";
+
+        // Config 2: Account ID (Hybrid with Datalist + OnChange)
+        c2 = ensureInput(c2, 'gh-acc-list');
+        c2.placeholder = "Account ID";
+        c2.onchange = function() { window.fetchReposForAccount(this); };
+
+        // Config 3: Obfuscate Title (Dropdown)
+        const obfTitleOpts = `
+            <option value="false" selected>No (Original Title)</option>
+            <option value="true">Yes (Base64 Scramble)</option>
+        `;
+        c3 = ensureSelect(c3, obfTitleOpts);
+
         desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
 
     } else if (type === 'enrich_metadata') {
