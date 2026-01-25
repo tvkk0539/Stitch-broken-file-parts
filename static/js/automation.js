@@ -46,14 +46,36 @@ function openWorkflowModal() {
     document.getElementById('wf-name').value = '';
     document.getElementById('wf-steps-container').innerHTML = '';
     document.querySelector('#workflow-modal h3').textContent = "Create Workflow";
+
+    // Inject Datalist for Categories if not exists
+    if(!document.getElementById('cat-datalist')) {
+        const dl = document.createElement('datalist');
+        dl.id = 'cat-datalist';
+        document.body.appendChild(dl);
+    }
+
+    // Fetch Categories for Datalist
+    fetch('/api/catalog/categories')
+        .then(r => r.json())
+        .then(cats => {
+            const dl = document.getElementById('cat-datalist');
+            dl.innerHTML = '';
+            cats.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                dl.appendChild(opt);
+            });
+        }).catch(e => console.error("Failed to load categories for modal", e));
 }
 
 function editWorkflow(id) {
     const wf = workflows.find(w => w.id === id);
     if (!wf) return;
 
+    // Ensure datalist is populated even in edit mode
+    openWorkflowModal(); // Re-use init logic (title/value override below)
+
     currentEditingId = id;
-    document.getElementById('workflow-modal').style.display = 'block';
     document.querySelector('#workflow-modal h3').textContent = "Edit Workflow";
     document.getElementById('wf-name').value = wf.name;
 
@@ -78,7 +100,6 @@ function editWorkflow(id) {
         if (step.type === 'pack') {
              c1.value = conf.split || '1024M';
              c2.value = conf.naming || 'part001';
-             // Convert boolean/string to select string
              c3.value = (conf.obfuscate === true || conf.obfuscate === 'true') ? 'true' : 'false';
         } else if (step.type === 'github_publish') {
              c1.value = conf.repo || '';
@@ -89,7 +110,7 @@ function editWorkflow(id) {
              if(cLong) cLong.value = conf.description || '';
         } else if (step.type === 'catalog_add') {
              c1.value = conf.category || '';
-             c2.value = conf.priority || '';
+             c2.value = conf.priority || '1';
         }
     });
 }
@@ -142,12 +163,13 @@ function updateStepConfigUI(select) {
     c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
     if(cLong) cLong.style.display = 'none';
 
-    // --- Helpers for Dynamic UI Swapping ---
-    const ensureInput = (el) => {
-        if (el.tagName === 'SELECT') {
+    // --- Helpers ---
+    const ensureInput = (el, listId=null) => {
+        if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && el.getAttribute('list') !== listId)) {
             const inp = document.createElement('input');
             inp.type = 'text';
             inp.className = el.className;
+            if(listId) inp.setAttribute('list', listId);
             el.replaceWith(inp);
             return inp;
         }
@@ -155,11 +177,9 @@ function updateStepConfigUI(select) {
     };
 
     const ensureSelect = (el, optionsHTML) => {
-        // Always replace to ensure correct options for the selected type
         const sel = document.createElement('select');
         sel.className = el.className;
         sel.innerHTML = optionsHTML;
-        // Basic style fix for selects
         sel.style.background = '#1a1b26';
         sel.style.color = '#c0caf5';
         sel.style.border = '1px solid #414868';
@@ -176,7 +196,6 @@ function updateStepConfigUI(select) {
 
     } else if (type === 'pack') {
         // Config 1: Split Size
-        // NOTE: We convert fractional GBs to MB for safe backend compatibility
         const sizeOpts = `
             <option value="1024M" selected>1 GB (Standard)</option>
             <option value="1536M">1.5 GB</option>
@@ -201,7 +220,7 @@ function updateStepConfigUI(select) {
         `;
         c1 = ensureSelect(c1, sizeOpts);
 
-        // Config 2: Naming Scheme
+        // Config 2: Naming
         const namingOpts = `
             <option value="part1">part1.rar</option>
             <option value="part01">part01.rar</option>
@@ -220,7 +239,6 @@ function updateStepConfigUI(select) {
 
     } else if (type === 'github_publish') {
         c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
-
         c1.placeholder = "Repo (user/repo)";
         c2.placeholder = "Account ID (Number from GitHub App)";
         c3.placeholder = "Obfuscate Title? (true/false)";
@@ -228,19 +246,25 @@ function updateStepConfigUI(select) {
 
     } else if (type === 'enrich_metadata') {
         c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
-
         c1.placeholder = "Reference URL (e.g. IMDB/Wikipedia)";
         c2.style.display = 'none';
         c3.style.display = 'none';
         if(cLong) cLong.style.display = 'block';
-
         desc.textContent = "Injects custom URL and Long Description into the catalog entry.";
 
     } else if (type === 'catalog_add') {
-        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
-
+        // Config 1: Category (Hybrid Datalist)
+        c1 = ensureInput(c1, 'cat-datalist');
         c1.placeholder = "Category (Movies/4K)";
-        c2.placeholder = "Priority (2=High, 1=Normal)";
+
+        // Config 2: Priority (Dropdown)
+        const priOpts = `
+            <option value="2">🔥 Necessary (High)</option>
+            <option value="1" selected>Normal</option>
+            <option value="0">💤 Unnecessary (Low)</option>
+        `;
+        c2 = ensureSelect(c2, priOpts);
+
         c3.style.display = 'none';
         desc.textContent = "Adds to local index with download links and syncs to bridge.";
     }
