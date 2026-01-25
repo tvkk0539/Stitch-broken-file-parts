@@ -180,6 +180,14 @@ def create_workflow():
     wf = workflow_manager.create_workflow(data['name'], data['steps'])
     return jsonify(wf)
 
+@bp.route('/api/automation/workflows/<wf_id>', methods=['PUT'])
+def update_workflow(wf_id):
+    data = request.json
+    wf = workflow_manager.update_workflow(wf_id, data['name'], data['steps'])
+    if wf:
+        return jsonify(wf)
+    return jsonify({'error': 'Workflow not found'}), 404
+
 @bp.route('/api/automation/workflows/<wf_id>', methods=['DELETE'])
 def delete_workflow(wf_id):
     workflow_manager.delete_workflow(wf_id)

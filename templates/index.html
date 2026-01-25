@@ -138,17 +138,20 @@
                 <div style="display: flex; height: 100%;">
 
                     <!-- Catalog Sidebar -->
-                    <div id="catalog-sidebar" style="width: 250px; background: var(--bg-dark); border-right: 1px solid var(--border-color); display: flex; flex-direction: column;">
-                        <div style="padding: 20px; border-bottom: 1px solid var(--border-color);">
-                            <h3 style="margin: 0;">Library</h3>
-                        </div>
-                        <div style="padding: 10px; overflow-y: auto; flex: 1;">
-                             <div class="cat-sidebar-item active" onclick="catalog.filterCategory(null)">
-                                All Categories
-                             </div>
-                             <div id="catalog-categories-list">
-                                <!-- JS Injected -->
-                             </div>
+                    <div id="catalog-sidebar" style="width: 0px; background: var(--bg-dark); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transition: width 0.3s ease; overflow: hidden;">
+                        <div style="min-width: 250px; display: flex; flex-direction: column; height: 100%;">
+                            <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                                <h3 style="margin: 0;">Library</h3>
+                                <button class="icon-btn" onclick="catalog.toggleSidebar()" title="Close">✖</button>
+                            </div>
+                            <div style="padding: 10px; overflow-y: auto; flex: 1;">
+                                 <div class="cat-sidebar-item active" onclick="catalog.filterCategory(null)">
+                                    All Categories
+                                 </div>
+                                 <div id="catalog-categories-list">
+                                    <!-- JS Injected -->
+                                 </div>
+                            </div>
                         </div>
                     </div>
 
@@ -158,6 +161,7 @@
                         <!-- Header (Search & Actions) -->
                         <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
                              <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
+                                <button class="secondary" onclick="catalog.toggleSidebar()" title="Toggle Library" style="padding: 8px 12px;">📚 Library</button>
                                 <input type="text" id="catalog-search" placeholder="Search..."
                                    onkeyup="catalog.filter(this.value)"
                                    style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px 12px; border-radius:4px; font-size:0.9em; width:300px;">
@@ -175,8 +179,13 @@
                         </div>
 
                         <!-- Content Grid -->
-                        <div id="catalog-grid" class="catalog-grid" style="padding: 20px; overflow-y: auto; flex: 1;">
-                            <!-- JS Injected -->
+                        <div id="catalog-content-area" style="overflow-y: auto; flex: 1;">
+                            <!-- Hero Section (Injected via JS) -->
+                            <div id="catalog-hero-container"></div>
+
+                            <div id="catalog-grid" class="catalog-grid" style="padding: 20px;">
+                                <!-- JS Injected -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -298,6 +307,9 @@
                                     <button class="secondary" onclick="fetchGhReleases()" style="flex:0; display:flex; align-items:center; gap:5px;">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                         Fetch
+                                    </button>
+                                    <button class="icon-btn" onclick="fetchGhReleases()" style="border:1px solid var(--border-color); color:var(--accent-color); padding: 0 10px;" title="Refresh List">
+                                        🔄
                                     </button>
                                 </div>
                             </div>

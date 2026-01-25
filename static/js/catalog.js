@@ -147,6 +147,13 @@ const catalog = {
         const container = document.getElementById('catalog-grid');
         if (!container) return;
 
+        // Render Hero if this is the first page and we have items
+        if (catalog.state.page === 1 && catalog.state.items.length > 0) {
+            catalog.renderHero(catalog.state.items[0]);
+        } else if (catalog.state.items.length === 0) {
+             document.getElementById('catalog-hero-container').innerHTML = ''; // Clear hero if no results
+        }
+
         if (catalog.state.items.length === 0) {
             container.innerHTML = `<div class="catalog-empty">No items found matching your filters.</div>`;
             return;
@@ -195,6 +202,44 @@ const catalog = {
         });
     },
 
+    // --- Hero Section Renderer ---
+    renderHero: (item) => {
+        const heroContainer = document.getElementById('catalog-hero-container');
+        if(!heroContainer) return;
+
+        // Image Logic
+        let bgStyle = '';
+        if (item.image) {
+            const imgSrc = item.image.includes('/') ? item.image : `/api/catalog/image/${item.image}`;
+            bgStyle = `background-image: url('${imgSrc}');`;
+        } else {
+            bgStyle = `background: linear-gradient(135deg, #1f2335, #000);`;
+        }
+
+        const catDisplay = item.category ? item.category.split('/').pop() : 'Featured';
+        const dateStr = item.created_at ? item.created_at.substring(0, 10) : '';
+
+        heroContainer.innerHTML = `
+            <div class="hero-banner" style="${bgStyle}">
+                <div class="hero-overlay">
+                    <div class="hero-content">
+                        <div class="hero-label">LATEST ADDITION</div>
+                        <h1 class="hero-title">${item.title}</h1>
+                        <div class="hero-meta">
+                            <span>${catDisplay}</span> • <span>${item.size_human}</span> • <span>${dateStr}</span>
+                        </div>
+                        <div class="hero-actions">
+                             <button onclick="catalog.openDetail(catalog.state.items[0])" class="hero-btn-primary">
+                                 ▶ Details
+                             </button>
+                             ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="hero-btn-secondary">🌍 Open</a>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
     openDetail: (item) => {
         try {
             console.log("Opening detail for:", item);
@@ -212,15 +257,50 @@ const catalog = {
 
             // Check for assets
             let extraActions = '';
+            let linksContainerHtml = '';
             let fileInfo = `Filename: <code>${item.file_name || 'Unknown'}</code>`;
 
             if (item.assets && item.assets.length > 0) {
                 fileInfo = `Contains <strong>${item.assets.length}</strong> files. Total Size: <strong>${item.size_human || '0 B'}</strong>`;
-                // Add Copy Links button
+
+                // Build Hidden Links Container
+                let linksList = item.assets.map(a => `
+                    <div class="link-row">
+                        <div style="display:flex;align-items:center;gap:10px; overflow:hidden; flex:1;">
+                            <span style="font-size:1.2em;">📦</span>
+                            <span class="link-name" title="${a.name}">${a.name}</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span class="link-meta">${catalog._formatBytes(a.size)}</span>
+                            <button onclick="catalog.copySingleLink('${a.url}')" class="icon-btn" style="padding:4px 8px; font-size:0.9em; background:#2f3549; border:1px solid #414868;" title="Copy Link">📋</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                linksContainerHtml = `
+                    <div id="catalog-links-${item.id}" class="catalog-links-dropdown">
+                        <h4 style="margin:0 0 10px 0; color:#7dcfff;">Direct Download Links</h4>
+                        <div class="links-scroll-area">
+                            ${linksList}
+                        </div>
+                    </div>
+                `;
+
+                // Add Buttons (Stacked Layout as requested if applicable, but horizontal fits actions area better)
+                // User asked: "make like this button below add the current button expanded direct download links button"
+                // This implies the Show Links button should be below the Copy button?
+                // Let's use a small vertical flex container for these two specific actions if space permits, or just keep horizontal.
+                // Given the layout is flex-row, keeping them side-by-side is safer, but we use the new text.
+
                 extraActions = `
-                    <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4;" title="Copy all links for JDownloader">
-                        📋 Copy Links (JD)
-                    </button>
+                    <div style="display:flex; flex-direction:column; gap:5px; margin-right:15px;">
+                        <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4; padding: 10px 20px; font-size:1em;" title="Copy all links for JDownloader">
+                            📋 DL Links for JD
+                        </button>
+                        <button onclick="catalog.toggleLinks('${item.id}')" class="secondary" style="background-color: #2f3549; border: 1px solid #414868; padding: 8px; font-size:0.9em;">
+                            ⬇️ Show Links
+                        </button>
+                    </div>
                 `;
             }
 
@@ -235,6 +315,81 @@ const catalog = {
 
             // Date Safe Check
             const dateStr = item.created_at ? item.created_at.substring(0, 10) : 'Unknown Date';
+
+            // --- Parse Description / Tree ---
+            let contentsHtml = '';
+            let rawDesc = item.description || '';
+            const b64Marker = "**Original Structure (Base64):**";
+
+            // Split rawDesc into two parts: Tree (if any) and Rest
+            let treeHtml = '';
+            let restDesc = rawDesc;
+
+            if (rawDesc.includes(b64Marker)) {
+                try {
+                    let parts = rawDesc.split(b64Marker);
+                    // part[0] is header/intro, part[1] is tree + rest
+                    if (parts.length > 1) {
+                        let afterMarker = parts[1];
+                        // We expect tree in backticks `...`
+                        // Format: ...\n`{B64}`\n...
+                        let subParts = afterMarker.split('`');
+                        if (subParts.length >= 3) {
+                            // subParts[0] = newline before tree
+                            // subParts[1] = b64
+                            // subParts[2] = newline + rest of description
+                            let b64 = subParts[1];
+                            let extra = subParts[2];
+
+                            restDesc = parts[0] + extra; // Remove the tree part from text description
+
+                            if (b64) {
+                                const decoded = atob(b64.trim());
+                                const lines = decoded.split('\n');
+                                treeHtml = `<div class="catalog-contents-section"><div class="catalog-tree-view"><h3 style="margin-top:0; color:var(--accent-color);">📁 Archive Contents</h3><div class="tree-container">`;
+                                lines.forEach(line => {
+                                    const cleanLine = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                                    treeHtml += `<div class="tree-row">${cleanLine}</div>`;
+                                });
+                                treeHtml += `</div></div></div>`;
+                            }
+                        }
+                    }
+                } catch(e) { console.error("Tree parse error", e); }
+            }
+
+            // Build Description Section (Rich Text)
+            // If tree exists, we show it separately.
+            // We use restDesc for the text block.
+
+            if (restDesc && restDesc.trim().length > 0) {
+                contentsHtml = `<div class="catalog-contents-section"><h3 style="color:var(--accent-color);">📝 Release Notes & Details</h3><div style="background:#16161e; padding:20px; border-radius:8px; border:1px solid var(--border-color); white-space:pre-wrap;">${restDesc.trim()}</div></div>`;
+            }
+
+            // Combine
+            contentsHtml = treeHtml + contentsHtml;
+
+            // --- Parse & Display Enriched Metadata (Reference URL) ---
+            // We look for **Reference:** in the description and turn it into a clickable link
+            if (contentsHtml.includes("**Reference:**")) {
+                // This is a simple regex replace to make the link clickable in the rendered HTML
+                // Note: The `contentsHtml` already contains `rawDesc` inside a div.
+                // We will enhance `contentsHtml` to parse links.
+
+                // Safer approach: Re-process `contentsHtml` string? No, messy.
+                // Better: If we have contentsHtml (the standard description block), we inject linkify logic.
+
+                // Let's replace the raw text link with an anchor tag.
+                // Regex matches: **Reference:**\n(http...)
+                // We use [^\\s<]+ to stop before HTML tags or whitespace
+                contentsHtml = contentsHtml.replace(
+                    /\*\*Reference:\*\*\s*(https?:\/\/[^\s<]+)/g,
+                    '<strong style="color:#7dcfff;">Reference:</strong> <a href="$1" target="_blank" style="color:#bb9af7; text-decoration:underline;">$1</a>'
+                );
+
+                // Make "Details" bold header
+                contentsHtml = contentsHtml.replace(/\*\*Details:\*\*/g, '<h4 style="color:#e0af68; margin-bottom:5px;">Details</h4>');
+            }
 
             content.innerHTML = `
                 <div class="catalog-hero">
@@ -251,24 +406,26 @@ const catalog = {
                             ${tagHtml}
                         </div>
 
-                        <p class="catalog-desc">
+                        <div class="catalog-desc">
                             Securely archived in your private library.
                             <br>${fileInfo}
-                        </p>
+                        </div>
 
                         <div class="catalog-actions">
-                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg" style="margin-right: 15px;"><i class="fas fa-download"></i> Open Release</a>` : ''}
+                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg" style="margin-right: 15px;">🌍 Open Release</a>` : ''}
                             ${extraActions}
                             <div style="flex: 1;"></div> <!-- Spacer -->
                             <button onclick="catalog.openEditModal('${item.id}')" class="warning-btn btn-lg" style="color:#1a1b26; margin-right: 15px;">
-                                <i class="fas fa-edit"></i> Edit
+                                ✏️ Edit
                             </button>
                             <button onclick="catalog.deleteItem('${item.id}')" class="danger btn-lg">
-                                <i class="fas fa-trash"></i> Remove
+                                🗑️ Remove
                             </button>
                         </div>
+                        ${linksContainerHtml}
                     </div>
                 </div>
+                ${contentsHtml}
             `;
 
             // Switch View Manually (Simulate SwitchView but custom logic)
@@ -286,9 +443,69 @@ const catalog = {
         if(!item || !item.assets) return;
 
         const links = item.assets.map(a => a.url).join('\n');
-        navigator.clipboard.writeText(links).then(() => {
-            alert(`Copied ${item.assets.length} links to clipboard! Paste into JDownloader.`);
-        });
+
+        // Robust Copy Logic (Secure & Non-Secure)
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(links).then(() => {
+                showToast(`Copied ${item.assets.length} links!`, 'success');
+            }).catch(err => {
+                console.error("Clipboard API failed, trying fallback", err);
+                catalog._fallbackCopy(links);
+            });
+        } else {
+            catalog._fallbackCopy(links);
+        }
+    },
+
+    copySingleLink: (url) => {
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(url).then(() => showToast('Link Copied!'));
+        } else {
+            catalog._fallbackCopy(url);
+        }
+    },
+
+    _fallbackCopy: (text) => {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+
+        // Ensure it's not visible but part of DOM
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            if(successful) showToast('Copied to clipboard!', 'success');
+            else showToast('Copy failed.', 'error');
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+            showToast('Copy failed (Browser restriction)', 'error');
+        }
+
+        document.body.removeChild(textArea);
+    },
+
+    toggleLinks: (id) => {
+        const el = document.getElementById(`catalog-links-${id}`);
+        if(el.classList.contains('active')) {
+            el.classList.remove('active');
+        } else {
+            el.classList.add('active');
+            // Auto scroll to it
+            setTimeout(() => el.scrollIntoView({behavior: 'smooth', block: 'center'}), 100);
+        }
+    },
+
+    _formatBytes: (bytes) => {
+        if(bytes===0) return '0 B';
+        const k=1024, sizes=['B','KB','MB','GB','TB'];
+        const i=Math.floor(Math.log(bytes)/Math.log(k));
+        return parseFloat((bytes/Math.pow(k,i)).toFixed(2))+' '+sizes[i];
     },
 
     closeDetail: () => {
@@ -535,6 +752,17 @@ const catalog = {
             }
         } catch (e) {
             alert("Add failed: " + e);
+        }
+    },
+
+    toggleSidebar: () => {
+        const sb = document.getElementById('catalog-sidebar');
+        if (!sb) return;
+
+        if (sb.style.width === '0px' || sb.style.width === '') {
+            sb.style.width = '250px';
+        } else {
+            sb.style.width = '0px';
         }
     }
 };

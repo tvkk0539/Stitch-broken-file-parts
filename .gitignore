@@ -11,3 +11,4 @@ catalog.json
 rclone.conf
 downloads/
 data/
+catalog.db

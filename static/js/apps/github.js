@@ -748,7 +748,6 @@ async function fetchGhReleases() {
             releaseCard.style.background = 'var(--panel-bg)';
             releaseCard.style.border = '1px solid var(--border-color)';
             releaseCard.style.marginBottom = '10px';
-            releaseCard.style.borderRadius = '6px';
             releaseCard.style.overflow = 'hidden';
 
             const isLatest = index === 0;
@@ -773,20 +772,20 @@ async function fetchGhReleases() {
             const hasAssets = release.assets && release.assets.length > 0;
 
             // Buttons
-            const dlAllBtn = hasAssets ? `<button class="purple-btn gh-btn-action" data-action="dl-all" style="padding:2px 8px; font-size:0.7em; margin-left:10px;">Download All</button>` : '';
-            const delAllBtn = hasAssets ? `<button class="danger gh-btn-action" data-action="del-all" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color);">Trash All</button>` : '';
-            const delRelBtn = `<button class="danger gh-btn-action" data-action="del-rel" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color);">Del Release</button>`;
+            const dlAllBtn = hasAssets ? `<button class="purple-btn gh-btn-action" data-action="dl-all" style="padding:2px 8px; font-size:0.7em; margin-left:10px; flex-shrink:0;">Download All</button>` : '';
+            const delAllBtn = hasAssets ? `<button class="danger gh-btn-action" data-action="del-all" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color); flex-shrink:0;">Trash All</button>` : '';
+            const delRelBtn = `<button class="danger gh-btn-action" data-action="del-rel" style="padding:2px 8px; font-size:0.7em; margin-left:5px; background:none; border:1px solid var(--error-color); color:var(--error-color); flex-shrink:0;">Del Release</button>`;
 
             headerDiv.innerHTML = `
-                <div style="display:flex; align-items:center;">
-                    <div style="font-weight:bold; color:#c0caf5; font-size:1.1em;" class="gh-tag-text">${release.tag}</div>
+                <div style="display:flex; align-items:center; overflow-x:auto; margin-right:15px; padding-bottom:4px; flex:1; scrollbar-width:thin;">
+                    <div style="font-weight:bold; color:#c0caf5; font-size:1.1em; white-space:nowrap;" class="gh-tag-text">${release.tag}</div>
                     ${badge}
                     ${preBadge}
                     ${dlAllBtn}
                     ${delAllBtn}
                     ${delRelBtn}
                 </div>
-                <div style="font-size:0.8em; color:var(--text-muted); display:flex; align-items:center; gap:10px;">
+                <div style="font-size:0.8em; color:var(--text-muted); display:flex; align-items:center; gap:10px; flex-shrink:0;">
                     <span>${dateStr}</span>
                     <span style="transform: rotate(${isLatest?0:-90}deg); transition: transform 0.2s;" class="arrow-icon">▼</span>
                 </div>
@@ -831,14 +830,14 @@ async function fetchGhReleases() {
                     row.dataset.filename = asset.name.toLowerCase();
                     row.style.marginBottom = '5px';
                     row.innerHTML = `
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#565f89"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                        <div style="display:flex; align-items:center; gap:10px; overflow-x:auto; white-space:nowrap; flex:1; margin-right:10px; padding-bottom:2px;" class="gh-asset-info">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#565f89; flex-shrink:0;"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
                             <div>
                                 <div style="color:#a9b1d6; font-size:0.95em;">${asset.name}</div>
                                 <div style="font-size:0.75em; color:var(--text-muted);">${formatBytes(asset.size)}</div>
                             </div>
                         </div>
-                        <div style="display:flex; gap:5px;">
+                        <div style="display:flex; gap:5px; flex-shrink:0;">
                             <button class="icon-btn dl-btn" style="color:var(--success-color); border:1px solid #2f3549; padding:4px 8px; border-radius:4px;" title="Download">⬇️</button>
                             <button class="icon-btn del-btn" style="color:var(--error-color); border:1px solid #2f3549; padding:4px 8px; border-radius:4px;" title="Delete">🗑️</button>
                         </div>

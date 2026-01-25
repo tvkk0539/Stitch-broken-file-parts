@@ -64,13 +64,15 @@ class CatalogManager:
                         is_encrypted INTEGER,
                         image TEXT,
                         assets TEXT,     -- JSON list of dicts
-                        priority INTEGER DEFAULT 1 -- 2=High, 1=Normal, 0=Low
+                        priority INTEGER DEFAULT 1, -- 2=High, 1=Normal, 0=Low
+                        description TEXT
                     )
                 """)
                 conn.commit()
 
-            # Check for migration of priority column
+            # Check for migrations
             self._migrate_priority_column()
+            self._migrate_description_column()
 
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
@@ -87,6 +89,19 @@ class CatalogManager:
                     conn.commit()
         except Exception as e:
             logger.error(f"Priority Migration Error: {e}")
+
+    def _migrate_description_column(self):
+        """Adds description column if missing."""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("PRAGMA table_info(items)")
+                columns = [info[1] for info in cursor.fetchall()]
+                if 'description' not in columns:
+                    logger.info("Migrating DB: Adding description column...")
+                    conn.execute("ALTER TABLE items ADD COLUMN description TEXT")
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Description Migration Error: {e}")
 
     def _migrate_json_to_sqlite(self):
         """Imports legacy catalog.json into catalog.db if db is empty."""
@@ -206,7 +221,7 @@ class CatalogManager:
             logger.error(f"Get ID Error: {e}")
         return None
 
-    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None, priority=1):
+    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None, priority=1, description=None):
         if tags is None: tags = []
         if assets is None: assets = []
 
@@ -223,7 +238,8 @@ class CatalogManager:
             "is_encrypted": is_encrypted,
             "assets": assets,
             "image": image,
-            "priority": priority
+            "priority": priority,
+            "description": description
         }
 
     def add_entry(self, entry):
@@ -232,8 +248,8 @@ class CatalogManager:
             with self._get_conn() as conn:
                 conn.execute("""
                     INSERT INTO items (id, title, category, file_name, size_bytes, size_human,
-                                       release_url, created_at, tags, is_encrypted, image, assets, priority)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       release_url, created_at, tags, is_encrypted, image, assets, priority, description)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     entry['id'],
                     entry['title'],
@@ -247,7 +263,8 @@ class CatalogManager:
                     1 if entry['is_encrypted'] else 0,
                     entry['image'],
                     json.dumps(entry['assets']),
-                    entry.get('priority', 1)
+                    entry.get('priority', 1),
+                    entry.get('description', '')
                 ))
                 conn.commit()
 
@@ -318,7 +335,8 @@ class CatalogManager:
                         image = ?,
                         release_url = ?,
                         assets = ?,
-                        priority = ?
+                        priority = ?,
+                        description = ?
                     WHERE id = ?
                 """, (
                     data.get('title', current['title']),
@@ -328,6 +346,7 @@ class CatalogManager:
                     data.get('release_url', current['release_url']),
                     json.dumps(data.get('assets', current['assets'])),
                     int(data.get('priority', current.get('priority', 1))),
+                    data.get('description', current.get('description', '')),
                     item_id
                 ))
                 conn.commit()
@@ -364,12 +383,34 @@ class CatalogManager:
     def trigger_sync(self, message):
         """Calls SyncManager to push the DB file."""
         if SyncManager.is_configured():
+            # Export DB to JSON for safe backup
+            self._export_to_json()
+
             # Ensure we are syncing the DB file
             ok, msg = SyncManager.push_data(message)
             if ok:
                 logger.info(f"Sync Success: {msg}")
             else:
                 logger.error(f"Sync Failed: {msg}")
+
+    def _export_to_json(self):
+        """Exports the entire SQLite DB to catalog.json for backup."""
+        try:
+            # We use get_all with a very large limit to get everything
+            # In a real massive production app, we might stream this,
+            # but for a personal library (even 10k items), this is fine.
+            # Using 1M limit to ensure we get all.
+            items = self.get_all(page=1, limit=1000000)
+
+            # Remove any non-serializable fields if necessary
+            # (items returned by get_all are already dicts with parsed JSON)
+
+            with open(self.json_path, 'w', encoding='utf-8') as f:
+                json.dump(items, f, indent=2, ensure_ascii=False)
+
+            logger.info(f"Exported {len(items)} items to {self.json_path}")
+        except Exception as e:
+            logger.error(f"JSON Export Error: {e}")
 
     def fetch_github_metadata(self, url):
         """Proxy to GitHubManager to fetch release details."""
@@ -422,7 +463,8 @@ class CatalogManager:
                 'total_size': total_size,
                 'file_count': len(assets_out),
                 'assets': assets_out,
-                'tag': target_release['tag']
+                'tag': target_release['tag'],
+                'description': target_release.get('body', '')
             }
 
         except Exception as e:
