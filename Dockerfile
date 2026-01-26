@@ -15,10 +15,12 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     p7zip-full \
     rclone \
     curl \
+    unzip \
     procps \
     genisoimage \
     mediainfo \
     ffmpeg \
+    gpac \
     ca-certificates \
     git \
     && apt-get clean && \

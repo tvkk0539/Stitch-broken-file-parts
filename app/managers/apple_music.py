@@ -22,7 +22,8 @@ class AppleMusicManager:
         return {
             'go': shutil.which('go') is not None,
             'mp4decrypt': shutil.which('mp4decrypt') is not None,
-            'ffmpeg': shutil.which('ffmpeg') is not None
+            'ffmpeg': shutil.which('ffmpeg') is not None,
+            'mp4box': shutil.which('MP4Box') is not None
         }
 
     def find_config_path(self):
