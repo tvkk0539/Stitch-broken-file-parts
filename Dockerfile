@@ -20,7 +20,6 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     genisoimage \
     mediainfo \
     ffmpeg \
-    gpac \
     ca-certificates \
     git \
     && apt-get clean && \
@@ -40,6 +39,13 @@ RUN curl -L -o bento4.zip https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-6
     mv /usr/local/bento4/Bento4-SDK-1-6-0-641.x86_64-unknown-linux/* /usr/local/bento4/ && \
     rm -rf /usr/local/bento4/Bento4-SDK-1-6-0-641.x86_64-unknown-linux bento4.zip
 ENV PATH=$PATH:/usr/local/bento4/bin
+
+# Install GPAC (MP4Box)
+RUN curl -L -o gpac.deb https://download.tsi.telecom-paristech.fr/gpac/new_builds/gpac_latest_head_linux64.deb && \
+    apt-get update && apt-get install -y ./gpac.deb && \
+    rm gpac.deb && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set work directory
 WORKDIR /app
