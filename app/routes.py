@@ -65,10 +65,10 @@ def list_catalog():
     page = int(request.args.get('page', 1))
     limit = int(request.args.get('limit', 50))
     search = request.args.get('search', '')
-    tag = request.args.get('tag', '')
+    tags = request.args.get('tags', '') # Comma separated
     category = request.args.get('category', '')
 
-    items = catalog_manager.get_all(page, limit, search, tag, category)
+    items = catalog_manager.get_all(page, limit, search, tags, category)
     return jsonify(items)
 
 @bp.route('/api/catalog', methods=['POST'])

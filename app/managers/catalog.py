@@ -160,7 +160,7 @@ class CatalogManager:
         self._init_db()
         self._migrate_json_to_sqlite()
 
-    def get_all(self, page=1, limit=50, search=None, tag=None, category=None):
+    def get_all(self, page=1, limit=50, search=None, tags=None, category=None):
         """
         Retrieves paginated and filtered items.
         Sorted by Priority DESC, then CreatedAt DESC.
@@ -178,10 +178,16 @@ class CatalogManager:
             term = f"%{search.lower()}%"
             params.extend([term, term])
 
-        if tag:
-            # Simple tag search in JSON string
-            query += " AND tags LIKE ?"
-            params.append(f"%{tag}%")
+        if tags:
+            # Multi-tag filtering (AND logic)
+            # If tags is a string, make list
+            if isinstance(tags, str):
+                tags = [t.strip() for t in tags.split(',') if t.strip()]
+
+            # For each tag, add a LIKE condition
+            for t in tags:
+                query += " AND tags LIKE ?"
+                params.append(f"%{t}%")
 
         # Sort: High Priority first (2), then Normal (1), then Low (0), then Date
         query += " ORDER BY priority DESC, created_at DESC LIMIT ? OFFSET ?"
