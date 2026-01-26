@@ -1,3 +1,20 @@
+# Stage 1: Build static MP4Box (GPAC)
+FROM python:3.11-slim AS gpac-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    git \
+    zlib1g-dev \
+    ca-certificates
+
+WORKDIR /src
+RUN git clone --depth 1 https://github.com/gpac/gpac.git . && \
+    ./configure --static-bin --use-zlib=no && \
+    make -j$(nproc) && \
+    strip bin/gcc/MP4Box
+
+# Stage 2: Final Image
 FROM python:3.11-slim
 
 # Set environment variables
@@ -40,12 +57,8 @@ RUN curl -L -o bento4.zip https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-6
     rm -rf /usr/local/bento4/Bento4-SDK-1-6-0-641.x86_64-unknown-linux bento4.zip
 ENV PATH=$PATH:/usr/local/bento4/bin
 
-# Install GPAC (MP4Box)
-RUN curl -L -o gpac.deb https://download.tsi.telecom-paristech.fr/gpac/new_builds/gpac_latest_head_linux64.deb && \
-    apt-get update && apt-get install -y ./gpac.deb && \
-    rm gpac.deb && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Install MP4Box from builder
+COPY --from=gpac-builder /src/bin/gcc/MP4Box /usr/local/bin/MP4Box
 
 # Set work directory
 WORKDIR /app
