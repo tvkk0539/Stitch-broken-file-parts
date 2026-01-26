@@ -256,11 +256,247 @@
                         <div class="app-name">GitHub Manager</div>
                         <div class="app-desc">Download releases or publish assets to GitHub.</div>
                     </div>
+                    <!-- Apple Music Downloader -->
+                    <div class="app-card" onclick="openAppleMusicApp()">
+                        <!-- Apple Music SVG Logo (Custom) -->
+                        <svg class="app-icon-svg" viewBox="0 0 512 512" style="filter: drop-shadow(0 0 10px rgba(250, 35, 59, 0.4));">
+                            <rect width="512" height="512" rx="15%" fill="url(#am-grad)" />
+                            <linearGradient id="am-grad" x1=".5" y1=".99" x2=".5" y2=".02">
+                                <stop offset="0" stop-color="#FA233B"/>
+                                <stop offset="1" stop-color="#FB5C74"/>
+                            </linearGradient>
+                            <path fill="#ffffff" d="M199 359V199q0-9 10-11l138-28q11-2 12 10v122q0 15-45 20c-57 9-48 105 30 79 30-11 35-40 35-69V88s0-20-17-15l-170 35s-13 2-13 18v203q0 15-45 20c-57 9-48 105 30 79 30-11 35-40 35-69"/>
+                        </svg>
+                        <div class="app-name">Apple Music Downloader</div>
+                        <div class="app-desc">Download Songs, Albums, and Playlists in high quality.</div>
+                    </div>
+
                     <!-- Future Apps Placeholders -->
                     <div class="app-card" style="opacity:0.3; cursor:default; border-style:dashed;">
                         <svg class="app-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                         <div class="app-name">Add App</div>
                         <div class="app-desc">More tools coming soon...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: APPLE MUSIC APP -->
+            <div id="view-apple-music" class="view-section">
+                <!-- Header -->
+                <div style="display:flex; align-items:center; margin-bottom:20px;">
+                    <button class="icon-btn" onclick="switchView('apps')" style="margin-right:15px; color:var(--text-muted);" title="Back to Apps">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    </button>
+                    <h2 style="margin:0; display:flex; align-items:center; gap:10px;">
+                        <svg width="28" height="28" viewBox="0 0 512 512">
+                            <rect width="512" height="512" rx="15%" fill="url(#am-grad-sm)" />
+                            <linearGradient id="am-grad-sm" x1=".5" y1=".99" x2=".5" y2=".02">
+                                <stop offset="0" stop-color="#FA233B"/>
+                                <stop offset="1" stop-color="#FB5C74"/>
+                            </linearGradient>
+                            <path fill="#ffffff" d="M199 359V199q0-9 10-11l138-28q11-2 12 10v122q0 15-45 20c-57 9-48 105 30 79 30-11 35-40 35-69V88s0-20-17-15l-170 35s-13 2-13 18v203q0 15-45 20c-57 9-48 105 30 79 30-11 35-40 35-69"/>
+                        </svg>
+                        Apple Music Downloader
+                    </h2>
+                </div>
+
+                <!-- AM Tabs -->
+                <div class="browser-header" style="margin-bottom: 20px;">
+                    <div class="browser-tabs">
+                        <button id="am-tab-down" class="browser-tab active" onclick="appleMusic.switchTab('down')">Downloader</button>
+                        <button id="am-tab-config" class="browser-tab" onclick="appleMusic.switchTab('config')">Config</button>
+                        <button id="am-tab-wrapper" class="browser-tab" onclick="appleMusic.switchTab('wrapper')">Wrapper</button>
+                        <button id="am-tab-setup" class="browser-tab" onclick="appleMusic.switchTab('setup')">Setup</button>
+                    </div>
+                </div>
+
+                <!-- TAB: DOWNLOADER -->
+                <div id="am-view-down">
+                    <div style="display:flex; gap:20px; height:100%;">
+                        <!-- Left: Search & Queue -->
+                        <div style="flex:1; display:flex; flex-direction:column; max-width:500px;">
+
+                            <!-- Input Box -->
+                            <div style="background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:20px;">
+                                <div class="form-group">
+                                    <label>Apple Music URL</label>
+                                    <input type="text" id="am-url-input" placeholder="https://music.apple.com/us/album/...">
+                                </div>
+                                <div style="display:flex; gap:10px;">
+                                    <select id="am-fmt" style="width:100px; background:#13141c; color:#c0caf5; border:1px solid var(--border-color); border-radius:4px; padding:5px;">
+                                        <option value="m4a">M4A (AAC)</option>
+                                        <option value="mp3">MP3</option>
+                                        <option value="flac">FLAC</option>
+                                    </select>
+                                    <button id="am-fetch-btn" class="purple-btn" style="flex:1;" onclick="appleMusic.handleFetch()">Fetch & Download</button>
+                                </div>
+                            </div>
+
+                            <!-- Queue -->
+                            <h3 style="margin:0 0 10px 0; color:var(--text-muted); font-size:1em; text-transform:uppercase; letter-spacing:1px;">Download Queue</h3>
+                            <div id="am-queue-list" style="flex:1; overflow-y:auto; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:10px;">
+                                <!-- Items injected here -->
+                                <div style="text-align:center; color:var(--text-muted); margin-top:20px;">Queue is empty</div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Results Preview -->
+                        <div id="am-results-area" style="flex:2; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); display:none; flex-direction:column; overflow:hidden;">
+                            <!-- Album Header -->
+                            <div style="display:flex; padding:20px; border-bottom:1px solid var(--border-color); gap:20px; align-items:flex-end; background:linear-gradient(to bottom, rgba(0,0,0,0.3), transparent);">
+                                <img id="am-cover-img" src="" style="width:150px; height:150px; border-radius:6px; box-shadow:0 4px 15px rgba(0,0,0,0.5);">
+                                <div>
+                                    <h1 id="am-album-title" style="margin:0; font-size:2em;">Album Title</h1>
+                                    <div id="am-album-artist" style="color:var(--accent-color); font-size:1.2em; margin-bottom:5px;">Artist Name</div>
+                                    <div id="am-album-meta" style="color:var(--text-muted);">2024 • 12 Tracks</div>
+                                    <button onclick="appleMusic.addToQueue()" class="secondary" style="margin-top:10px;">⬇️ Download All</button>
+                                </div>
+                            </div>
+
+                            <!-- Tracklist -->
+                            <div id="am-tracklist" style="padding:10px; overflow-y:auto; flex:1;">
+                                <!-- Rows injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: SETUP -->
+                <div id="am-view-setup" style="display:none;">
+                    <div style="max-width:700px; margin:0 auto;">
+
+                        <!-- Quick Install Card -->
+                        <div style="background:linear-gradient(135deg, #1f2335 0%, #13141c 100%); padding:25px; border-radius:8px; border:1px solid #7aa2f7; margin-bottom:30px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                            <h3 style="margin-top:0; color:#7aa2f7; display:flex; align-items:center; gap:10px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H8l4-4 4 4h-3v4h-2z"/></svg>
+                                Recommended Installation
+                            </h3>
+                            <p style="color:#c0caf5; margin-bottom:20px;">
+                                <strong>Apple Music Downloader (zhaarey)</strong><br>
+                                <span style="font-size:0.9em; opacity:0.8;">A powerful, open-source Python tool for downloading M4A/MP3/FLAC from Apple Music.</span>
+                            </p>
+                            <button class="secondary" style="background:#7aa2f7; color:#15161e; font-weight:bold; border:none;" onclick="appleMusic.installRecommended()">
+                                ⬇️ Install Recommended Tool
+                            </button>
+                        </div>
+
+                        <!-- Custom Install -->
+                        <div style="background:var(--panel-bg); padding:25px; border-radius:8px; border:1px solid var(--border-color);">
+                            <h3 style="margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:15px; font-size:1.1em;">Custom Repository</h3>
+
+                            <div class="form-group">
+                                <label>Repository URL (GitHub / Bitbucket)</label>
+                                <div style="display:flex; gap:10px;">
+                                    <input type="text" id="am-setup-url" placeholder="https://github.com/user/repo.git">
+                                    <button class="secondary" onclick="appleMusic.handleImportRepo()" style="flex:0; white-space:nowrap;">Import</button>
+                                </div>
+                                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Clones into <code>/data/downloads/Apple Music/{RepoName}</code></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- TAB: CONFIG -->
+                <div id="am-view-config" style="display:none;">
+                    <div style="max-width:800px; margin:0 auto; background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
+                            <h3 style="margin:0;">Configuration Editor</h3>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <div id="am-config-path" style="font-family:monospace; font-size:0.8em; color:var(--text-muted); max-width:400px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+                                <button class="secondary" onclick="appleMusic.loadConfig()">🔄 Refresh</button>
+                                <button class="purple-btn" onclick="appleMusic.saveConfig()">💾 Save Changes</button>
+                            </div>
+                        </div>
+
+                        <div id="am-config-loader" style="text-align:center; padding:50px;">
+                            <div class="spinner-border"></div> Loading config...
+                        </div>
+
+                        <div id="am-config-error" style="display:none; text-align:center; padding:30px; color:var(--danger-color);"></div>
+
+                        <div id="am-config-form" style="display:none; display:grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap:20px;">
+                            <!-- Form injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: WRAPPER (Decrypt Service) -->
+                <div id="am-view-wrapper" style="display:none; height: calc(100vh - 200px);">
+                    <div style="display:flex; gap:20px; height:100%;">
+
+                        <!-- Left: Control Panel -->
+                        <div style="width:350px; display:flex; flex-direction:column; gap:20px;">
+
+                            <!-- Status Card -->
+                            <div style="background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color);">
+                                <h3 style="margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:15px;">Service Status</h3>
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:15px;">
+                                    <span style="color:var(--text-muted);">State:</span>
+                                    <span id="am-wrap-state" class="badge badge-gray">UNKNOWN</span>
+                                </div>
+                                <div style="display:flex; align-items:center; justify-content:space-between;">
+                                    <span style="color:var(--text-muted);">PID:</span>
+                                    <span id="am-wrap-pid" style="font-family:monospace;">-</span>
+                                </div>
+                            </div>
+
+                            <!-- Install Card (Conditional) -->
+                            <div id="am-wrap-install-card" style="display:none; background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid #e0af68;">
+                                <h4 style="margin-top:0; color:#e0af68; border-bottom:1px solid #e0af68; padding-bottom:10px; margin-bottom:15px;">⚠️ Not Installed</h4>
+                                <p style="font-size:0.9em; color:var(--text-muted); margin-bottom:15px;">The Wrapper binary (v2 Linux x86_64) is missing.</p>
+
+                                <!-- Recommended -->
+                                <button onclick="appleMusic.installWrapper()" class="secondary" style="width:100%; margin-bottom:20px; padding:10px; font-weight:bold;">⬇️ Quick Install (Recommended)</button>
+
+                                <!-- Custom URL -->
+                                <div style="border-top:1px solid var(--border-color); padding-top:15px;">
+                                    <label style="font-size:0.8em; color:var(--text-muted); display:block; margin-bottom:5px;">Advanced: Custom URL (Zip)</label>
+                                    <div style="display:flex; gap:5px;">
+                                        <input type="text" id="am-wrap-custom-url" placeholder="https://..." style="flex:1; background:#13141c; border:1px solid var(--border-color); color:var(--text-color); font-size:0.8em; padding:5px; border-radius:4px;">
+                                        <button onclick="appleMusic.installWrapper(true)" class="icon-btn" style="border:1px solid var(--border-color); padding:5px 10px; font-size:0.8em;" title="Install Custom">⬇️</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Controls Card -->
+                            <div id="am-wrap-control-card" style="display:none; background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color); flex:1;">
+                                <h3 style="margin-top:0; margin-bottom:15px;">Service Control</h3>
+                                <div class="form-group">
+                                    <label>Apple ID (Email)</label>
+                                    <input type="text" id="am-wrap-user" placeholder="user@icloud.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>Password</label>
+                                    <input type="password" id="am-wrap-pass" placeholder="Required for 2FA init">
+                                </div>
+                                <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
+                                    <button id="am-wrap-start-btn" onclick="appleMusic.startWrapper()" class="purple-btn">▶ Start Service</button>
+                                    <button id="am-wrap-stop-btn" onclick="appleMusic.stopWrapper()" class="danger" style="display:none;">⏹ Stop Service</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Console Output -->
+                        <div style="flex:1; display:flex; flex-direction:column; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
+                            <div style="padding:10px; background:#13141c; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-family:monospace; font-weight:bold; color:var(--accent-color);"> >_ wrapper.log</span>
+                                <span style="font-size:0.8em; color:var(--text-muted);">Updates automatically</span>
+                            </div>
+
+                            <div id="am-wrap-console" style="flex:1; padding:15px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:0.9em; color:#9ece6a; white-space:pre-wrap;">
+                                <!-- Logs Injected Here -->
+                                <span style="color:var(--text-muted);">Waiting for output...</span>
+                            </div>
+
+                            <!-- Input Area (Always visible for interaction) -->
+                            <div style="padding:10px; background:#1a1b26; border-top:1px solid var(--border-color); display:flex; gap:10px;">
+                                <input type="text" id="am-wrap-input" placeholder="Type command or 2FA code here..."
+                                       style="flex:1; background:#13141c; border:1px solid var(--border-color); color:#c0caf5; padding:8px; border-radius:4px; font-family:monospace;">
+                                <button onclick="appleMusic.sendWrapperInput()" class="secondary" style="white-space:nowrap;">Send ↵</button>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -922,5 +1158,6 @@
     <script src="/static/js/catalog.js"></script>
     <script src="/static/js/automation.js"></script>
     <script src="/static/js/apps/github.js"></script>
+    <script src="/static/js/apps/apple_music.js"></script>
 </body>
 </html>
