@@ -1102,6 +1102,10 @@ def apple_music_update_config():
     data = request.json
     return jsonify(apple_music_manager.update_config(data))
 
+@bp.route('/api/apps/apple-music/dependencies', methods=['GET'])
+def apple_music_dependencies():
+    return jsonify(apple_music_manager.check_dependencies())
+
 # --- Apps: Apple Music Wrapper ---
 am_wrapper = AppleMusicWrapperManager()
 

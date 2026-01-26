@@ -1,6 +1,8 @@
 import os
 from ruamel.yaml import YAML
 from app.core.job_manager import log
+import subprocess
+import shutil
 
 class AppleMusicManager:
     """
@@ -14,6 +16,14 @@ class AppleMusicManager:
         self.yaml = YAML()
         self.yaml.preserve_quotes = True
         self.yaml.indent(mapping=2, sequence=4, offset=2)
+
+    def check_dependencies(self):
+        """Checks if external tools (Go, mp4decrypt, ffmpeg) are available."""
+        return {
+            'go': shutil.which('go') is not None,
+            'mp4decrypt': shutil.which('mp4decrypt') is not None,
+            'ffmpeg': shutil.which('ffmpeg') is not None
+        }
 
     def find_config_path(self):
         """
