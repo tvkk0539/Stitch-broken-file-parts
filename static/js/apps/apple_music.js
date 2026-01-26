@@ -505,7 +505,15 @@ const appleMusic = {
         }
 
         const args = {};
-        // Future: Check for checkboxes like atmos/aac
+
+        // Gather Options
+        if (document.getElementById('am-opt-atmos').checked) args.atmos = true;
+        if (document.getElementById('am-opt-aac').checked) args.aac = true;
+        if (document.getElementById('am-opt-song').checked) args.song = true;
+        if (document.getElementById('am-opt-select').checked) {
+            const sel = document.getElementById('am-opt-select-val').value.trim();
+            if (sel) args.select = sel;
+        }
 
         if(!confirm(`Start download for:\n${url}`)) return;
 
