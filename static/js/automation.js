@@ -478,7 +478,7 @@ function updateStepConfigUI(select) {
         c4.style.display = 'block';
         const contentOpts = `
             <option value="standard">Standard (Details + Stats)</option>
-            <option value="tree_only" selected>Tree Only (Base64 + Stats)</option>
+            <option value="tree_only" selected>Tree Only + Stats (No Signature No Header)</option>
             <option value="clean">Clean (Assets Only)</option>
         `;
         c4 = ensureSelect(c4, contentOpts);
