@@ -64,6 +64,7 @@ class ArchiveManager:
                 cwd=parent_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
                 universal_newlines=True
             )
             job_manager.set_current_process(process)
@@ -129,6 +130,7 @@ class ArchiveManager:
                         cwd=parent_dir,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
+                        stdin=subprocess.DEVNULL,
                         universal_newlines=True
                     )
                     job_manager.set_current_process(p2_process)
@@ -202,6 +204,14 @@ class ArchiveManager:
 
         elif fmt == 'iso':
             # Use genisoimage for ISO creation
+            # Force cleanup first since genisoimage might prompt if file exists
+            if os.path.exists(os.path.join(parent_dir, archive_name)):
+                try:
+                    os.remove(os.path.join(parent_dir, archive_name))
+                    log(f"Removed existing ISO: {archive_name}")
+                except Exception as e:
+                    log(f"Warning: Could not remove existing ISO: {e}")
+
             # -J: Joliet extensions (Windows compat)
             # -R: Rock Ridge extensions (Linux compat)
             # -V: Volume ID
@@ -233,6 +243,7 @@ class ArchiveManager:
                 cwd=parent_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
                 universal_newlines=True
             )
             job_manager.set_current_process(process)
