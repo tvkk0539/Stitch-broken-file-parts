@@ -450,8 +450,8 @@ function updateStepConfigUI(select) {
 
         // Config 3: Obfuscation
         const obfOpts = `
-            <option value="false" selected>No Obfuscation</option>
-            <option value="true">Base64 Scramble</option>
+            <option value="false">No Obfuscation</option>
+            <option value="true" selected>Base64 Scramble</option>
         `;
         c3 = ensureSelect(c3, obfOpts);
 
