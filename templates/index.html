@@ -340,22 +340,14 @@
                             </div>
                         </div>
 
-                        <!-- Right: Results Preview -->
-                        <div id="am-results-area" style="flex:2; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); display:none; flex-direction:column; overflow:hidden;">
-                            <!-- Album Header -->
-                            <div style="display:flex; padding:20px; border-bottom:1px solid var(--border-color); gap:20px; align-items:flex-end; background:linear-gradient(to bottom, rgba(0,0,0,0.3), transparent);">
-                                <img id="am-cover-img" src="" style="width:150px; height:150px; border-radius:6px; box-shadow:0 4px 15px rgba(0,0,0,0.5);">
-                                <div>
-                                    <h1 id="am-album-title" style="margin:0; font-size:2em;">Album Title</h1>
-                                    <div id="am-album-artist" style="color:var(--accent-color); font-size:1.2em; margin-bottom:5px;">Artist Name</div>
-                                    <div id="am-album-meta" style="color:var(--text-muted);">2024 • 12 Tracks</div>
-                                    <button onclick="appleMusic.addToQueue()" class="secondary" style="margin-top:10px;">⬇️ Download All</button>
-                                </div>
+                        <!-- Right: Downloader Console -->
+                        <div style="flex:2; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; display:flex; flex-direction:column; overflow:hidden;">
+                            <div style="padding:10px; background:#13141c; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-family:monospace; font-weight:bold; color:var(--accent-color);"> >_ downloader.log</span>
+                                <span style="font-size:0.8em; color:var(--text-muted);">Live Output</span>
                             </div>
-
-                            <!-- Tracklist -->
-                            <div id="am-tracklist" style="padding:10px; overflow-y:auto; flex:1;">
-                                <!-- Rows injected here -->
+                            <div id="am-dl-console" style="flex:1; padding:15px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:0.9em; color:#9ece6a; white-space:pre-wrap;">
+                                <span style="color:var(--text-muted);">Waiting for jobs...</span>
                             </div>
                         </div>
                     </div>

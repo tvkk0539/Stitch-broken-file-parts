@@ -13,10 +13,28 @@ class AppleMusicManager:
     BASE_DIR = os.environ.get('DOWNLOAD_ROOT', '/data/downloads')
     APP_DIR = os.path.join(BASE_DIR, 'Apple Music')
 
+    # Shared state for isolated logging
+    _log_history = []
+    _running_process = None
+
     def __init__(self):
         self.yaml = YAML()
         self.yaml.preserve_quotes = True
         self.yaml.indent(mapping=2, sequence=4, offset=2)
+
+    @classmethod
+    def _append_log(cls, message):
+        cls._log_history.append(message)
+        if len(cls._log_history) > 200:
+            cls._log_history.pop(0)
+
+    @classmethod
+    def get_downloader_status(cls):
+        running = cls._running_process is not None and cls._running_process.poll() is None
+        return {
+            'running': running,
+            'logs': cls._log_history
+        }
 
     def check_dependencies(self):
         """Checks if external tools (Go, mp4decrypt, ffmpeg) are available."""
@@ -170,16 +188,21 @@ class AppleMusicManager:
                 env={**os.environ, 'PATH': os.environ.get('PATH', '')}
             )
             job_manager.set_current_process(process)
+            AppleMusicManager._running_process = process # Track for status polling
 
             for line in process.stdout:
                 line = line.strip()
                 if line:
+                    # Dual logging: Global Job Log + Isolated Console
                     log(f"[AM-DL] {line}")
+                    AppleMusicManager._append_log(line)
+
                     # Try to parse progress or status
                     if "Downloading" in line:
                         job_manager.update_job_details({'action': line})
 
             process.wait()
+            AppleMusicManager._running_process = None # Clear when done
 
             if process.returncode == 0:
                 log("Download Complete.")

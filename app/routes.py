@@ -1121,6 +1121,10 @@ def apple_music_download():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/apps/apple-music/downloader/status', methods=['GET'])
+def apple_music_downloader_status():
+    return jsonify(AppleMusicManager.get_downloader_status())
+
 # --- Apps: Apple Music Wrapper ---
 am_wrapper = AppleMusicWrapperManager()
 

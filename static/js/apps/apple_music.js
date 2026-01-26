@@ -497,10 +497,6 @@ const appleMusic = {
 
     // --- REAL DOWNLOADER LOGIC ---
 
-    // We removed the Mock Fetch logic because the tool (CLI) handles everything
-    // including fetching metadata and downloading in one go.
-    // So "Fetch" now just triggers the download directly.
-
     handleFetch: async () => {
         const url = document.getElementById('am-url-input').value;
         if (!url) {
@@ -508,12 +504,8 @@ const appleMusic = {
             return;
         }
 
-        // Collect basic args if we had UI for them (e.g. checkbox for atmos)
-        // For now, standard download.
         const args = {};
-
-        // Example: Check for Dolby Atmos toggle if exists in UI (future)
-        // if (document.getElementById('am-opt-atmos')?.checked) args.atmos = true;
+        // Future: Check for checkboxes like atmos/aac
 
         if(!confirm(`Start download for:\n${url}`)) return;
 
@@ -529,27 +521,49 @@ const appleMusic = {
                 showToast("Download Started!", "success");
                 document.getElementById('am-url-input').value = '';
 
-                // Add to UI Queue (Visual only, real status in Job Queue)
-                const qContainer = document.getElementById('am-queue-list');
-                const item = document.createElement('div');
-                item.className = 'am-queue-item';
-                item.innerHTML = `
-                    <div>
-                        <div style="font-weight:bold;">${url}</div>
-                        <div style="font-size:0.8em; color:var(--text-muted);">Job ID: ${data.job_id}</div>
-                    </div>
-                    <div style="color:var(--accent-color);">Queued</div>
-                `;
-                qContainer.prepend(item);
-
-                // Optional: redirect to Queue tab
-                // switchView('queue');
+                // Start Polling Console
+                appleMusic.startConsolePoll();
             } else {
                 showToast("Error: " + data.error, "error");
             }
         } catch (e) {
             showToast("Request Failed: " + e, "error");
         }
+    },
+
+    // --- CONSOLE LOGIC ---
+    downloaderPollInterval: null,
+
+    startConsolePoll: () => {
+        if(appleMusic.downloaderPollInterval) clearInterval(appleMusic.downloaderPollInterval);
+        appleMusic.pollConsole(); // Immediate
+        appleMusic.downloaderPollInterval = setInterval(appleMusic.pollConsole, 1000);
+    },
+
+    pollConsole: async () => {
+        try {
+            const res = await fetch('/api/apps/apple-music/downloader/status');
+            const data = await res.json();
+
+            const consoleEl = document.getElementById('am-dl-console');
+            if(!consoleEl) return;
+
+            // Only update if logs changed to avoid flicker/perf issues?
+            // Simple approach: join and replace
+            const text = data.logs.join('\n');
+            if (consoleEl.innerText !== text) {
+                consoleEl.innerText = text;
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+
+            if (!data.running && appleMusic.downloaderPollInterval) {
+                // Stop polling if finished? Or keep polling for a bit?
+                // User might want to see the last message.
+                // Let's keep polling slowly or stop after 10s of inactivity?
+                // Ideally, keep polling so user sees "Download Complete" message.
+                // We'll leave it running for now as long as the tab is open.
+            }
+        } catch(e) { console.error("Console poll failed", e); }
     },
 
     // Legacy mock functions removed/stubbed
