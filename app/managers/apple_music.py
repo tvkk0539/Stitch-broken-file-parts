@@ -24,6 +24,16 @@ class AppleMusicManager:
 
     @classmethod
     def _append_log(cls, message):
+        # Progress Bar Debouncing
+        # If new message is progress, and last message was progress, replace it.
+        is_progress = message.startswith("Downloading...") or message.startswith("Decrypting...")
+
+        if is_progress and cls._log_history:
+            last = cls._log_history[-1]
+            if last.startswith("Downloading...") or last.startswith("Decrypting..."):
+                cls._log_history[-1] = message
+                return
+
         cls._log_history.append(message)
         if len(cls._log_history) > 200:
             cls._log_history.pop(0)
@@ -193,11 +203,15 @@ class AppleMusicManager:
             for line in process.stdout:
                 line = line.strip()
                 if line:
-                    # Dual logging: Global Job Log + Isolated Console
-                    log(f"[AM-DL] {line}")
+                    # Filter System Log: Don't spam "Downloading..."
+                    is_progress = line.startswith("Downloading...") or line.startswith("Decrypting...")
+                    if not is_progress:
+                        log(f"[AM-DL] {line}")
+
+                    # Update Console (Debounced)
                     AppleMusicManager._append_log(line)
 
-                    # Try to parse progress or status
+                    # Update Job UI status
                     if "Downloading" in line:
                         job_manager.update_job_details({'action': line})
 
