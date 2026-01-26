@@ -55,15 +55,15 @@ const appleMusic = {
     },
 
     switchTab: (tab) => {
-        // Tabs: 'down', 'config', 'wrapper', 'setup'
+        // Tabs: 'down', 'console', 'config', 'wrapper', 'setup'
         document.querySelectorAll('.browser-tab').forEach(b => b.classList.remove('active'));
         const tabBtn = document.getElementById(`am-tab-${tab}`);
         if(tabBtn) tabBtn.classList.add('active');
 
-        document.getElementById('am-view-down').style.display = 'none';
-        document.getElementById('am-view-setup').style.display = 'none';
-        document.getElementById('am-view-config').style.display = 'none';
-        document.getElementById('am-view-wrapper').style.display = 'none';
+        ['down', 'console', 'setup', 'config', 'wrapper'].forEach(t => {
+            const el = document.getElementById(`am-view-${t}`);
+            if(el) el.style.display = 'none';
+        });
 
         document.getElementById(`am-view-${tab}`).style.display = 'block';
 
@@ -73,11 +73,19 @@ const appleMusic = {
             appleMusic.state.wrapperPollInterval = null;
         }
 
+        // Stop console poll if leaving console (optional, saves bandwidth)
+        if (tab !== 'console' && appleMusic.downloaderPollInterval) {
+             clearInterval(appleMusic.downloaderPollInterval);
+             appleMusic.downloaderPollInterval = null;
+        }
+
         if (tab === 'config') {
             appleMusic.loadConfig();
         } else if (tab === 'wrapper') {
             appleMusic.checkWrapperStatus();
             appleMusic.state.wrapperPollInterval = setInterval(appleMusic.checkWrapperStatus, 2000);
+        } else if (tab === 'console') {
+            appleMusic.startConsolePoll();
         }
     },
 
@@ -510,9 +518,23 @@ const appleMusic = {
         if (document.getElementById('am-opt-atmos').checked) args.atmos = true;
         if (document.getElementById('am-opt-aac').checked) args.aac = true;
         if (document.getElementById('am-opt-song').checked) args.song = true;
+        if (document.getElementById('am-opt-all-album').checked) args['all-album'] = true;
+
         if (document.getElementById('am-opt-select').checked) {
             const sel = document.getElementById('am-opt-select-val').value.trim();
             if (sel) args.select = sel;
+        }
+
+        // MV Options
+        if (document.getElementById('am-opt-mv').checked) {
+            // Wait, does the tool have a --mv flag? User said default is MV Downloader?
+            // "this is Music Video Downloader by default you gave --mv-max 2160"
+            // Assuming passing URL to a MV automatically downloads it, but --mv-max controls quality.
+            // But if it's an album and we want MVs?
+            // Usually tools auto-detect.
+            // However, to pass --mv-max, we need to read the input.
+            const max = document.getElementById('am-opt-mv-max').value;
+            if(max) args['mv-max'] = parseInt(max);
         }
 
         if(!confirm(`Start download for:\n${url}`)) return;

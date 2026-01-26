@@ -35,7 +35,7 @@ class AppleMusicManager:
                 return
 
         cls._log_history.append(message)
-        if len(cls._log_history) > 200:
+        if len(cls._log_history) > 1000:
             cls._log_history.pop(0)
 
     @classmethod
