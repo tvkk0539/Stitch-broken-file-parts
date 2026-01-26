@@ -351,18 +351,37 @@
 
                 <!-- TAB: SETUP -->
                 <div id="am-view-setup" style="display:none;">
-                    <div style="background:var(--panel-bg); padding:30px; border-radius:8px; border:1px solid var(--border-color); max-width:600px; margin:0 auto;">
-                        <h3 style="margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:15px; margin-bottom:20px;">Import Repository</h3>
+                    <div style="max-width:700px; margin:0 auto;">
 
-                        <div class="form-group">
-                            <label>Repository URL (GitHub / Bitbucket)</label>
-                            <input type="text" id="am-setup-url" placeholder="https://github.com/user/repo.git">
-                            <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">The repository will be cloned into <code>/data/downloads/Apple Music/</code></div>
+                        <!-- Quick Install Card -->
+                        <div style="background:linear-gradient(135deg, #1f2335 0%, #13141c 100%); padding:25px; border-radius:8px; border:1px solid #7aa2f7; margin-bottom:30px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                            <h3 style="margin-top:0; color:#7aa2f7; display:flex; align-items:center; gap:10px;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H8l4-4 4 4h-3v4h-2z"/></svg>
+                                Recommended Installation
+                            </h3>
+                            <p style="color:#c0caf5; margin-bottom:20px;">
+                                <strong>Apple Music Downloader (zhaarey)</strong><br>
+                                <span style="font-size:0.9em; opacity:0.8;">A powerful, open-source Python tool for downloading M4A/MP3/FLAC from Apple Music.</span>
+                            </p>
+                            <button class="secondary" style="background:#7aa2f7; color:#15161e; font-weight:bold; border:none;" onclick="appleMusic.installRecommended()">
+                                ⬇️ Install Recommended Tool
+                            </button>
                         </div>
 
-                        <div style="text-align:right;">
-                            <button class="secondary" onclick="appleMusic.handleImportRepo()">Import Repository</button>
+                        <!-- Custom Install -->
+                        <div style="background:var(--panel-bg); padding:25px; border-radius:8px; border:1px solid var(--border-color);">
+                            <h3 style="margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:15px; font-size:1.1em;">Custom Repository</h3>
+
+                            <div class="form-group">
+                                <label>Repository URL (GitHub / Bitbucket)</label>
+                                <div style="display:flex; gap:10px;">
+                                    <input type="text" id="am-setup-url" placeholder="https://github.com/user/repo.git">
+                                    <button class="secondary" onclick="appleMusic.handleImportRepo()" style="flex:0; white-space:nowrap;">Import</button>
+                                </div>
+                                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Clones into <code>/data/downloads/Apple Music/{RepoName}</code></div>
+                            </div>
                         </div>
+
                     </div>
                 </div>
             </div>

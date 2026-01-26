@@ -27,15 +27,20 @@ const appleMusic = {
         document.getElementById(`am-view-${tab}`).style.display = 'block';
     },
 
-    handleImportRepo: async () => {
-        const url = document.getElementById('am-setup-url').value.trim();
+    installRecommended: () => {
+        const url = "https://github.com/zhaarey/apple-music-downloader.git";
+        appleMusic.handleImportRepo(url);
+    },
+
+    handleImportRepo: async (targetUrl = null) => {
+        const url = targetUrl || document.getElementById('am-setup-url').value.trim();
         if (!url) {
             showToast("Please enter a Repository URL", "error");
             return;
         }
 
         // Validate basic git url structure
-        if (!url.startsWith('http') || !url.endsWith('.git')) {
+        if (!url.startsWith('http') || (!url.endsWith('.git') && !targetUrl)) {
             if (!confirm("URL doesn't look like a standard git clone URL (usually ends in .git). Continue?")) return;
         }
 
