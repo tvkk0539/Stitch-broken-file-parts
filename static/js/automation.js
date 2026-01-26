@@ -467,16 +467,16 @@ function updateStepConfigUI(select) {
 
         // Config 3: Obfuscate Title (Dropdown)
         const obfTitleOpts = `
-            <option value="false" selected>No (Original Title)</option>
-            <option value="true">Yes (Base64 Scramble)</option>
+            <option value="false">No (Original Title)</option>
+            <option value="true" selected>Yes (Base64 Scramble)</option>
         `;
         c3 = ensureSelect(c3, obfTitleOpts);
 
         // Config 4: Release Content (Dropdown)
         c4.style.display = 'block';
         const contentOpts = `
-            <option value="standard" selected>Standard (Default)</option>
-            <option value="tree_only">Tree Only (No Header)</option>
+            <option value="standard">Standard (Details + Stats)</option>
+            <option value="tree_only" selected>Tree Only (Base64 + Stats)</option>
             <option value="clean">Clean (Assets Only)</option>
         `;
         c4 = ensureSelect(c4, contentOpts);
