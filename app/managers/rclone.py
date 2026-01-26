@@ -98,6 +98,7 @@ class RcloneManager:
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
                 universal_newlines=True
             )
             job_manager.set_current_process(process)
@@ -195,6 +196,7 @@ class RcloneManager:
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
+                    stdin=subprocess.DEVNULL,
                     universal_newlines=True
                 )
 
@@ -249,7 +251,7 @@ class RcloneManager:
 
             cmd = ['rclone', 'moveto', full_src, full_dest, '-v', '--stats', '2s']
 
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
             job_manager.set_current_process(process)
 
             for line in process.stdout:
@@ -290,7 +292,7 @@ class RcloneManager:
 
             cmd = ['rclone', 'copyto', full_src, full_dest, '-v', '--stats', '2s']
 
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
             job_manager.set_current_process(process)
 
             for line in process.stdout:
@@ -325,7 +327,7 @@ class RcloneManager:
 
             cmd = ['rclone', 'purge', full_path, '-v']
 
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, universal_newlines=True)
             job_manager.set_current_process(process)
 
             # Read output to avoid blocking
