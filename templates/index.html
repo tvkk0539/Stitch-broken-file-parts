@@ -258,7 +258,10 @@
                     </div>
                     <!-- Apple Music Downloader -->
                     <div class="app-card" onclick="openAppleMusicApp()">
-                        <div style="font-size: 2em; margin-bottom: 10px;">🎵</div>
+                        <!-- Apple Music SVG Logo -->
+                        <svg class="app-icon-svg" viewBox="0 0 24 24" fill="#fa233b" style="filter: drop-shadow(0 0 10px rgba(250, 35, 59, 0.4));">
+                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.526 8.35v6.23c0 .54-.257 1.05-.688 1.36-.432.31-1.003.41-1.52.27l-4.72-1.3c-.63-.17-1.07-.75-1.07-1.4v-4.9l4.47 1.22c.24.07.49.03.68-.1.19-.14.3-.36.3-.6v-1.92c0-.52-.33-.98-.82-1.11l-5.75-1.57c-.42-.11-.86.03-1.18.35-.31.32-.49.76-.49 1.21v9.64c0 .32-.15.62-.41.81-.26.19-.59.27-.9.21l-1.3-.23c-.5-.09-.96-.44-1.19-.91-.23-.47-.2-1.02.08-1.46l.06-.09c.33-.49.88-.79 1.47-.79.22 0 .43.04.64.12l.24.09V6.3c0-.89.35-1.75.97-2.39.63-.64 1.49-.92 2.34-.69l5.75 1.57c1.45.39 2.45 1.74 2.45 3.25v.31z"/>
+                        </svg>
                         <div class="app-name">Apple Music Downloader</div>
                         <div class="app-desc">Download Songs, Albums, and Playlists in high quality.</div>
                     </div>
@@ -279,7 +282,12 @@
                     <button class="icon-btn" onclick="switchView('apps')" style="margin-right:15px; color:var(--text-muted);" title="Back to Apps">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
                     </button>
-                    <h2 style="margin:0;">🎵 Apple Music Downloader</h2>
+                    <h2 style="margin:0; display:flex; align-items:center; gap:10px;">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="#fa233b">
+                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.526 8.35v6.23c0 .54-.257 1.05-.688 1.36-.432.31-1.003.41-1.52.27l-4.72-1.3c-.63-.17-1.07-.75-1.07-1.4v-4.9l4.47 1.22c.24.07.49.03.68-.1.19-.14.3-.36.3-.6v-1.92c0-.52-.33-.98-.82-1.11l-5.75-1.57c-.42-.11-.86.03-1.18.35-.31.32-.49.76-.49 1.21v9.64c0 .32-.15.62-.41.81-.26.19-.59.27-.9.21l-1.3-.23c-.5-.09-.96-.44-1.19-.91-.23-.47-.2-1.02.08-1.46l.06-.09c.33-.49.88-.79 1.47-.79.22 0 .43.04.64.12l.24.09V6.3c0-.89.35-1.75.97-2.39.63-.64 1.49-.92 2.34-.69l5.75 1.57c1.45.39 2.45 1.74 2.45 3.25v.31z"/>
+                        </svg>
+                        Apple Music Downloader
+                    </h2>
                 </div>
 
                 <!-- AM Tabs -->
