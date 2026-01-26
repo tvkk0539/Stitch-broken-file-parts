@@ -27,7 +27,7 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     rm -rf /var/lib/apt/lists/*
 
 # Install Go
-RUN curl -L -o go.tar.gz https://go.dev/dl/go1.22.0.linux-amd64.tar.gz && \
+RUN curl -L -o go.tar.gz https://go.dev/dl/go1.25.6.linux-amd64.tar.gz && \
     rm -rf /usr/local/go && \
     tar -C /usr/local -xzf go.tar.gz && \
     rm go.tar.gz
