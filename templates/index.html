@@ -630,6 +630,18 @@
     <div id="mkdir-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>New Folder</h3></div><input type="text" id="mkdir-name" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-mkdir" class="danger">Cancel</button><button id="confirm-mkdir" class="secondary">Create</button></div></div></div>
     <div id="inspect-modal" class="modal"><div class="modal-content" style="width:600px;"><div class="modal-header"><h3>File Info</h3></div><div id="inspect-content" style="max-height:400px; overflow-y:auto;"></div><div class="modal-actions"><button id="close-inspect" class="secondary">Close</button></div></div></div>
 
+    <!-- Media Viewer Modal -->
+    <div id="media-viewer-modal" class="modal" style="z-index: 2000; background: rgba(0,0,0,0.9);">
+        <div class="modal-content" style="width: auto; max-width: 90vw; max-height: 90vh; background: transparent; padding: 0; box-shadow: none; border: none; display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;">
+                <h3 id="media-viewer-title" style="margin: 0; color: #fff; text-shadow: 0 1px 3px black; font-weight: normal;">Filename.jpg</h3>
+                <button onclick="document.getElementById('media-viewer-modal').style.display='none'" class="icon-btn" style="color: #fff; font-size: 1.5em; background: none; border: none;">✖</button>
+            </div>
+            <div id="media-viewer-content" style="display: flex; justify-content: center; align-items: center; flex: 1; overflow: hidden;">
+                <!-- Content Injected Here -->
+            </div>
+        </div>
+    </div>
 
     <!-- Catalog Add Modal -->
     <div id="catalog-add-modal" class="modal" style="z-index: 1021;">

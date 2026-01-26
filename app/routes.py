@@ -58,6 +58,25 @@ def list_files():
         'items': items
     })
 
+@bp.route('/api/files/serve')
+def serve_file():
+    """Serves a file for the media viewer."""
+    req_path = request.args.get('path', '')
+    if not req_path:
+        return "Path required", 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, req_path)
+
+    # Security Check
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return "Access denied", 403
+
+    if not os.path.exists(abs_path):
+        return "File not found", 404
+
+    from flask import send_file
+    return send_file(abs_path)
+
 # --- Catalog API ---
 
 @bp.route('/api/catalog', methods=['GET'])

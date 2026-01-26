@@ -106,6 +106,8 @@ le inside the Move/Copy selector too).
 - **Delete:** Manually delete files/folders to clean up space.
 - **Multi-Select:** Check multiple files/folders to perform batch actions (Uploa
 d, Move, Delete, etc.).
+- **Media Viewer:** Click on any Image (`.jpg`, `.png`), Video (`.mp4`), or Audio (`.mp3`) file to preview it instantly in a high-quality viewer without downloading.
+- **Audio Covers:** Use the **"🎵 Covers"** button to recursively scan folders and extract embedded cover art from audio files to `filename.jpg`.
 
 ### 🛡️ Stability & UX
 - **System Dashboard:** Live monitoring of **Disk Space**, **RAM**, and **CPU**
