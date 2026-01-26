@@ -71,32 +71,29 @@ class AppleMusicWrapperManager:
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_temp)
 
-            # 3. Locate and Move
-            # The zip likely contains a single file or a folder.
-            # User said: "rename that folder to completely as wrapper"
-            # But the URL is a zip of a single binary usually? Or a folder?
-            # Let's inspect what we got.
-            # Assuming zip content is simple. We want final path: .../Apple Music/wrapper/wrapper
+            # 3. Move All Contents
+            # The zip contains dependencies (rootfs/) required by the binary.
+            # We must preserve the entire structure.
 
             if os.path.exists(self.WRAPPER_DIR):
                 shutil.rmtree(self.WRAPPER_DIR)
-            os.makedirs(self.WRAPPER_DIR)
 
-            # Find the binary in extract_temp
-            found_binary = None
-            for root, dirs, files in os.walk(extract_temp):
-                for file in files:
-                    if "wrapper" in file.lower():
-                        found_binary = os.path.join(root, file)
-                        break
+            # Move the *contents* of extract_temp to WRAPPER_DIR
+            # If the zip has a root folder, we might want to strip it?
+            # Based on inspection: it has 'rootfs/' and 'wrapper' at root level.
+            # So direct move is correct.
+            shutil.move(extract_temp, self.WRAPPER_DIR)
 
-            if found_binary:
-                target_path = os.path.join(self.WRAPPER_DIR, self.BINARY_NAME)
-                shutil.move(found_binary, target_path)
-                os.chmod(target_path, 0o755) # Make executable
+            # 4. Finalize
+            binary_path = os.path.join(self.WRAPPER_DIR, self.BINARY_NAME)
+            if os.path.exists(binary_path):
+                os.chmod(binary_path, 0o755) # Make executable
                 self._log("Installation successful.")
             else:
-                raise Exception("Could not locate wrapper binary in downloaded archive")
+                # Fallback: Check if it's inside a subfolder?
+                # But based on user inspection, 'wrapper' is at root.
+                # If not found, warn but don't fail hard, maybe user needs to rename.
+                self._log(f"Warning: Main binary '{self.BINARY_NAME}' not found at root. Please check installation.")
 
         except Exception as e:
             self._log(f"Installation failed: {e}")
