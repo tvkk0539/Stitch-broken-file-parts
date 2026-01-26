@@ -46,16 +46,17 @@ class AppleMusicWrapperManager:
         exe_path = os.path.join(self.WRAPPER_DIR, self.BINARY_NAME)
         return os.path.exists(exe_path)
 
-    def install(self):
-        self._log("Starting installation...")
+    def install(self, custom_url=None):
+        target_url = custom_url if custom_url else self.DOWNLOAD_URL
+        self._log(f"Starting installation from {target_url}...")
         os.makedirs(self.APP_DIR, exist_ok=True)
 
         zip_path = os.path.join(self.APP_DIR, 'wrapper_temp.zip')
 
         try:
             # 1. Download
-            self._log(f"Downloading from {self.DOWNLOAD_URL}")
-            with requests.get(self.DOWNLOAD_URL, stream=True) as r:
+            self._log(f"Downloading...")
+            with requests.get(target_url, stream=True) as r:
                 r.raise_for_status()
                 with open(zip_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192):

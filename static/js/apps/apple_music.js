@@ -135,11 +135,27 @@ const appleMusic = {
         }
     },
 
-    installWrapper: async () => {
-        if (!confirm("Download and install the Wrapper binary (~50MB)?")) return;
+    installWrapper: async (isCustom = false) => {
+        let url = null;
+        let confirmMsg = "Download and install the Wrapper binary (~50MB)?";
+
+        if (isCustom) {
+            url = document.getElementById('am-wrap-custom-url').value.trim();
+            if (!url) {
+                showToast("Please enter a URL", "error");
+                return;
+            }
+            confirmMsg = `Install wrapper from custom URL?\n${url}`;
+        }
+
+        if (!confirm(confirmMsg)) return;
 
         try {
-            const res = await fetch('/api/apps/apple-music/wrapper/install', {method: 'POST'});
+            const res = await fetch('/api/apps/apple-music/wrapper/install', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ url: url })
+            });
             const json = await res.json();
             if (json.status === 'queued') {
                 showToast("Installation Queued", "success");

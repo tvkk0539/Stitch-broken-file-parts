@@ -443,9 +443,20 @@
 
                             <!-- Install Card (Conditional) -->
                             <div id="am-wrap-install-card" style="display:none; background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid #e0af68;">
-                                <h4 style="margin-top:0; color:#e0af68;">⚠️ Not Installed</h4>
-                                <p style="font-size:0.9em; color:var(--text-muted);">The Wrapper binary (v2 Linux x86_64) is missing.</p>
-                                <button onclick="appleMusic.installWrapper()" class="secondary" style="width:100%;">⬇️ Download & Install</button>
+                                <h4 style="margin-top:0; color:#e0af68; border-bottom:1px solid #e0af68; padding-bottom:10px; margin-bottom:15px;">⚠️ Not Installed</h4>
+                                <p style="font-size:0.9em; color:var(--text-muted); margin-bottom:15px;">The Wrapper binary (v2 Linux x86_64) is missing.</p>
+
+                                <!-- Recommended -->
+                                <button onclick="appleMusic.installWrapper()" class="secondary" style="width:100%; margin-bottom:20px; padding:10px; font-weight:bold;">⬇️ Quick Install (Recommended)</button>
+
+                                <!-- Custom URL -->
+                                <div style="border-top:1px solid var(--border-color); padding-top:15px;">
+                                    <label style="font-size:0.8em; color:var(--text-muted); display:block; margin-bottom:5px;">Advanced: Custom URL (Zip)</label>
+                                    <div style="display:flex; gap:5px;">
+                                        <input type="text" id="am-wrap-custom-url" placeholder="https://..." style="flex:1; background:#13141c; border:1px solid var(--border-color); color:var(--text-color); font-size:0.8em; padding:5px; border-radius:4px;">
+                                        <button onclick="appleMusic.installWrapper(true)" class="icon-btn" style="border:1px solid var(--border-color); padding:5px 10px; font-size:0.8em;" title="Install Custom">⬇️</button>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Controls Card -->

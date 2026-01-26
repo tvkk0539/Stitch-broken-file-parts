@@ -1111,10 +1111,13 @@ def am_wrapper_status():
 
 @bp.route('/api/apps/apple-music/wrapper/install', methods=['POST'])
 def am_wrapper_install():
+    data = request.json or {}
+    custom_url = data.get('url') # Optional
+
     # Run as job to avoid timeout
     job_id = job_manager.add_job(
         "Install Apple Music Wrapper",
-        lambda: am_wrapper.install(), # Wrap simple call
+        lambda: am_wrapper.install(custom_url=custom_url), # Wrap simple call
         args=()
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
