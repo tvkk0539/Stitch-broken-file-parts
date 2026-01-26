@@ -72,25 +72,29 @@ const catalog = {
         try {
             const res = await fetch('/api/catalog/tags');
             const tags = await res.json();
-            const select = document.getElementById('catalog-tag-filter');
-            if(!select) return;
+            const datalist = document.getElementById('catalog-tag-datalist');
+            if(!datalist) return;
 
-            // Keep the first placeholder option
-            select.innerHTML = '<option value="">+ Add Tag Filter</option>';
+            datalist.innerHTML = '';
 
             tags.forEach(tag => {
                 const opt = document.createElement('option');
                 opt.value = tag;
-                opt.textContent = tag;
-                select.appendChild(opt);
+                datalist.appendChild(opt);
             });
         } catch (e) { console.error("Load tags failed", e); }
     },
 
-    addTagFilter: (tag) => {
-        const select = document.getElementById('catalog-tag-filter');
-        if (select) select.value = ""; // Reset dropdown
+    handleTagInput: (input) => {
+        const val = input.value;
+        if (!val) return;
 
+        catalog.addTagFilter(val);
+        input.value = ""; // Clear after add
+        input.blur(); // Remove focus
+    },
+
+    addTagFilter: (tag) => {
         if (!tag) return;
         if (catalog.state.currentTags.includes(tag)) return; // Already added
 

@@ -182,10 +182,12 @@
                                     <!-- JS Injected Pills -->
                                 </div>
 
-                                <select id="catalog-tag-filter" onchange="catalog.addTagFilter(this.value)" style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px; border-radius:4px; width: 150px; flex-shrink: 0;">
-                                    <option value="">+ Add Tag Filter</option>
+                                <input type="text" id="catalog-tag-input" list="catalog-tag-datalist" placeholder="+ Add Tag Filter"
+                                       onchange="catalog.handleTagInput(this)"
+                                       style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px; border-radius:4px; width: 150px; flex-shrink: 0;">
+                                <datalist id="catalog-tag-datalist">
                                     <!-- JS Injected -->
-                                </select>
+                                </datalist>
 
                                 <select id="catalog-priority-filter" onchange="catalog.setPriorityFilter(this.value)" style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px; border-radius:4px; width: 130px; flex-shrink: 0;">
                                     <option value="">Priority: All</option>
