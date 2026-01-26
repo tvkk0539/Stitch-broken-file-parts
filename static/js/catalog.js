@@ -5,6 +5,7 @@ const catalog = {
         items: [],
         currentCategory: null,
         currentTags: [], // Changed from single tag to array
+        currentPriority: null,
         searchQuery: '',
         page: 1,
         limit: 50,
@@ -131,6 +132,12 @@ const catalog = {
         }, 300);
     },
 
+    setPriorityFilter: (val) => {
+        if (val === "") catalog.state.currentPriority = null;
+        else catalog.state.currentPriority = parseInt(val);
+        catalog.reload();
+    },
+
     reload: async () => {
         catalog.state.page = 1;
         catalog.state.items = [];
@@ -155,6 +162,7 @@ const catalog = {
 
             if (catalog.state.searchQuery) params.append('search', catalog.state.searchQuery);
             if (catalog.state.currentCategory) params.append('category', catalog.state.currentCategory);
+            if (catalog.state.currentPriority !== null) params.append('priority', catalog.state.currentPriority);
 
             // Send comma-separated tags
             if (catalog.state.currentTags && catalog.state.currentTags.length > 0) {

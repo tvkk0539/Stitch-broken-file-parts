@@ -160,7 +160,7 @@ class CatalogManager:
         self._init_db()
         self._migrate_json_to_sqlite()
 
-    def get_all(self, page=1, limit=50, search=None, tags=None, category=None):
+    def get_all(self, page=1, limit=50, search=None, tags=None, category=None, priority=None):
         """
         Retrieves paginated and filtered items.
         Sorted by Priority DESC, then CreatedAt DESC.
@@ -172,6 +172,15 @@ class CatalogManager:
         if category:
             query += " AND lower(category) = ?"
             params.append(category.lower())
+
+        if priority is not None:
+            # Check if valid integer
+            try:
+                p_val = int(priority)
+                query += " AND priority = ?"
+                params.append(p_val)
+            except ValueError:
+                pass # Ignore invalid priority
 
         if search:
             query += " AND (lower(title) LIKE ? OR lower(category) LIKE ?)"

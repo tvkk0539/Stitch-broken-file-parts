@@ -186,6 +186,13 @@
                                     <option value="">+ Add Tag Filter</option>
                                     <!-- JS Injected -->
                                 </select>
+
+                                <select id="catalog-priority-filter" onchange="catalog.setPriorityFilter(this.value)" style="background:#13141c; border:1px solid var(--border-color); color:var(--text-color); padding:8px; border-radius:4px; width: 130px; flex-shrink: 0;">
+                                    <option value="">Priority: All</option>
+                                    <option value="2">🔥 Necessary</option>
+                                    <option value="1">Normal</option>
+                                    <option value="0">💤 Unnecessary</option>
+                                </select>
                              </div>
                         </div>
 

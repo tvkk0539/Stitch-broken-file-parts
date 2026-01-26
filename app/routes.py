@@ -68,7 +68,16 @@ def list_catalog():
     tags = request.args.get('tags', '') # Comma separated
     category = request.args.get('category', '')
 
-    items = catalog_manager.get_all(page, limit, search, tags, category)
+    # Priority Filtering
+    priority_arg = request.args.get('priority', '')
+    priority = None
+    if priority_arg:
+        if priority_arg.lower() == 'necessary': priority = 2
+        elif priority_arg.lower() == 'normal': priority = 1
+        elif priority_arg.lower() == 'unnecessary': priority = 0
+        elif priority_arg.isdigit(): priority = int(priority_arg)
+
+    items = catalog_manager.get_all(page, limit, search, tags, category, priority)
     return jsonify(items)
 
 @bp.route('/api/catalog', methods=['POST'])
