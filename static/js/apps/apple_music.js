@@ -55,15 +55,15 @@ const appleMusic = {
     },
 
     switchTab: (tab) => {
-        // Tabs: 'down', 'config', 'wrapper', 'setup'
+        // Tabs: 'down', 'console', 'config', 'wrapper', 'setup'
         document.querySelectorAll('.browser-tab').forEach(b => b.classList.remove('active'));
         const tabBtn = document.getElementById(`am-tab-${tab}`);
         if(tabBtn) tabBtn.classList.add('active');
 
-        document.getElementById('am-view-down').style.display = 'none';
-        document.getElementById('am-view-setup').style.display = 'none';
-        document.getElementById('am-view-config').style.display = 'none';
-        document.getElementById('am-view-wrapper').style.display = 'none';
+        ['down', 'console', 'setup', 'config', 'wrapper'].forEach(t => {
+            const el = document.getElementById(`am-view-${t}`);
+            if(el) el.style.display = 'none';
+        });
 
         document.getElementById(`am-view-${tab}`).style.display = 'block';
 
@@ -73,11 +73,19 @@ const appleMusic = {
             appleMusic.state.wrapperPollInterval = null;
         }
 
+        // Stop console poll if leaving console (optional, saves bandwidth)
+        if (tab !== 'console' && appleMusic.downloaderPollInterval) {
+             clearInterval(appleMusic.downloaderPollInterval);
+             appleMusic.downloaderPollInterval = null;
+        }
+
         if (tab === 'config') {
             appleMusic.loadConfig();
         } else if (tab === 'wrapper') {
             appleMusic.checkWrapperStatus();
             appleMusic.state.wrapperPollInterval = setInterval(appleMusic.checkWrapperStatus, 2000);
+        } else if (tab === 'console') {
+            appleMusic.startConsolePoll();
         }
     },
 
@@ -495,7 +503,8 @@ const appleMusic = {
         }
     },
 
-    // --- MOCK DOWNLOADER LOGIC ---
+    // --- REAL DOWNLOADER LOGIC ---
+
     handleFetch: async () => {
         const url = document.getElementById('am-url-input').value;
         if (!url) {
@@ -503,81 +512,94 @@ const appleMusic = {
             return;
         }
 
-        const btn = document.getElementById('am-fetch-btn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border"></span> Fetching...';
-        btn.disabled = true;
+        const args = {};
 
-        // Mockup Simulation for UI UX Phase
-        setTimeout(() => {
-            appleMusic.mockFetchSuccess(url);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }, 1000);
+        // Gather Options
+        if (document.getElementById('am-opt-atmos').checked) args.atmos = true;
+        if (document.getElementById('am-opt-aac').checked) args.aac = true;
+        if (document.getElementById('am-opt-song').checked) args.song = true;
+        if (document.getElementById('am-opt-all-album').checked) args['all-album'] = true;
+
+        if (document.getElementById('am-opt-select').checked) {
+            const sel = document.getElementById('am-opt-select-val').value.trim();
+            if (sel) args.select = sel;
+        }
+
+        // MV Options
+        if (document.getElementById('am-opt-mv').checked) {
+            // Wait, does the tool have a --mv flag? User said default is MV Downloader?
+            // "this is Music Video Downloader by default you gave --mv-max 2160"
+            // Assuming passing URL to a MV automatically downloads it, but --mv-max controls quality.
+            // But if it's an album and we want MVs?
+            // Usually tools auto-detect.
+            // However, to pass --mv-max, we need to read the input.
+            const max = document.getElementById('am-opt-mv-max').value;
+            if(max) args['mv-max'] = parseInt(max);
+        }
+
+        if(!confirm(`Start download for:\n${url}`)) return;
+
+        try {
+            const res = await fetch('/api/apps/apple-music/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ url: url, args: args })
+            });
+            const data = await res.json();
+
+            if (data.status === 'queued') {
+                showToast("Download Started!", "success");
+                document.getElementById('am-url-input').value = '';
+
+                // Start Polling Console
+                appleMusic.startConsolePoll();
+            } else {
+                showToast("Error: " + data.error, "error");
+            }
+        } catch (e) {
+            showToast("Request Failed: " + e, "error");
+        }
     },
 
-    mockFetchSuccess: (url) => {
-        // Simulating a result for UI testing
-        const mockData = {
-            title: "Hit Me Hard and Soft",
-            artist: "Billie Eilish",
-            year: "2024",
-            cover: "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/4a/92/7d/4a927d73-2c13-e74f-90f7-6c84c6799d16/196589165243.jpg/600x600bb.jpg",
-            tracks: [
-                "Skinny", "Lunch", "Chihiro", "Birds of a Feather", "Wildflower", "The Greatest"
-            ]
-        };
+    // --- CONSOLE LOGIC ---
+    downloaderPollInterval: null,
 
-        appleMusic.renderResult(mockData);
+    startConsolePoll: () => {
+        if(appleMusic.downloaderPollInterval) clearInterval(appleMusic.downloaderPollInterval);
+        appleMusic.pollConsole(); // Immediate
+        appleMusic.downloaderPollInterval = setInterval(appleMusic.pollConsole, 1000);
     },
 
-    renderResult: (data) => {
-        const container = document.getElementById('am-results-area');
-        container.style.display = 'flex';
+    pollConsole: async () => {
+        try {
+            const res = await fetch('/api/apps/apple-music/downloader/status');
+            const data = await res.json();
 
-        // Populate
-        document.getElementById('am-cover-img').src = data.cover;
-        document.getElementById('am-album-title').textContent = data.title;
-        document.getElementById('am-album-artist').textContent = data.artist;
-        document.getElementById('am-album-meta').textContent = `${data.year} • ${data.tracks.length} Tracks`;
+            const consoleEl = document.getElementById('am-dl-console');
+            if(!consoleEl) return;
 
-        const trackList = document.getElementById('am-tracklist');
-        trackList.innerHTML = '';
-        data.tracks.forEach((t, i) => {
-            const row = document.createElement('div');
-            row.className = 'am-track-row';
-            row.innerHTML = `
-                <span style="color:var(--text-muted); width:20px;">${i+1}</span>
-                <span style="flex:1;">${t}</span>
-                <input type="checkbox" checked title="Download this track">
-            `;
-            trackList.appendChild(row);
-        });
+            // Only update if logs changed to avoid flicker/perf issues?
+            // Simple approach: join and replace
+            const text = data.logs.join('\n');
+            if (consoleEl.innerText !== text) {
+                consoleEl.innerText = text;
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+
+            if (!data.running && appleMusic.downloaderPollInterval) {
+                // Stop polling if finished? Or keep polling for a bit?
+                // User might want to see the last message.
+                // Let's keep polling slowly or stop after 10s of inactivity?
+                // Ideally, keep polling so user sees "Download Complete" message.
+                // We'll leave it running for now as long as the tab is open.
+            }
+        } catch(e) { console.error("Console poll failed", e); }
     },
 
-    addToQueue: () => {
-        const url = document.getElementById('am-url-input').value;
-        if (!url) return;
-
-        showToast("Added to Download Queue", "success");
-
-        // clear input
-        document.getElementById('am-url-input').value = '';
-        document.getElementById('am-results-area').style.display = 'none';
-
-        // Add to UI Queue (Mock)
-        const qContainer = document.getElementById('am-queue-list');
-        const item = document.createElement('div');
-        item.className = 'am-queue-item';
-        item.innerHTML = `
-            <div>
-                <div style="font-weight:bold;">${document.getElementById('am-album-title').textContent}</div>
-                <div style="font-size:0.8em; color:var(--text-muted);">Queued</div>
-            </div>
-            <div style="color:var(--accent-color);">Waiting...</div>
-        `;
-        qContainer.prepend(item);
-    }
+    // Legacy mock functions removed/stubbed
+    mockFetchSuccess: () => {},
+    renderResult: () => {},
+    addToQueue: () => {}
 };
 
 // Expose globally

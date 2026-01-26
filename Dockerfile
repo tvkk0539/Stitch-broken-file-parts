@@ -1,3 +1,20 @@
+# Stage 1: Build static MP4Box (GPAC)
+FROM python:3.11-slim AS gpac-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    git \
+    zlib1g-dev \
+    ca-certificates
+
+WORKDIR /src
+RUN git clone --depth 1 https://github.com/gpac/gpac.git . && \
+    ./configure --static-bin --use-zlib=no && \
+    make -j$(nproc) && \
+    strip bin/gcc/MP4Box
+
+# Stage 2: Final Image
 FROM python:3.11-slim
 
 # Set environment variables
@@ -15,6 +32,7 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     p7zip-full \
     rclone \
     curl \
+    unzip \
     procps \
     genisoimage \
     mediainfo \
@@ -23,6 +41,24 @@ RUN sed -i -r 's/Components: main/Components: main non-free non-free-firmware/g'
     git \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install Go
+RUN curl -L -o go.tar.gz https://go.dev/dl/go1.25.6.linux-amd64.tar.gz && \
+    rm -rf /usr/local/go && \
+    tar -C /usr/local -xzf go.tar.gz && \
+    rm go.tar.gz
+ENV PATH=$PATH:/usr/local/go/bin
+
+# Install Bento4
+RUN curl -L -o bento4.zip https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-641.x86_64-unknown-linux.zip && \
+    mkdir -p /usr/local/bento4 && \
+    unzip bento4.zip -d /usr/local/bento4 && \
+    mv /usr/local/bento4/Bento4-SDK-1-6-0-641.x86_64-unknown-linux/* /usr/local/bento4/ && \
+    rm -rf /usr/local/bento4/Bento4-SDK-1-6-0-641.x86_64-unknown-linux bento4.zip
+ENV PATH=$PATH:/usr/local/bento4/bin
+
+# Install MP4Box from builder
+COPY --from=gpac-builder /src/bin/gcc/MP4Box /usr/local/bin/MP4Box
 
 # Set work directory
 WORKDIR /app

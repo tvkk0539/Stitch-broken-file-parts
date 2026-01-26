@@ -1102,6 +1102,29 @@ def apple_music_update_config():
     data = request.json
     return jsonify(apple_music_manager.update_config(data))
 
+@bp.route('/api/apps/apple-music/dependencies', methods=['GET'])
+def apple_music_dependencies():
+    return jsonify(apple_music_manager.check_dependencies())
+
+@bp.route('/api/apps/apple-music/download', methods=['POST'])
+def apple_music_download():
+    data = request.json
+    url = data.get('url')
+    args = data.get('args', {})
+
+    if not url: return jsonify({'error': 'URL required'}), 400
+
+    job_id = job_manager.add_job(
+        f"Apple Music Download",
+        AppleMusicManager.run_download_job,
+        args=(url, args)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/apps/apple-music/downloader/status', methods=['GET'])
+def apple_music_downloader_status():
+    return jsonify(AppleMusicManager.get_downloader_status())
+
 # --- Apps: Apple Music Wrapper ---
 am_wrapper = AppleMusicWrapperManager()
 

@@ -304,6 +304,7 @@
                 <div class="browser-header" style="margin-bottom: 20px;">
                     <div class="browser-tabs">
                         <button id="am-tab-down" class="browser-tab active" onclick="appleMusic.switchTab('down')">Downloader</button>
+                        <button id="am-tab-console" class="browser-tab" onclick="appleMusic.switchTab('console')">Console</button>
                         <button id="am-tab-config" class="browser-tab" onclick="appleMusic.switchTab('config')">Config</button>
                         <button id="am-tab-wrapper" class="browser-tab" onclick="appleMusic.switchTab('wrapper')">Wrapper</button>
                         <button id="am-tab-setup" class="browser-tab" onclick="appleMusic.switchTab('setup')">Setup</button>
@@ -312,51 +313,100 @@
 
                 <!-- TAB: DOWNLOADER -->
                 <div id="am-view-down">
-                    <div style="display:flex; gap:20px; height:100%;">
-                        <!-- Left: Search & Queue -->
-                        <div style="flex:1; display:flex; flex-direction:column; max-width:500px;">
+                    <div style="max-width:800px; margin:0 auto;">
 
-                            <!-- Input Box -->
-                            <div style="background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:20px;">
-                                <div class="form-group">
-                                    <label>Apple Music URL</label>
-                                    <input type="text" id="am-url-input" placeholder="https://music.apple.com/us/album/...">
+                        <!-- Input Box -->
+                        <div style="background:var(--panel-bg); padding:25px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:20px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+                            <div class="form-group">
+                                <label style="color:var(--accent-color); font-weight:bold; font-size:1.1em; display:flex; align-items:center; gap:10px;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H8l4-4 4 4h-3v4h-2z"/></svg>
+                                    Apple Music URL
+                                </label>
+                                <input type="text" id="am-url-input" placeholder="https://music.apple.com/us/album/..." style="font-size:1.1em; padding:12px; background:#13141c; border:1px solid var(--border-color); color:#fff;">
+                            </div>
+
+                            <!-- Advanced Options -->
+                            <div style="background:#15161e; padding:20px; border-radius:6px; border:1px solid var(--border-color); margin-bottom:20px;">
+                                <label style="display:block; margin-bottom:15px; font-size:0.85em; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #2f334d; padding-bottom:5px;">Download Options</label>
+
+                                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:15px; margin-bottom:15px;">
+                                    <label class="custom-check" style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:5px; background:#1a1b26; border-radius:4px;">
+                                        <input type="checkbox" id="am-opt-atmos">
+                                        <span style="font-weight:500;">Dolby Atmos <span style="font-size:0.8em; color:var(--text-muted);">(--atmos)</span></span>
+                                    </label>
+                                    <label class="custom-check" style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:5px; background:#1a1b26; border-radius:4px;">
+                                        <input type="checkbox" id="am-opt-aac">
+                                        <span style="font-weight:500;">AAC <span style="font-size:0.8em; color:var(--text-muted);">(--aac)</span></span>
+                                    </label>
+                                    <label class="custom-check" style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:5px; background:#1a1b26; border-radius:4px;">
+                                        <input type="checkbox" id="am-opt-song">
+                                        <span style="font-weight:500;">Single Song <span style="font-size:0.8em; color:var(--text-muted);">(--song)</span></span>
+                                    </label>
+                                    <label class="custom-check" style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:5px; background:#1a1b26; border-radius:4px;">
+                                        <input type="checkbox" id="am-opt-all-album">
+                                        <span style="font-weight:500;">All Albums <span style="font-size:0.8em; color:var(--text-muted);">(--all-album)</span></span>
+                                    </label>
+                                    <label class="custom-check" style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:5px; background:#1a1b26; border-radius:4px;">
+                                        <input type="checkbox" id="am-opt-select" onchange="document.getElementById('am-select-container').style.display = this.checked ? 'block' : 'none'">
+                                        <span style="font-weight:500;">Select Tracks <span style="font-size:0.8em; color:var(--text-muted);">(--select)</span></span>
+                                    </label>
                                 </div>
-                                <div style="display:flex; gap:10px;">
-                                    <select id="am-fmt" style="width:100px; background:#13141c; color:#c0caf5; border:1px solid var(--border-color); border-radius:4px; padding:5px;">
-                                        <option value="m4a">M4A (AAC)</option>
-                                        <option value="mp3">MP3</option>
-                                        <option value="flac">FLAC</option>
-                                    </select>
-                                    <button id="am-fetch-btn" class="purple-btn" style="flex:1;" onclick="appleMusic.handleFetch()">Fetch & Download</button>
+
+                                <!-- Select Input (Hidden) -->
+                                <div id="am-select-container" style="display:none; margin-top:10px; padding:10px; background:#1a1b26; border-radius:4px; margin-bottom:15px;">
+                                    <label style="font-size:0.8em; display:block; margin-bottom:5px;">Track Numbers (Space separated)</label>
+                                    <input type="text" id="am-opt-select-val" placeholder="e.g. 1 3 5-7" style="width:100%; background:#13141c; border:1px solid #414868; font-family:monospace; padding:8px;">
+                                </div>
+
+                                <!-- MV Options -->
+                                <div style="border-top:1px solid #2f334d; padding-top:15px;">
+                                    <label style="font-size:0.8em; color:var(--text-muted); display:block; margin-bottom:10px;">Music Video Options</label>
+                                    <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+                                        <label class="custom-check" style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:5px; background:#1a1b26; border-radius:4px;">
+                                            <input type="checkbox" id="am-opt-mv">
+                                            <span style="font-weight:500;">Download MV</span>
+                                        </label>
+                                        <div style="display:flex; align-items:center; gap:10px; background:#1a1b26; padding:5px 10px; border-radius:4px;">
+                                            <span style="font-size:0.9em;">Max Quality:</span>
+                                            <input type="number" id="am-opt-mv-max" value="2160" style="width:80px; background:#13141c; border:1px solid #414868; padding:5px; color:#c0caf5;">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Queue -->
-                            <h3 style="margin:0 0 10px 0; color:var(--text-muted); font-size:1em; text-transform:uppercase; letter-spacing:1px;">Download Queue</h3>
-                            <div id="am-queue-list" style="flex:1; overflow-y:auto; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:10px;">
-                                <!-- Items injected here -->
-                                <div style="text-align:center; color:var(--text-muted); margin-top:20px;">Queue is empty</div>
-                            </div>
+                            <button id="am-fetch-btn" class="purple-btn" style="width:100%; padding:15px; font-size:1.2em; font-weight:bold; display:flex; justify-content:center; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(118, 77, 255, 0.4);" onclick="appleMusic.handleFetch()">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                Start Download
+                            </button>
                         </div>
 
-                        <!-- Right: Results Preview -->
-                        <div id="am-results-area" style="flex:2; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); display:none; flex-direction:column; overflow:hidden;">
-                            <!-- Album Header -->
-                            <div style="display:flex; padding:20px; border-bottom:1px solid var(--border-color); gap:20px; align-items:flex-end; background:linear-gradient(to bottom, rgba(0,0,0,0.3), transparent);">
-                                <img id="am-cover-img" src="" style="width:150px; height:150px; border-radius:6px; box-shadow:0 4px 15px rgba(0,0,0,0.5);">
-                                <div>
-                                    <h1 id="am-album-title" style="margin:0; font-size:2em;">Album Title</h1>
-                                    <div id="am-album-artist" style="color:var(--accent-color); font-size:1.2em; margin-bottom:5px;">Artist Name</div>
-                                    <div id="am-album-meta" style="color:var(--text-muted);">2024 • 12 Tracks</div>
-                                    <button onclick="appleMusic.addToQueue()" class="secondary" style="margin-top:10px;">⬇️ Download All</button>
-                                </div>
+                        <!-- Queue (Mini) -->
+                        <div style="background:var(--panel-bg); border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
+                            <div style="padding:10px 15px; background:#13141c; border-bottom:1px solid var(--border-color);">
+                                <h3 style="margin:0; font-size:0.9em; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted);">Recent Jobs</h3>
                             </div>
+                            <div id="am-queue-list" style="max-height:200px; overflow-y:auto; padding:10px;">
+                                <div style="text-align:center; color:var(--text-muted);">No recent jobs</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                            <!-- Tracklist -->
-                            <div id="am-tracklist" style="padding:10px; overflow-y:auto; flex:1;">
-                                <!-- Rows injected here -->
+                <!-- TAB: CONSOLE (Dedicated) -->
+                <div id="am-view-console" style="display:none; height:calc(100vh - 200px);">
+                    <div style="height:100%; display:flex; flex-direction:column; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
+                        <div style="padding:15px; background:#13141c; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-family:monospace; font-weight:bold; color:var(--accent-color); font-size:1.1em;"> >_ downloader.log</span>
+                                <span id="am-console-status" class="badge badge-gray">IDLE</span>
                             </div>
+                            <div style="display:flex; gap:10px;">
+                                <button class="secondary" onclick="appleMusic.pollConsole()" style="font-size:0.8em;">Refresh</button>
+                                <button class="danger" style="font-size:0.8em;" onclick="alert('To stop, go to Job Queue.')">Stop Job</button>
+                            </div>
+                        </div>
+                        <div id="am-dl-console" style="flex:1; padding:20px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:0.9em; color:#9ece6a; white-space:pre-wrap; background:#0f0f14;">
+                            <span style="color:var(--text-muted);">Waiting for output...</span>
                         </div>
                     </div>
                 </div>

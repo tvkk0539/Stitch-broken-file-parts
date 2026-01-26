@@ -51,6 +51,7 @@ class RepairManager:
                 cwd=directory,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
                 universal_newlines=True
             )
             job_manager.set_current_process(process)
@@ -134,6 +135,7 @@ class RepairManager:
             cwd=directory,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
             universal_newlines=True
         )
         job_manager.set_current_process(process)
