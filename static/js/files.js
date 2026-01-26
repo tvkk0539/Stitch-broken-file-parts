@@ -119,6 +119,7 @@ function updateButtonState() {
     const copyBtn = document.getElementById('copy-btn');
     const renameBtn = document.getElementById('rename-btn');
     const inspectBtn = document.getElementById('inspect-btn');
+    const extractCoversBtn = document.getElementById('extract-covers-btn');
     const deleteBtn = document.getElementById('delete-btn');
 
     const cloudMoveBtn = document.getElementById('cloud-move-btn');
@@ -135,6 +136,7 @@ function updateButtonState() {
         if(compressBtn) compressBtn.disabled = !single;
         if(renameBtn) renameBtn.disabled = !single;
         if(inspectBtn) inspectBtn.disabled = !has;
+        if(extractCoversBtn) extractCoversBtn.disabled = !has;
         if(uploadBtn) uploadBtn.disabled = !has;
         if(moveBtn) moveBtn.disabled = !has;
         if(copyBtn) copyBtn.disabled = !has;
@@ -148,6 +150,9 @@ function updateButtonState() {
         if(cloudRenameBtn) cloudRenameBtn.disabled = !single;
     }
 }
+
+// Initialize global namespace
+window.files = window.files || {};
 
 // --- Wire Events ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -346,6 +351,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const d = await res.json();
         renderInspectModal(d);
         document.getElementById('inspect-modal').style.display='block';
+    };
+
+    // Extract Covers (Attached to global window.files for onClick access from HTML)
+    window.files.triggerExtractCovers = async () => {
+        if(!confirm(`Extract covers from ${selectedPaths.length} items? (Recursively scans folders)`)) return;
+
+        try {
+            const res = await fetch('/api/media/extract-covers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ paths: selectedPaths })
+            });
+            const data = await res.json();
+
+            if(data.status === 'queued') {
+                showToast(`Extraction Queued (Job ID: ${data.job_id})`, 'success');
+            } else {
+                showToast(data.error || "Failed to queue job", 'error');
+            }
+        } catch(e) {
+            showToast("Request failed: " + e, 'error');
+        }
     };
 
     function renderInspectModal(data) {

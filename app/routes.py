@@ -5,6 +5,7 @@ from app.managers.archive import ArchiveManager
 from app.managers.repair import RepairManager
 from app.managers.extract import ExtractManager
 from app.managers.inspector import InspectorManager
+from app.managers.media import MediaManager
 from app.managers.github_tool import GitHubManager
 from app.managers.catalog import CatalogManager
 from app.managers.sync import SyncManager
@@ -455,6 +456,25 @@ def trigger_extract():
         f"Extract {os.path.basename(target_path)}",
         ExtractManager.run_extract_job,
         args=(abs_path, data.get('method', 'unrar'), data.get('password'))
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/media/extract-covers', methods=['POST'])
+def trigger_cover_extract():
+    data = request.json
+    paths = data.get('paths', [])
+    if not paths: return jsonify({'error': 'No paths provided'}), 400
+
+    abs_paths = [os.path.join(DOWNLOAD_ROOT, p) for p in paths]
+    # Filter only existing
+    abs_paths = [p for p in abs_paths if os.path.exists(p)]
+
+    if not abs_paths: return jsonify({'error': 'No valid paths'}), 400
+
+    job_id = job_manager.add_job(
+        f"Extract Covers ({len(abs_paths)} items)",
+        MediaManager.run_extract_covers_job,
+        args=(abs_paths,)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
