@@ -4,7 +4,8 @@ const catalog = {
     state: {
         items: [],
         currentCategory: null,
-        currentTag: null,
+        currentTags: [], // Changed from single tag to array
+        currentPriority: null,
         searchQuery: '',
         page: 1,
         limit: 50,
@@ -71,24 +72,60 @@ const catalog = {
         try {
             const res = await fetch('/api/catalog/tags');
             const tags = await res.json();
-            const select = document.getElementById('catalog-tag-filter');
-            if(!select) return;
+            const datalist = document.getElementById('catalog-tag-datalist');
+            if(!datalist) return;
 
-            // Keep the first "All Tags" option
-            select.innerHTML = '<option value="">All Tags</option>';
+            datalist.innerHTML = '';
 
             tags.forEach(tag => {
                 const opt = document.createElement('option');
                 opt.value = tag;
-                opt.textContent = tag;
-                select.appendChild(opt);
+                datalist.appendChild(opt);
             });
         } catch (e) { console.error("Load tags failed", e); }
     },
 
-    filterTag: (tag) => {
-        catalog.state.currentTag = tag || null;
+    handleTagInput: (input) => {
+        const val = input.value;
+        if (!val) return;
+
+        catalog.addTagFilter(val);
+        input.value = ""; // Clear after add
+        input.blur(); // Remove focus
+    },
+
+    addTagFilter: (tag) => {
+        if (!tag) return;
+        if (catalog.state.currentTags.includes(tag)) return; // Already added
+
+        catalog.state.currentTags.push(tag);
+        catalog.renderActiveTags();
         catalog.reload();
+    },
+
+    removeTagFilter: (tag) => {
+        catalog.state.currentTags = catalog.state.currentTags.filter(t => t !== tag);
+        catalog.renderActiveTags();
+        catalog.reload();
+    },
+
+    renderActiveTags: () => {
+        const container = document.getElementById('catalog-active-tags');
+        if (!container) return;
+        container.innerHTML = '';
+
+        catalog.state.currentTags.forEach(tag => {
+            const pill = document.createElement('div');
+            pill.className = 'filter-pill active'; // Re-using existing CSS
+            pill.style.display = 'flex';
+            pill.style.alignItems = 'center';
+            pill.style.gap = '5px';
+            pill.innerHTML = `
+                <span>${tag}</span>
+                <span onclick="catalog.removeTagFilter('${tag}')" style="cursor:pointer; opacity:0.7; font-size:0.8em;" title="Remove">✖</span>
+            `;
+            container.appendChild(pill);
+        });
     },
 
     filter: (query) => {
@@ -97,6 +134,12 @@ const catalog = {
             catalog.state.searchQuery = query;
             catalog.reload();
         }, 300);
+    },
+
+    setPriorityFilter: (val) => {
+        if (val === "") catalog.state.currentPriority = null;
+        else catalog.state.currentPriority = parseInt(val);
+        catalog.reload();
     },
 
     reload: async () => {
@@ -123,7 +166,12 @@ const catalog = {
 
             if (catalog.state.searchQuery) params.append('search', catalog.state.searchQuery);
             if (catalog.state.currentCategory) params.append('category', catalog.state.currentCategory);
-            if (catalog.state.currentTag) params.append('tag', catalog.state.currentTag);
+            if (catalog.state.currentPriority !== null) params.append('priority', catalog.state.currentPriority);
+
+            // Send comma-separated tags
+            if (catalog.state.currentTags && catalog.state.currentTags.length > 0) {
+                params.append('tags', catalog.state.currentTags.join(','));
+            }
 
             const res = await fetch(`/api/catalog?${params.toString()}`);
             const data = await res.json();

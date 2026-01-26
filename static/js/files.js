@@ -90,12 +90,63 @@ function renderFiles(items, parentPath) {
         let cls = item.is_dir ? 'dir-icon' : 'file-icon';
         if(!item.is_dir && item.name.endsWith('.par2')) { icon='🔧'; cls='par2-icon'; }
 
-        li.innerHTML = `<span class="${cls} icon">${icon}</span> <span>${item.name}</span>`;
+        // Media Viewer Click Handler for specific types
+        const ext = item.name.split('.').pop().toLowerCase();
+        const isImage = ['jpg','jpeg','png','gif','webp','svg','bmp','ico'].includes(ext);
+        const isVideo = ['mp4','webm','mkv','mov'].includes(ext); // Browser supports mp4/webm mostly
+        const isAudio = ['mp3','wav','ogg','flac','m4a'].includes(ext);
+
+        let clickHandler = null;
+        if(item.is_dir) {
+            clickHandler = (e) => { if(e.target!==cb) loadPath(item.path); };
+        } else if (browserMode === 'local' && (isImage || isVideo || isAudio)) {
+            // Only local files can be served directly by the viewer route efficiently
+            clickHandler = (e) => {
+                if(e.target!==cb) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openMediaViewer(item.path, isImage ? 'image' : (isVideo ? 'video' : 'audio'));
+                }
+            };
+        }
+
+        li.innerHTML = `<span class="${cls} icon">${icon}</span> <span class="file-name">${item.name}</span>`;
         li.prepend(cb);
 
-        if(item.is_dir) li.onclick = (e) => { if(e.target!==cb) loadPath(item.path); };
+        if(clickHandler) li.onclick = clickHandler;
+
+        // Add pointer cursor for clickable items
+        if(item.is_dir || (browserMode === 'local' && (isImage || isVideo || isAudio))) {
+            li.style.cursor = 'pointer';
+        }
+
         fileList.appendChild(li);
     });
+}
+
+function openMediaViewer(path, type) {
+    const modal = document.getElementById('media-viewer-modal');
+    const content = document.getElementById('media-viewer-content');
+    const title = document.getElementById('media-viewer-title');
+    const src = `/api/files/serve?path=${encodeURIComponent(path)}`;
+
+    title.textContent = path.split('/').pop();
+    content.innerHTML = '';
+
+    if (type === 'image') {
+        content.innerHTML = `<img src="${src}" style="max-width:100%; max-height:85vh; border-radius:4px; box-shadow: 0 0 20px rgba(0,0,0,0.5);">`;
+    } else if (type === 'video') {
+        content.innerHTML = `<video controls autoplay style="max-width:100%; max-height:85vh; border-radius:4px;"><source src="${src}">Your browser does not support video.</video>`;
+    } else if (type === 'audio') {
+        content.innerHTML = `
+            <div style="background:var(--panel-bg); padding:40px; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:20px;">
+                <div style="font-size:3em;">🎵</div>
+                <audio controls autoplay style="width:300px;"><source src="${src}">Your browser does not support audio.</audio>
+            </div>
+        `;
+    }
+
+    modal.style.display = 'flex';
 }
 
 function toggleSelection(path, checked) {
@@ -119,6 +170,7 @@ function updateButtonState() {
     const copyBtn = document.getElementById('copy-btn');
     const renameBtn = document.getElementById('rename-btn');
     const inspectBtn = document.getElementById('inspect-btn');
+    const extractCoversBtn = document.getElementById('extract-covers-btn');
     const deleteBtn = document.getElementById('delete-btn');
 
     const cloudMoveBtn = document.getElementById('cloud-move-btn');
@@ -135,6 +187,7 @@ function updateButtonState() {
         if(compressBtn) compressBtn.disabled = !single;
         if(renameBtn) renameBtn.disabled = !single;
         if(inspectBtn) inspectBtn.disabled = !has;
+        if(extractCoversBtn) extractCoversBtn.disabled = !has;
         if(uploadBtn) uploadBtn.disabled = !has;
         if(moveBtn) moveBtn.disabled = !has;
         if(copyBtn) copyBtn.disabled = !has;
@@ -148,6 +201,9 @@ function updateButtonState() {
         if(cloudRenameBtn) cloudRenameBtn.disabled = !single;
     }
 }
+
+// Initialize global namespace
+window.files = window.files || {};
 
 // --- Wire Events ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -346,6 +402,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const d = await res.json();
         renderInspectModal(d);
         document.getElementById('inspect-modal').style.display='block';
+    };
+
+    // Extract Covers (Attached to global window.files for onClick access from HTML)
+    window.files.triggerExtractCovers = async () => {
+        if(!confirm(`Extract covers from ${selectedPaths.length} items? (Recursively scans folders)`)) return;
+
+        try {
+            const res = await fetch('/api/media/extract-covers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ paths: selectedPaths })
+            });
+            const data = await res.json();
+
+            if(data.status === 'queued') {
+                showToast(`Extraction Queued (Job ID: ${data.job_id})`, 'success');
+            } else {
+                showToast(data.error || "Failed to queue job", 'error');
+            }
+        } catch(e) {
+            showToast("Request failed: " + e, 'error');
+        }
     };
 
     function renderInspectModal(data) {

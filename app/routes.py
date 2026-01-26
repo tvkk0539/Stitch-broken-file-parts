@@ -5,6 +5,7 @@ from app.managers.archive import ArchiveManager
 from app.managers.repair import RepairManager
 from app.managers.extract import ExtractManager
 from app.managers.inspector import InspectorManager
+from app.managers.media import MediaManager
 from app.managers.github_tool import GitHubManager
 from app.managers.catalog import CatalogManager
 from app.managers.sync import SyncManager
@@ -57,6 +58,25 @@ def list_files():
         'items': items
     })
 
+@bp.route('/api/files/serve')
+def serve_file():
+    """Serves a file for the media viewer."""
+    req_path = request.args.get('path', '')
+    if not req_path:
+        return "Path required", 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, req_path)
+
+    # Security Check
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return "Access denied", 403
+
+    if not os.path.exists(abs_path):
+        return "File not found", 404
+
+    from flask import send_file
+    return send_file(abs_path)
+
 # --- Catalog API ---
 
 @bp.route('/api/catalog', methods=['GET'])
@@ -65,10 +85,19 @@ def list_catalog():
     page = int(request.args.get('page', 1))
     limit = int(request.args.get('limit', 50))
     search = request.args.get('search', '')
-    tag = request.args.get('tag', '')
+    tags = request.args.get('tags', '') # Comma separated
     category = request.args.get('category', '')
 
-    items = catalog_manager.get_all(page, limit, search, tag, category)
+    # Priority Filtering
+    priority_arg = request.args.get('priority', '')
+    priority = None
+    if priority_arg:
+        if priority_arg.lower() == 'necessary': priority = 2
+        elif priority_arg.lower() == 'normal': priority = 1
+        elif priority_arg.lower() == 'unnecessary': priority = 0
+        elif priority_arg.isdigit(): priority = int(priority_arg)
+
+    items = catalog_manager.get_all(page, limit, search, tags, category, priority)
     return jsonify(items)
 
 @bp.route('/api/catalog', methods=['POST'])
@@ -446,6 +475,25 @@ def trigger_extract():
         f"Extract {os.path.basename(target_path)}",
         ExtractManager.run_extract_job,
         args=(abs_path, data.get('method', 'unrar'), data.get('password'))
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/media/extract-covers', methods=['POST'])
+def trigger_cover_extract():
+    data = request.json
+    paths = data.get('paths', [])
+    if not paths: return jsonify({'error': 'No paths provided'}), 400
+
+    abs_paths = [os.path.join(DOWNLOAD_ROOT, p) for p in paths]
+    # Filter only existing
+    abs_paths = [p for p in abs_paths if os.path.exists(p)]
+
+    if not abs_paths: return jsonify({'error': 'No valid paths'}), 400
+
+    job_id = job_manager.add_job(
+        f"Extract Covers ({len(abs_paths)} items)",
+        MediaManager.run_extract_covers_job,
+        args=(abs_paths,)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
