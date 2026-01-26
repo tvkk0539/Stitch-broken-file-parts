@@ -282,50 +282,78 @@
                     <h2 style="margin:0;">🎵 Apple Music Downloader</h2>
                 </div>
 
-                <div style="display:flex; gap:20px; height:100%;">
-                    <!-- Left: Search & Queue -->
-                    <div style="flex:1; display:flex; flex-direction:column; max-width:500px;">
+                <!-- AM Tabs -->
+                <div class="browser-header" style="margin-bottom: 20px;">
+                    <div class="browser-tabs">
+                        <button id="am-tab-down" class="browser-tab active" onclick="appleMusic.switchTab('down')">Downloader</button>
+                        <button id="am-tab-setup" class="browser-tab" onclick="appleMusic.switchTab('setup')">Setup</button>
+                    </div>
+                </div>
 
-                        <!-- Input Box -->
-                        <div style="background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:20px;">
-                            <div class="form-group">
-                                <label>Apple Music URL</label>
-                                <input type="text" id="am-url-input" placeholder="https://music.apple.com/us/album/...">
+                <!-- TAB: DOWNLOADER -->
+                <div id="am-view-down">
+                    <div style="display:flex; gap:20px; height:100%;">
+                        <!-- Left: Search & Queue -->
+                        <div style="flex:1; display:flex; flex-direction:column; max-width:500px;">
+
+                            <!-- Input Box -->
+                            <div style="background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:20px;">
+                                <div class="form-group">
+                                    <label>Apple Music URL</label>
+                                    <input type="text" id="am-url-input" placeholder="https://music.apple.com/us/album/...">
+                                </div>
+                                <div style="display:flex; gap:10px;">
+                                    <select id="am-fmt" style="width:100px; background:#13141c; color:#c0caf5; border:1px solid var(--border-color); border-radius:4px; padding:5px;">
+                                        <option value="m4a">M4A (AAC)</option>
+                                        <option value="mp3">MP3</option>
+                                        <option value="flac">FLAC</option>
+                                    </select>
+                                    <button id="am-fetch-btn" class="purple-btn" style="flex:1;" onclick="appleMusic.handleFetch()">Fetch & Download</button>
+                                </div>
                             </div>
-                            <div style="display:flex; gap:10px;">
-                                <select id="am-fmt" style="width:100px; background:#13141c; color:#c0caf5; border:1px solid var(--border-color); border-radius:4px; padding:5px;">
-                                    <option value="m4a">M4A (AAC)</option>
-                                    <option value="mp3">MP3</option>
-                                    <option value="flac">FLAC</option>
-                                </select>
-                                <button id="am-fetch-btn" class="purple-btn" style="flex:1;" onclick="appleMusic.handleFetch()">Fetch & Download</button>
+
+                            <!-- Queue -->
+                            <h3 style="margin:0 0 10px 0; color:var(--text-muted); font-size:1em; text-transform:uppercase; letter-spacing:1px;">Download Queue</h3>
+                            <div id="am-queue-list" style="flex:1; overflow-y:auto; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:10px;">
+                                <!-- Items injected here -->
+                                <div style="text-align:center; color:var(--text-muted); margin-top:20px;">Queue is empty</div>
                             </div>
                         </div>
 
-                        <!-- Queue -->
-                        <h3 style="margin:0 0 10px 0; color:var(--text-muted); font-size:1em; text-transform:uppercase; letter-spacing:1px;">Download Queue</h3>
-                        <div id="am-queue-list" style="flex:1; overflow-y:auto; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:10px;">
-                            <!-- Items injected here -->
-                            <div style="text-align:center; color:var(--text-muted); margin-top:20px;">Queue is empty</div>
+                        <!-- Right: Results Preview -->
+                        <div id="am-results-area" style="flex:2; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); display:none; flex-direction:column; overflow:hidden;">
+                            <!-- Album Header -->
+                            <div style="display:flex; padding:20px; border-bottom:1px solid var(--border-color); gap:20px; align-items:flex-end; background:linear-gradient(to bottom, rgba(0,0,0,0.3), transparent);">
+                                <img id="am-cover-img" src="" style="width:150px; height:150px; border-radius:6px; box-shadow:0 4px 15px rgba(0,0,0,0.5);">
+                                <div>
+                                    <h1 id="am-album-title" style="margin:0; font-size:2em;">Album Title</h1>
+                                    <div id="am-album-artist" style="color:var(--accent-color); font-size:1.2em; margin-bottom:5px;">Artist Name</div>
+                                    <div id="am-album-meta" style="color:var(--text-muted);">2024 • 12 Tracks</div>
+                                    <button onclick="appleMusic.addToQueue()" class="secondary" style="margin-top:10px;">⬇️ Download All</button>
+                                </div>
+                            </div>
+
+                            <!-- Tracklist -->
+                            <div id="am-tracklist" style="padding:10px; overflow-y:auto; flex:1;">
+                                <!-- Rows injected here -->
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Right: Results Preview -->
-                    <div id="am-results-area" style="flex:2; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); display:none; flex-direction:column; overflow:hidden;">
-                        <!-- Album Header -->
-                        <div style="display:flex; padding:20px; border-bottom:1px solid var(--border-color); gap:20px; align-items:flex-end; background:linear-gradient(to bottom, rgba(0,0,0,0.3), transparent);">
-                            <img id="am-cover-img" src="" style="width:150px; height:150px; border-radius:6px; box-shadow:0 4px 15px rgba(0,0,0,0.5);">
-                            <div>
-                                <h1 id="am-album-title" style="margin:0; font-size:2em;">Album Title</h1>
-                                <div id="am-album-artist" style="color:var(--accent-color); font-size:1.2em; margin-bottom:5px;">Artist Name</div>
-                                <div id="am-album-meta" style="color:var(--text-muted);">2024 • 12 Tracks</div>
-                                <button onclick="appleMusic.addToQueue()" class="secondary" style="margin-top:10px;">⬇️ Download All</button>
-                            </div>
+                <!-- TAB: SETUP -->
+                <div id="am-view-setup" style="display:none;">
+                    <div style="background:var(--panel-bg); padding:30px; border-radius:8px; border:1px solid var(--border-color); max-width:600px; margin:0 auto;">
+                        <h3 style="margin-top:0; border-bottom:1px solid var(--border-color); padding-bottom:15px; margin-bottom:20px;">Import Repository</h3>
+
+                        <div class="form-group">
+                            <label>Repository URL (GitHub / Bitbucket)</label>
+                            <input type="text" id="am-setup-url" placeholder="https://github.com/user/repo.git">
+                            <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">The repository will be cloned into <code>/data/downloads/Apple Music/</code></div>
                         </div>
 
-                        <!-- Tracklist -->
-                        <div id="am-tracklist" style="padding:10px; overflow-y:auto; flex:1;">
-                            <!-- Rows injected here -->
+                        <div style="text-align:right;">
+                            <button class="secondary" onclick="appleMusic.handleImportRepo()">Import Repository</button>
                         </div>
                     </div>
                 </div>
