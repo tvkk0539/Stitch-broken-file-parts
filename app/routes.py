@@ -10,6 +10,7 @@ from app.managers.github_tool import GitHubManager
 from app.managers.catalog import CatalogManager
 from app.managers.sync import SyncManager
 from app.managers.workflow import WorkflowManager
+from app.managers.apple_music import AppleMusicManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -1087,3 +1088,15 @@ def github_delete_secret():
     name = data.get('name')
     account_id = data.get('account_id')
     return jsonify(GitHubManager.delete_secret(owner, repo, name, account_id))
+
+# --- Apps: Apple Music ---
+apple_music_manager = AppleMusicManager()
+
+@bp.route('/api/apps/apple-music/config', methods=['GET'])
+def apple_music_get_config():
+    return jsonify(apple_music_manager.get_config())
+
+@bp.route('/api/apps/apple-music/config', methods=['POST'])
+def apple_music_update_config():
+    data = request.json
+    return jsonify(apple_music_manager.update_config(data))
