@@ -247,6 +247,17 @@ to grab everything.
 he repo).
     - **Clone Source:** Click "Clone Source" to `git clone` the entire repositor
 y to your VPS.
+#### Apple Music Downloader
+A dedicated tool for archiving music in high quality.
+- **Search & Download:** Paste an Apple Music URL (Song, Album, Playlist) to fet
+ch metadata and download.
+- **Format Support:** Choose between **M4A (AAC)**, **MP3**, or **FLAC**.
+- **Professional UI:** View Album Art, Tracklists, and manage your Download Queu
+e.
+- **Setup & Import:** Includes a **Setup Tab** to easily clone/import external do
+wnloader tools (GitHub/Bitbucket repos) directly into the `Apple Music` folder f
+or advanced usage.
+
 4. **Publish:**
    - Select an account (must have write access).
    - Switch to the "Publisher" tab.
