@@ -327,9 +327,16 @@ class WorkflowManager:
             body = ""
             log("📝 Release Content: Clean (Empty Body)")
         elif content_mode == 'tree_only':
-            # Raw Base64 + Stats
-            body = f"{tree_b64}{stats_block}"
-            log("📝 Release Content: Tree Only (Base64 + Stats)")
+            # ENTIRE CONTENT IS BASE64 (Tree + Stats)
+            # 1. Decode the tree back to text (or just use meta['tree_text'])
+            raw_tree = meta.get('tree_text', '')
+            # 2. Combine Tree + Stats
+            full_raw_content = f"{raw_tree}{stats_block}"
+            # 3. Encode everything
+            full_b64 = base64.b64encode(full_raw_content.encode('utf-8')).decode('utf-8')
+
+            body = full_b64
+            log("📝 Release Content: Tree Only (Full Base64)")
         else:
             # Standard
             body = private_body
