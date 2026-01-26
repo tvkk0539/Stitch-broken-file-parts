@@ -425,6 +425,8 @@ function updateStepConfigUI(select) {
             <option value="4608M">4.5 GB</option>
             <option value="5120M">5 GB</option>
             <option disabled>--- Small ---</option>
+            <option value="50M">50 MB</option>
+            <option value="100M">100 MB</option>
             <option value="200M">200 MB</option>
             <option value="300M">300 MB</option>
             <option value="400M">400 MB</option>
