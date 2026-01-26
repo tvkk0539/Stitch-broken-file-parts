@@ -495,7 +495,12 @@ const appleMusic = {
         }
     },
 
-    // --- MOCK DOWNLOADER LOGIC ---
+    // --- REAL DOWNLOADER LOGIC ---
+
+    // We removed the Mock Fetch logic because the tool (CLI) handles everything
+    // including fetching metadata and downloading in one go.
+    // So "Fetch" now just triggers the download directly.
+
     handleFetch: async () => {
         const url = document.getElementById('am-url-input').value;
         if (!url) {
@@ -503,81 +508,54 @@ const appleMusic = {
             return;
         }
 
-        const btn = document.getElementById('am-fetch-btn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border"></span> Fetching...';
-        btn.disabled = true;
+        // Collect basic args if we had UI for them (e.g. checkbox for atmos)
+        // For now, standard download.
+        const args = {};
 
-        // Mockup Simulation for UI UX Phase
-        setTimeout(() => {
-            appleMusic.mockFetchSuccess(url);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }, 1000);
+        // Example: Check for Dolby Atmos toggle if exists in UI (future)
+        // if (document.getElementById('am-opt-atmos')?.checked) args.atmos = true;
+
+        if(!confirm(`Start download for:\n${url}`)) return;
+
+        try {
+            const res = await fetch('/api/apps/apple-music/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ url: url, args: args })
+            });
+            const data = await res.json();
+
+            if (data.status === 'queued') {
+                showToast("Download Started!", "success");
+                document.getElementById('am-url-input').value = '';
+
+                // Add to UI Queue (Visual only, real status in Job Queue)
+                const qContainer = document.getElementById('am-queue-list');
+                const item = document.createElement('div');
+                item.className = 'am-queue-item';
+                item.innerHTML = `
+                    <div>
+                        <div style="font-weight:bold;">${url}</div>
+                        <div style="font-size:0.8em; color:var(--text-muted);">Job ID: ${data.job_id}</div>
+                    </div>
+                    <div style="color:var(--accent-color);">Queued</div>
+                `;
+                qContainer.prepend(item);
+
+                // Optional: redirect to Queue tab
+                // switchView('queue');
+            } else {
+                showToast("Error: " + data.error, "error");
+            }
+        } catch (e) {
+            showToast("Request Failed: " + e, "error");
+        }
     },
 
-    mockFetchSuccess: (url) => {
-        // Simulating a result for UI testing
-        const mockData = {
-            title: "Hit Me Hard and Soft",
-            artist: "Billie Eilish",
-            year: "2024",
-            cover: "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/4a/92/7d/4a927d73-2c13-e74f-90f7-6c84c6799d16/196589165243.jpg/600x600bb.jpg",
-            tracks: [
-                "Skinny", "Lunch", "Chihiro", "Birds of a Feather", "Wildflower", "The Greatest"
-            ]
-        };
-
-        appleMusic.renderResult(mockData);
-    },
-
-    renderResult: (data) => {
-        const container = document.getElementById('am-results-area');
-        container.style.display = 'flex';
-
-        // Populate
-        document.getElementById('am-cover-img').src = data.cover;
-        document.getElementById('am-album-title').textContent = data.title;
-        document.getElementById('am-album-artist').textContent = data.artist;
-        document.getElementById('am-album-meta').textContent = `${data.year} • ${data.tracks.length} Tracks`;
-
-        const trackList = document.getElementById('am-tracklist');
-        trackList.innerHTML = '';
-        data.tracks.forEach((t, i) => {
-            const row = document.createElement('div');
-            row.className = 'am-track-row';
-            row.innerHTML = `
-                <span style="color:var(--text-muted); width:20px;">${i+1}</span>
-                <span style="flex:1;">${t}</span>
-                <input type="checkbox" checked title="Download this track">
-            `;
-            trackList.appendChild(row);
-        });
-    },
-
-    addToQueue: () => {
-        const url = document.getElementById('am-url-input').value;
-        if (!url) return;
-
-        showToast("Added to Download Queue", "success");
-
-        // clear input
-        document.getElementById('am-url-input').value = '';
-        document.getElementById('am-results-area').style.display = 'none';
-
-        // Add to UI Queue (Mock)
-        const qContainer = document.getElementById('am-queue-list');
-        const item = document.createElement('div');
-        item.className = 'am-queue-item';
-        item.innerHTML = `
-            <div>
-                <div style="font-weight:bold;">${document.getElementById('am-album-title').textContent}</div>
-                <div style="font-size:0.8em; color:var(--text-muted);">Queued</div>
-            </div>
-            <div style="color:var(--accent-color);">Waiting...</div>
-        `;
-        qContainer.prepend(item);
-    }
+    // Legacy mock functions removed/stubbed
+    mockFetchSuccess: () => {},
+    renderResult: () => {},
+    addToQueue: () => {}
 };
 
 // Expose globally
