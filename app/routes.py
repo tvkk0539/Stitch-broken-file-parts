@@ -11,6 +11,7 @@ from app.managers.catalog import CatalogManager
 from app.managers.sync import SyncManager
 from app.managers.workflow import WorkflowManager
 from app.managers.apple_music import AppleMusicManager
+from app.managers.am_wrapper import AppleMusicWrapperManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -1100,3 +1101,41 @@ def apple_music_get_config():
 def apple_music_update_config():
     data = request.json
     return jsonify(apple_music_manager.update_config(data))
+
+# --- Apps: Apple Music Wrapper ---
+am_wrapper = AppleMusicWrapperManager()
+
+@bp.route('/api/apps/apple-music/wrapper/status', methods=['GET'])
+def am_wrapper_status():
+    return jsonify(am_wrapper.get_status())
+
+@bp.route('/api/apps/apple-music/wrapper/install', methods=['POST'])
+def am_wrapper_install():
+    # Run as job to avoid timeout
+    job_id = job_manager.add_job(
+        "Install Apple Music Wrapper",
+        lambda: am_wrapper.install(), # Wrap simple call
+        args=()
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/apps/apple-music/wrapper/start', methods=['POST'])
+def am_wrapper_start():
+    data = request.json
+    user = data.get('username')
+    pw = data.get('password')
+    if not user or not pw: return jsonify({'error': 'Credentials required'}), 400
+
+    return jsonify(am_wrapper.start(user, pw))
+
+@bp.route('/api/apps/apple-music/wrapper/stop', methods=['POST'])
+def am_wrapper_stop():
+    return jsonify(am_wrapper.stop())
+
+@bp.route('/api/apps/apple-music/wrapper/input', methods=['POST'])
+def am_wrapper_input():
+    data = request.json
+    text = data.get('text')
+    if not text: return jsonify({'error': 'Input text required'}), 400
+
+    return jsonify(am_wrapper.send_input(text))

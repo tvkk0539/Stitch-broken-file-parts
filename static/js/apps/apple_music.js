@@ -4,7 +4,8 @@ const appleMusic = {
     state: {
         currentAlbum: null,
         queue: [],
-        config: null
+        config: null,
+        wrapperPollInterval: null
     },
 
     // Schema mapping for "Professional" UI generation
@@ -54,7 +55,7 @@ const appleMusic = {
     },
 
     switchTab: (tab) => {
-        // Tabs: 'down', 'config', 'setup'
+        // Tabs: 'down', 'config', 'wrapper', 'setup'
         document.querySelectorAll('.browser-tab').forEach(b => b.classList.remove('active'));
         const tabBtn = document.getElementById(`am-tab-${tab}`);
         if(tabBtn) tabBtn.classList.add('active');
@@ -62,11 +63,156 @@ const appleMusic = {
         document.getElementById('am-view-down').style.display = 'none';
         document.getElementById('am-view-setup').style.display = 'none';
         document.getElementById('am-view-config').style.display = 'none';
+        document.getElementById('am-view-wrapper').style.display = 'none';
 
         document.getElementById(`am-view-${tab}`).style.display = 'block';
 
+        // Clear wrapper interval if leaving wrapper tab
+        if (appleMusic.state.wrapperPollInterval) {
+            clearInterval(appleMusic.state.wrapperPollInterval);
+            appleMusic.state.wrapperPollInterval = null;
+        }
+
         if (tab === 'config') {
             appleMusic.loadConfig();
+        } else if (tab === 'wrapper') {
+            appleMusic.checkWrapperStatus();
+            appleMusic.state.wrapperPollInterval = setInterval(appleMusic.checkWrapperStatus, 2000);
+        }
+    },
+
+    // --- WRAPPER LOGIC ---
+
+    checkWrapperStatus: async () => {
+        try {
+            const res = await fetch('/api/apps/apple-music/wrapper/status');
+            const status = await res.json();
+
+            // 1. Update State Badges
+            const badge = document.getElementById('am-wrap-state');
+            const pidDisplay = document.getElementById('am-wrap-pid');
+
+            if (status.running) {
+                badge.className = 'badge badge-success';
+                badge.innerText = 'RUNNING';
+                pidDisplay.innerText = status.pid;
+            } else {
+                badge.className = 'badge badge-gray';
+                badge.innerText = 'STOPPED';
+                pidDisplay.innerText = '-';
+            }
+
+            // 2. Update Panels based on Install state
+            if (status.installed) {
+                document.getElementById('am-wrap-install-card').style.display = 'none';
+                document.getElementById('am-wrap-control-card').style.display = 'block';
+            } else {
+                document.getElementById('am-wrap-install-card').style.display = 'block';
+                document.getElementById('am-wrap-control-card').style.display = 'none';
+            }
+
+            // 3. Toggle Start/Stop Buttons
+            if (status.running) {
+                document.getElementById('am-wrap-start-btn').style.display = 'none';
+                document.getElementById('am-wrap-stop-btn').style.display = 'block';
+            } else {
+                document.getElementById('am-wrap-start-btn').style.display = 'block';
+                document.getElementById('am-wrap-stop-btn').style.display = 'none';
+            }
+
+            // 4. Update Logs
+            const consoleDiv = document.getElementById('am-wrap-console');
+            if (status.logs && status.logs.length > 0) {
+                consoleDiv.innerText = status.logs.join('\n');
+                // Auto scroll to bottom
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            } else if (!status.running) {
+                consoleDiv.innerHTML = '<span style="color:var(--text-muted);">Process stopped. Waiting for output...</span>';
+            }
+
+        } catch (e) {
+            console.error("Wrapper status poll failed", e);
+        }
+    },
+
+    installWrapper: async () => {
+        if (!confirm("Download and install the Wrapper binary (~50MB)?")) return;
+
+        try {
+            const res = await fetch('/api/apps/apple-music/wrapper/install', {method: 'POST'});
+            const json = await res.json();
+            if (json.status === 'queued') {
+                showToast("Installation Queued", "success");
+            } else {
+                showToast("Install failed", "error");
+            }
+        } catch (e) {
+            showToast("Error: " + e, "error");
+        }
+    },
+
+    startWrapper: async () => {
+        const user = document.getElementById('am-wrap-user').value.trim();
+        const pass = document.getElementById('am-wrap-pass').value.trim();
+
+        if (!user || !pass) {
+            showToast("Username and Password required", "error");
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/apps/apple-music/wrapper/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, password: pass})
+            });
+            const json = await res.json();
+
+            if (json.status === 'started') {
+                showToast("Wrapper Service Started", "success");
+                appleMusic.checkWrapperStatus();
+            } else {
+                showToast("Start failed: " + json.error, "error");
+            }
+        } catch (e) {
+            showToast("Error: " + e, "error");
+        }
+    },
+
+    stopWrapper: async () => {
+        if(!confirm("Stop the wrapper service?")) return;
+
+        await fetch('/api/apps/apple-music/wrapper/stop', {method: 'POST'});
+        showToast("Service Stopped", "success");
+        appleMusic.checkWrapperStatus();
+    },
+
+    sendWrapperInput: async () => {
+        const input = document.getElementById('am-wrap-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        try {
+            const res = await fetch('/api/apps/apple-music/wrapper/input', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: text})
+            });
+
+            // Clear input immediately for better UX
+            input.value = '';
+
+            const json = await res.json();
+            if (json.status === 'sent') {
+                // Manually append to log for instant feedback
+                const consoleDiv = document.getElementById('am-wrap-console');
+                consoleDiv.innerText += `\n[UI Input] ${text}`;
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            } else {
+                showToast("Send failed: " + json.error, "error");
+            }
+        } catch (e) {
+            showToast("Error: " + e, "error");
         }
     },
 
