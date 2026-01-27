@@ -330,7 +330,8 @@ class WorkflowManager:
             public_body = base64.b64encode(full_raw.encode('utf-8')).decode('utf-8')
 
         # Check for Smart Publish Requirement
-        if span_repos:
+        # We now assume smart publish if span_limit is present or span_repos is true
+        if span_repos or conf.get('span_limit'):
             # Repo is assumed to be base name "user/repo-base" or just "repo-base"
             # We strip 'https://github.com/'
             clean_repo = repo.replace('https://github.com/', '').strip('/')
@@ -350,11 +351,12 @@ class WorkflowManager:
                 account_id,
                 body=public_body,
                 private=True, # Enforce private for cold storage
-                span_limit_gb=40,
+                span_limit_gb=int(conf.get('span_limit', 40)),
+                account_limit_gb=int(conf.get('account_limit', 45)),
                 camouflage=camouflage,
                 meta=meta,
-                rate_limit_sleep=15 if conf.get('rate_limit') else 0,
-                safety_sleep=3600 if conf.get('safety_sleep') else 0
+                rate_limit_sleep=int(conf.get('rate_limit_seconds', 15)),
+                safety_sleep=int(conf.get('safety_sleep_seconds', 3600))
             )
 
             # Inject private body into result for Catalog

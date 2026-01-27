@@ -177,12 +177,12 @@ function editWorkflow(id) {
              if(optsDiv) {
                  optsDiv.querySelector('.wf-gh-content').value = conf.release_content || 'standard';
                  optsDiv.querySelector('.wf-opt-camo').checked = (conf.camouflage === true);
-                 optsDiv.querySelector('.wf-opt-span').checked = (conf.span_repos === true);
-                 // New options
-                 const safeCb = optsDiv.querySelector('.wf-opt-safe');
-                 if(safeCb) safeCb.checked = (conf.safety_sleep === true);
-                 const rateCb = optsDiv.querySelector('.wf-opt-rate');
-                 if(rateCb) rateCb.checked = (conf.rate_limit === true);
+
+                 // Numeric options
+                 optsDiv.querySelector('.wf-val-repo-lim').value = conf.span_limit || 40;
+                 optsDiv.querySelector('.wf-val-acc-lim').value = conf.account_limit || 45;
+                 optsDiv.querySelector('.wf-val-sleep').value = conf.safety_sleep_seconds || 3600;
+                 optsDiv.querySelector('.wf-val-rate').value = conf.rate_limit_seconds || 15;
              }
 
              // Populate Account IDs (Tokenizer)
@@ -584,23 +584,35 @@ function updateStepConfigUI(select) {
                     <option value="clean">Clean Body</option>
                 </select>
             </div>
-            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Renames files to look like System Logs">
-                <input type="checkbox" class="wf-opt-camo"> 🛡️ Camouflage (Cold Storage)
+
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5; margin-bottom:5px;" title="Renames files to look like System Logs">
+                <input type="checkbox" class="wf-opt-camo"> 🛡️ Camouflage Mode
             </label>
-            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Auto-create new repos if >40GB">
-                <input type="checkbox" class="wf-opt-span"> 📦 Smart Repo Spanning (40GB/Repo)
-            </label>
-            <div style="border-top:1px solid #414868; margin-top:5px; padding-top:5px;">
-                <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Sleep 1 hour when switching accounts">
-                    <input type="checkbox" class="wf-opt-safe"> 🛌 Safety Sleep (1hr Relay)
-                </label>
-                <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Sleep 15s between files">
-                    <input type="checkbox" class="wf-opt-rate"> 🐌 Rate Limit (15s/File)
-                </label>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-top:1px solid #414868; padding-top:5px;">
+                <div title="Max size per Repository before creating new one">
+                    <label style="font-size:0.75em; color:#7aa2f7;">Repo Limit (GB)</label>
+                    <input type="number" class="wf-val-repo-lim" value="40" style="width:100%; background:#13141c; border:1px solid #414868; color:#fff; padding:2px;">
+                </div>
+                <div title="Max upload per Account before switching">
+                    <label style="font-size:0.75em; color:#7aa2f7;">Account Limit (GB)</label>
+                    <input type="number" class="wf-val-acc-lim" value="45" style="width:100%; background:#13141c; border:1px solid #414868; color:#fff; padding:2px;">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; margin-top:5px;">
+                <div title="Sleep time when switching accounts">
+                    <label style="font-size:0.75em; color:#e0af68;">Safety Sleep (s)</label>
+                    <input type="number" class="wf-val-sleep" value="3600" style="width:100%; background:#13141c; border:1px solid #414868; color:#fff; padding:2px;">
+                </div>
+                <div title="Sleep time after each file upload">
+                    <label style="font-size:0.75em; color:#e0af68;">Rate Limit (s)</label>
+                    <input type="number" class="wf-val-rate" value="15" style="width:100%; background:#13141c; border:1px solid #414868; color:#fff; padding:2px;">
+                </div>
             </div>
         `;
 
-        desc.textContent = "Uploads archives. Supports Multi-Account Relay, Camouflage, and Safety Pauses.";
+        desc.textContent = "Advanced Cold Storage: Configure limits, camouflage, and relay timers.";
 
     } else if (type === 'enrich_metadata') {
         c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
@@ -681,9 +693,12 @@ async function saveWorkflow() {
             const optsDiv = div.querySelector('.wf-opts-container');
             const content = optsDiv ? optsDiv.querySelector('.wf-gh-content').value : 'standard';
             const camo = optsDiv ? optsDiv.querySelector('.wf-opt-camo').checked : false;
-            const span = optsDiv ? optsDiv.querySelector('.wf-opt-span').checked : false;
-            const safe = optsDiv ? optsDiv.querySelector('.wf-opt-safe').checked : false;
-            const rate = optsDiv ? optsDiv.querySelector('.wf-opt-rate').checked : false;
+
+            // Numeric Configs
+            const repoLim = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-repo-lim').value) || 40) : 40;
+            const accLim = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-acc-lim').value) || 45) : 45;
+            const sleepSec = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-sleep').value) || 3600) : 3600;
+            const rateSec = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-rate').value) || 15) : 15;
 
             // Get Account IDs from Tokenizer (c2)
             // c2 is div.tag-container
@@ -700,9 +715,11 @@ async function saveWorkflow() {
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
                 release_content: content,
                 camouflage: camo,
-                span_repos: span,
-                safety_sleep: safe,
-                rate_limit: rate,
+                span_repos: true, // Always active if limit provided? Or implicit? Let's assume active if limit > 0
+                span_limit: repoLim,
+                account_limit: accLim,
+                safety_sleep_seconds: sleepSec,
+                rate_limit_seconds: rateSec,
                 tag_template: 'v{date}_{name}'
             };
         } else if(type === 'enrich_metadata') {

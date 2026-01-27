@@ -871,7 +871,7 @@ class GitHubManager:
             return {'error': str(e)}
 
     @staticmethod
-    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0):
+    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0):
         """
         Publishes files across multiple repositories and accounts if needed.
         Handles Camouflage renaming and Boring Templates if enabled.
@@ -986,16 +986,16 @@ class GitHubManager:
 
                 file_size_gb = os.path.getsize(file_path) / (1024 * 1024 * 1024)
 
-                # Check Repo Limit (40GB) OR Account Switch Requirement (45GB)
+                # Check Repo Limit OR Account Switch Requirement
                 repo_limit_reached = (current_size_gb + file_size_gb > span_limit_gb)
-                account_limit_reached = (current_acc_uploaded_gb + file_size_gb > 45) # Hard limit 45GB per account/session
+                account_limit_reached = (current_acc_uploaded_gb + file_size_gb > account_limit_gb)
 
                 if repo_limit_reached or account_limit_reached:
                     # Switch Repo or Account?
 
                     if account_limit_reached and len(account_ids) > 1:
                         # Rotate Account
-                        log(f"Account {current_acc_id} limit reached ({current_acc_uploaded_gb:.2f}GB). Switching...")
+                        log(f"Account {current_acc_id} limit reached ({current_acc_uploaded_gb:.2f}GB > {account_limit_gb}GB). Switching...")
 
                         if safety_sleep > 0:
                             log(f"💤 Safety Sleep for {safety_sleep}s...")
