@@ -659,21 +659,36 @@ async function saveWorkflow() {
 
     stepDivs.forEach(div => {
         const type = div.querySelector('.wf-step-type').value;
-        const conf1 = div.querySelector('.wf-conf-1').value;
-        const conf2 = div.querySelector('.wf-conf-2').value;
-        const conf4 = div.querySelector('.wf-conf-4').value;
-        let conf3Value = ''; // Handle special value for tags
+        // Use simpler selector logic or defaults to avoid errors if elements are hidden/replaced
+        const c1El = div.querySelector('.wf-conf-1');
+        const c2El = div.querySelector('.wf-conf-2');
 
-        // Get conf3 element
-        const c3El = div.querySelector('.wf-conf-3');
-        if (c3El.classList.contains('tag-container')) {
-            // It's a tokenizer, get value from hidden input
-            conf3Value = c3El.querySelector('.tag-value').value;
-        } else {
-            conf3Value = c3El.value;
+        const conf1 = c1El ? c1El.value : '';
+        // c2 might be a tag container now
+        let conf2 = '';
+        if (c2El) {
+             if (c2El.classList.contains('tag-container')) {
+                 conf2 = c2El.querySelector('.tag-value').value;
+             } else {
+                 conf2 = c2El.value;
+             }
         }
 
-        const conf3 = conf3Value;
+        // c3 logic
+        const c3El = div.querySelector('.wf-conf-3');
+        let conf3 = '';
+        if (c3El) {
+            if (c3El.classList.contains('tag-container')) {
+                conf3 = c3El.querySelector('.tag-value').value;
+            } else {
+                conf3 = c3El.value;
+            }
+        }
+
+        // c4 logic (might be div container or input)
+        const c4El = div.querySelector('.wf-conf-4');
+        const conf4 = (c4El && c4El.tagName !== 'DIV') ? c4El.value : '';
+
         const confLong = div.querySelector('.wf-conf-long') ? div.querySelector('.wf-conf-long').value : '';
 
         let config = {};
@@ -706,18 +721,9 @@ async function saveWorkflow() {
             const sleepSec = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-sleep').value) || 3600) : 3600;
             const rateSec = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-rate').value) || 15) : 15;
 
-            // Get Account IDs from Tokenizer (c2)
-            // c2 is div.tag-container
-            let accIds = '';
-            if (div.querySelector('.wf-conf-2').classList.contains('tag-container')) {
-                 accIds = div.querySelector('.wf-conf-2 .tag-value').value;
-            } else {
-                 accIds = conf2; // Fallback
-            }
-
             config = {
                 repo: conf1,
-                account_id: accIds, // Comma separated list
+                account_id: conf2, // Already extracted (supports Tokenizer or Text)
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
                 release_content: content,
                 strategy: strat,
