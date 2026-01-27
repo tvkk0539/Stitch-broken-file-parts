@@ -857,6 +857,167 @@ class GitHubManager:
         except Exception as e: return {'error': str(e)}
 
     @staticmethod
+    def get_repo_details(repo, account_id):
+        token = GitHubManager._get_token_for_account(account_id)
+        if not token: return {'error': 'Auth failed'}
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+        try:
+            r = requests.get(f"https://api.github.com/repos/{repo}", headers=headers)
+            if r.status_code == 200:
+                return r.json()
+            return {'error': f"Failed to get details: {r.status_code}"}
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, camouflage=False, meta=None):
+        """
+        Publishes files across multiple repositories if needed.
+        Handles Camouflage renaming if enabled.
+        """
+        from app.managers.obfuscation import ObfuscationManager
+
+        log(f"Starting Smart Publish: {len(files)} files -> {base_repo_name}*")
+
+        restore_map = {}
+        active_files = files
+
+        # 1. Camouflage Logic
+        if camouflage:
+            log("🛡️ Camouflage Mode: ON")
+            job_manager.update_job_details({'action': 'Obfuscating file names...'})
+
+            # Rename files
+            camouflaged_paths, mapping = ObfuscationManager.camouflage_files(files)
+            active_files = camouflaged_paths
+            restore_map = mapping
+
+            # Save local map for backup
+            ObfuscationManager.save_map_file(mapping, base_repo_name)
+
+        # 2. Repo Spanning Logic
+        current_repo_index = 1
+        current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+
+        # Helper to get/create repo
+        def ensure_repo(name):
+            # Check existence
+            user_info = GitHubManager._fetch_user_profile(GitHubManager._get_token_for_account(account_id))
+            owner = user_info['username']
+            full_name = f"{owner}/{name}"
+
+            details = GitHubManager.get_repo_details(full_name, account_id)
+            if 'error' not in details:
+                return full_name, details['size'] # size is in KB
+
+            # Create if missing
+            log(f"Creating repository: {name}")
+            res = GitHubManager.create_repository(name, private, description, account_id)
+            if 'error' in res:
+                raise Exception(f"Failed to create repo {name}: {res['error']}")
+
+            return res['repo'], 0
+
+        # Upload Loop
+        uploaded_assets = []
+
+        try:
+            repo_full, repo_size_kb = ensure_repo(current_repo_name)
+            current_size_gb = repo_size_kb / (1024 * 1024)
+
+            # We need to create a release in the current repo
+            # Or assume run_publish_job logic but adapted for loop
+
+            # Helper to create release return upload_url
+            def get_release_upload_url(r_name, t_name):
+                token = GitHubManager._get_token_for_account(account_id)
+                headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+                create_url = f"https://api.github.com/repos/{r_name}/releases"
+                payload = {
+                    "tag_name": t_name,
+                    "name": f"Archive {t_name}",
+                    "body": body or "Automated Archive",
+                    "draft": False,
+                    "prerelease": False
+                }
+
+                # Check existing
+                get_url = f"https://api.github.com/repos/{r_name}/releases/tags/{t_name}"
+                gr = requests.get(get_url, headers=headers)
+                if gr.status_code == 200:
+                    return gr.json()['upload_url']
+
+                # Create
+                pr = requests.post(create_url, json=payload, headers=headers)
+                if pr.status_code in [200, 201]:
+                    return pr.json()['upload_url']
+                raise Exception(f"Failed to create release on {r_name}")
+
+            upload_url_template = get_release_upload_url(repo_full, tag)
+
+            total_files = len(active_files)
+
+            for idx, file_path in enumerate(active_files):
+                if job_manager.is_cancelled(): break
+
+                file_size_gb = os.path.getsize(file_path) / (1024 * 1024 * 1024)
+
+                # Check limits
+                if current_size_gb + file_size_gb > span_limit_gb:
+                    log(f"Repo {current_repo_name} full ({current_size_gb:.2f}GB). Switching...")
+                    current_repo_index += 1
+                    current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+                    repo_full, _ = ensure_repo(current_repo_name)
+                    current_size_gb = 0
+                    upload_url_template = get_release_upload_url(repo_full, tag)
+
+                # Upload
+                fname = os.path.basename(file_path)
+                job_manager.update_job_details({'action': f"Uploading {idx+1}/{total_files}: {fname} to {current_repo_name}"})
+
+                token = GitHubManager._get_token_for_account(account_id)
+                headers = {'Authorization': f'token {token}', 'Content-Type': 'application/octet-stream'}
+
+                real_upload_url = upload_url_template.split('{')[0] + f"?name={fname}"
+
+                with open(file_path, 'rb') as f:
+                    r = requests.post(real_upload_url, data=f, headers=headers)
+                    if r.status_code not in [200, 201]:
+                        log(f"Failed upload {fname}: {r.text}")
+                        continue
+
+                    adata = r.json()
+                    uploaded_assets.append({
+                        'name': fname,
+                        'size': os.path.getsize(file_path),
+                        'url': adata.get('browser_download_url', ''),
+                        'repo': repo_full
+                    })
+                    current_size_gb += file_size_gb
+
+            # Cleanup Camouflaged files
+            if camouflage:
+                log("Cleaning up camouflaged files...")
+                for p in active_files:
+                    try:
+                        os.remove(p)
+                    except: pass
+
+            log(f"Smart Publish Complete. {len(uploaded_assets)} assets across repos.")
+
+            # Return data structure for Catalog
+            return {
+                'assets': uploaded_assets,
+                'restore_map': restore_map,
+                'repo_base': base_repo_name
+            }
+
+        except Exception as e:
+            log(f"Smart Publish Failed: {e}")
+            raise e
+
+    @staticmethod
     def run_batch_download_job(assets, dest_root, account_id):
         """
         Downloads multiple assets in parallel.

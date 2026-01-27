@@ -167,7 +167,14 @@ function editWorkflow(id) {
              c1.value = conf.repo || '';
              c2.value = conf.account_id || '';
              c3.value = (conf.obfuscate_title === true || conf.obfuscate_title === 'true') ? 'true' : 'false';
-             c4.value = conf.release_content || 'standard'; // Load release content mode
+
+             // Populate Options
+             const optsDiv = stepDiv.querySelector('.wf-opts-container');
+             if(optsDiv) {
+                 optsDiv.querySelector('.wf-gh-content').value = conf.release_content || 'standard';
+                 optsDiv.querySelector('.wf-opt-camo').checked = (conf.camouflage === true);
+                 optsDiv.querySelector('.wf-opt-span').checked = (conf.span_repos === true);
+             }
         } else if (step.type === 'enrich_metadata') {
              c1.value = conf.reference_url || '';
              if(cLong) cLong.value = conf.description || '';
@@ -521,16 +528,42 @@ function updateStepConfigUI(select) {
         `;
         c3 = ensureSelect(c3, obfTitleOpts);
 
-        // Config 4: Release Content (Dropdown)
+        // Config 4: Options Container (Repo Span + Camouflage + Content)
         c4.style.display = 'block';
-        const contentOpts = `
-            <option value="standard">Standard (Details + Stats)</option>
-            <option value="tree_only" selected>Tree Only + Stats (No Signature No Header)</option>
-            <option value="clean">Clean (Assets Only)</option>
-        `;
-        c4 = ensureSelect(c4, contentOpts);
 
-        desc.textContent = "Uploads archives. Obfuscation uses Base64 Release Titles.";
+        let optsDiv = c4;
+        if (c4.tagName !== 'DIV' || !c4.classList.contains('wf-opts-container')) {
+            optsDiv = document.createElement('div');
+            optsDiv.className = 'wf-conf-4 wf-opts-container';
+            optsDiv.style.flex = '1';
+            optsDiv.style.display = 'flex';
+            optsDiv.style.flexDirection = 'column';
+            optsDiv.style.gap = '5px';
+            optsDiv.style.background = '#1a1b26';
+            optsDiv.style.padding = '5px';
+            optsDiv.style.border = '1px solid #414868';
+            optsDiv.style.maxHeight = '100px';
+            optsDiv.style.overflowY = 'auto';
+            c4.replaceWith(optsDiv);
+        }
+
+        optsDiv.innerHTML = `
+            <div style="margin-bottom:5px;">
+                <select class="wf-gh-content" style="width:100%; background:#13141c; color:#c0caf5; border:1px solid #414868; padding:3px;">
+                    <option value="standard">Standard Body</option>
+                    <option value="tree_only" selected>Tree Only Body</option>
+                    <option value="clean">Clean Body</option>
+                </select>
+            </div>
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Renames files to look like System Logs">
+                <input type="checkbox" class="wf-opt-camo"> 🛡️ Camouflage (Cold Storage)
+            </label>
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Auto-create new repos if >40GB">
+                <input type="checkbox" class="wf-opt-span"> 📦 Smart Repo Spanning
+            </label>
+        `;
+
+        desc.textContent = "Uploads archives. Supports Cold Storage Camouflage & Multi-Repo Spanning.";
 
     } else if (type === 'enrich_metadata') {
         c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
@@ -607,11 +640,19 @@ async function saveWorkflow() {
                 obfuscate: (conf3 && conf3.toLowerCase() === 'true')
             };
         } else if(type === 'github_publish') {
+            // Get Options from c4 div
+            const optsDiv = div.querySelector('.wf-opts-container');
+            const content = optsDiv ? optsDiv.querySelector('.wf-gh-content').value : 'standard';
+            const camo = optsDiv ? optsDiv.querySelector('.wf-opt-camo').checked : false;
+            const span = optsDiv ? optsDiv.querySelector('.wf-opt-span').checked : false;
+
             config = {
                 repo: conf1,
                 account_id: conf2,
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
-                release_content: conf4 || 'standard',
+                release_content: content,
+                camouflage: camo,
+                span_repos: span,
                 tag_template: 'v{date}_{name}'
             };
         } else if(type === 'enrich_metadata') {

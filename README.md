@@ -352,3 +352,31 @@ olders into the tool by nesting them inside `/data/downloads`.
 ```
 
 Now when you open ParFix, you will see two folders: `movies` and `games`.
+
+## ❄️ Cold Storage & Camouflage Protocol
+
+ParFix includes a professional-grade **Cold Storage** workflow designed for secure, long-term backup of large datasets (100GB+) to private clouds (like GitHub Releases).
+
+### 🛡️ Armored Archives
+- **Standardization:** Automatically splits files into **1GB RAR parts**.
+- **Protection:** Adds **5% Recovery Record** to every part to protect against bit rot.
+- **Encryption:** Uses **AES-256** (RAR `-hp`) to encrypt both data and filenames.
+
+### 🎭 Camouflage Strategy
+To prevent detection or snooping, ParFix can rename your archives before upload.
+- **Original:** `Movie_4K_Remux.part01.rar`
+- **Camouflaged:** `sys_log_20240315_shard_a1b2c3.dat`
+- **Restore Map:** A mapping file (`restore_map.txt`) is generated in `/data/maps` (and stored in the Catalog DB) allowing you to restore the original names later.
+
+### 📦 Smart Repo Spanning
+- **Auto-Split:** If you are backing up 200GB, ParFix will automatically split the upload across multiple private repositories (e.g., `backup-repo-01`, `backup-repo-02`) to keep each repo under the **40GB** safe limit.
+- **Auto-Create:** Repositories are created automatically as needed.
+
+### How to use:
+1. Go to **Automation**.
+2. Create a new Workflow.
+3. Add **Pack (Archive)** step: Enable "Encrypt File Names" and "Recovery Record".
+4. Add **GitHub Publish** step:
+   - Check **Camouflage Mode**.
+   - Check **Smart Repo Spanning**.
+5. Save and Run on any folder.

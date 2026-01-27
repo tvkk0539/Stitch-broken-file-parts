@@ -65,7 +65,8 @@ class CatalogManager:
                         image TEXT,
                         assets TEXT,     -- JSON list of dicts
                         priority INTEGER DEFAULT 1, -- 2=High, 1=Normal, 0=Low
-                        description TEXT
+                        description TEXT,
+                        restore_map TEXT -- JSON dict for Cold Storage
                     )
                 """)
                 conn.commit()
@@ -73,6 +74,7 @@ class CatalogManager:
             # Check for migrations
             self._migrate_priority_column()
             self._migrate_description_column()
+            self._migrate_restore_map_column()
 
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
@@ -102,6 +104,19 @@ class CatalogManager:
                     conn.commit()
         except Exception as e:
             logger.error(f"Description Migration Error: {e}")
+
+    def _migrate_restore_map_column(self):
+        """Adds restore_map column if missing."""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("PRAGMA table_info(items)")
+                columns = [info[1] for info in cursor.fetchall()]
+                if 'restore_map' not in columns:
+                    logger.info("Migrating DB: Adding restore_map column...")
+                    conn.execute("ALTER TABLE items ADD COLUMN restore_map TEXT")
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Restore Map Migration Error: {e}")
 
     def _migrate_json_to_sqlite(self):
         """Imports legacy catalog.json into catalog.db if db is empty."""
@@ -236,9 +251,10 @@ class CatalogManager:
             logger.error(f"Get ID Error: {e}")
         return None
 
-    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None, priority=1, description=None):
+    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None, priority=1, description=None, restore_map=None):
         if tags is None: tags = []
         if assets is None: assets = []
+        if restore_map is None: restore_map = {}
 
         return {
             "id": str(uuid.uuid4()),
@@ -254,7 +270,8 @@ class CatalogManager:
             "assets": assets,
             "image": image,
             "priority": priority,
-            "description": description
+            "description": description,
+            "restore_map": restore_map
         }
 
     def add_entry(self, entry):
@@ -263,8 +280,8 @@ class CatalogManager:
             with self._get_conn() as conn:
                 conn.execute("""
                     INSERT INTO items (id, title, category, file_name, size_bytes, size_human,
-                                       release_url, created_at, tags, is_encrypted, image, assets, priority, description)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       release_url, created_at, tags, is_encrypted, image, assets, priority, description, restore_map)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     entry['id'],
                     entry['title'],
@@ -279,7 +296,8 @@ class CatalogManager:
                     entry['image'],
                     json.dumps(entry['assets']),
                     entry.get('priority', 1),
-                    entry.get('description', '')
+                    entry.get('description', ''),
+                    json.dumps(entry.get('restore_map', {}))
                 ))
                 conn.commit()
 
