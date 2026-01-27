@@ -381,7 +381,7 @@ function renderStepUI(stepDiv, type, config = {}) {
                 </div>
             </div>
 
-            <div style="background:#15161e; border:1px solid #414868; border-radius:4px; padding:15px;">
+            <div class="wf-opts-container" style="background:#15161e; border:1px solid #414868; border-radius:4px; padding:15px;">
                 <h4 style="margin:0 0 10px 0; color:#7dcfff; font-size:0.9em; display:flex; align-items:center; gap:5px;">
                     ❄️ Cold Storage Protocol
                 </h4>
@@ -431,6 +431,7 @@ function renderStepUI(stepDiv, type, config = {}) {
         // Tokenizer for Accounts
         const accContainer = contentDiv.querySelector('.wf-gh-acc-container');
         const tokenizer = createTagInput(accContainer, 'gh-acc-list');
+        tokenizer.classList.add('wf-gh-acc-tokenizer'); // Add marker for save
         const tokenInput = tokenizer.querySelector('.tag-input');
         tokenInput.placeholder = "Add Account IDs...";
 
@@ -519,7 +520,7 @@ async function saveWorkflow() {
              const repo = contentDiv.querySelector('.wf-gh-repo').value;
 
              // Account Tokenizer
-             const accContainer = contentDiv.querySelector('.wf-gh-acc-container .tag-container');
+             const accContainer = contentDiv.querySelector('.wf-gh-acc-tokenizer');
              const accIds = accContainer ? accContainer.querySelector('.tag-value').value : '';
 
              const strat = contentDiv.querySelector('.wf-gh-strat').value;

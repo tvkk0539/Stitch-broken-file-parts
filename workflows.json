@@ -25,5 +25,149 @@
       }
     ],
     "created_at": "2026-01-25T01:04:14.197858"
+  },
+  {
+    "id": "49af9d17-6d27-4308-bfc8-23b28b0d097c",
+    "name": "Test Save Account",
+    "steps": [
+      {
+        "type": "github_publish",
+        "config": {
+          "repo": "",
+          "account_id": "test-account-123",
+          "strategy": "relay",
+          "release_content": "tree_only",
+          "camouflage": false,
+          "obfuscate_title": true,
+          "span_limit": 40,
+          "account_limit": 45,
+          "safety_sleep_seconds": 3600,
+          "rate_limit_seconds": 15,
+          "span_repos": true,
+          "tag_template": "v{date}_{name}"
+        }
+      }
+    ],
+    "created_at": "2026-01-27T11:46:35.210340"
+  },
+  {
+    "id": "bbd531e2-317b-4452-9b8e-c238ad4f5b58",
+    "name": "Test Save Account Final",
+    "steps": [
+      {
+        "type": "github_publish",
+        "config": {
+          "repo": "",
+          "account_id": "test-final-123",
+          "strategy": "relay",
+          "release_content": "tree_only",
+          "camouflage": false,
+          "obfuscate_title": true,
+          "span_limit": 40,
+          "account_limit": 45,
+          "safety_sleep_seconds": 3600,
+          "rate_limit_seconds": 15,
+          "span_repos": true,
+          "tag_template": "v{date}_{name}"
+        }
+      }
+    ],
+    "created_at": "2026-01-27T11:50:02.950220"
+  },
+  {
+    "id": "cfa47bf7-4524-47aa-8da5-4026a372b5dd",
+    "name": "Test Save Account Final",
+    "steps": [
+      {
+        "type": "github_publish",
+        "config": {
+          "repo": "",
+          "account_id": "test-final-123",
+          "strategy": "relay",
+          "release_content": "tree_only",
+          "camouflage": false,
+          "obfuscate_title": true,
+          "span_limit": 40,
+          "account_limit": 45,
+          "safety_sleep_seconds": 3600,
+          "rate_limit_seconds": 15,
+          "span_repos": true,
+          "tag_template": "v{date}_{name}"
+        }
+      }
+    ],
+    "created_at": "2026-01-27T12:00:19.026455"
+  },
+  {
+    "id": "87343347-f712-4f53-b64f-fa01f33631f1",
+    "name": "Test Save Account Final",
+    "steps": [
+      {
+        "type": "github_publish",
+        "config": {
+          "repo": "",
+          "account_id": "test-final-123",
+          "strategy": "relay",
+          "release_content": "tree_only",
+          "camouflage": false,
+          "obfuscate_title": true,
+          "span_limit": 40,
+          "account_limit": 45,
+          "safety_sleep_seconds": 3600,
+          "rate_limit_seconds": 15,
+          "span_repos": true,
+          "tag_template": "v{date}_{name}"
+        }
+      }
+    ],
+    "created_at": "2026-01-27T12:01:45.387167"
+  },
+  {
+    "id": "69269d66-46a5-4e87-901f-57fbed0890c8",
+    "name": "Test Save Account Final",
+    "steps": [
+      {
+        "type": "github_publish",
+        "config": {
+          "repo": "",
+          "account_id": "test-final-123",
+          "strategy": "relay",
+          "release_content": "tree_only",
+          "camouflage": false,
+          "obfuscate_title": true,
+          "span_limit": 40,
+          "account_limit": 45,
+          "safety_sleep_seconds": 3600,
+          "rate_limit_seconds": 15,
+          "span_repos": true,
+          "tag_template": "v{date}_{name}"
+        }
+      }
+    ],
+    "created_at": "2026-01-27T12:02:57.501385"
+  },
+  {
+    "id": "2fa611a6-490d-42a9-ae58-d55fe887f0ab",
+    "name": "Test Save 1769515443460",
+    "steps": [
+      {
+        "type": "github_publish",
+        "config": {
+          "repo": "",
+          "account_id": "acc-1769515443460",
+          "strategy": "relay",
+          "release_content": "tree_only",
+          "camouflage": false,
+          "obfuscate_title": true,
+          "span_limit": 40,
+          "account_limit": 45,
+          "safety_sleep_seconds": 3600,
+          "rate_limit_seconds": 15,
+          "span_repos": true,
+          "tag_template": "v{date}_{name}"
+        }
+      }
+    ],
+    "created_at": "2026-01-27T12:04:05.866523"
   }
 ]
