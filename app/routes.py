@@ -1125,6 +1125,29 @@ def apple_music_download():
 def apple_music_downloader_status():
     return jsonify(AppleMusicManager.get_downloader_status())
 
+# --- Apple Music Queue API ---
+
+@bp.route('/api/apps/apple-music/queue', methods=['GET'])
+def apple_music_get_queue():
+    return jsonify(apple_music_manager.get_queue())
+
+@bp.route('/api/apps/apple-music/queue/add', methods=['POST'])
+def apple_music_queue_add():
+    data = request.json
+    return jsonify(apple_music_manager.add_to_queue(data.get('url'), data.get('args', {})))
+
+@bp.route('/api/apps/apple-music/queue/<int:item_id>', methods=['DELETE'])
+def apple_music_queue_delete(item_id):
+    return jsonify(apple_music_manager.remove_from_queue(item_id))
+
+@bp.route('/api/apps/apple-music/queue/start', methods=['POST'])
+def apple_music_queue_start():
+    return jsonify(apple_music_manager.start_queue())
+
+@bp.route('/api/apps/apple-music/queue/stop', methods=['POST'])
+def apple_music_queue_stop():
+    return jsonify(apple_music_manager.stop_queue())
+
 # --- Apps: Apple Music Wrapper ---
 am_wrapper = AppleMusicWrapperManager()
 

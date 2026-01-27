@@ -69,12 +69,12 @@ const appleMusic = {
     },
 
     switchTab: (tab) => {
-        // Tabs: 'down', 'console', 'config', 'wrapper', 'setup'
+        // Tabs: 'down', 'queue', 'console', 'config', 'wrapper', 'setup'
         document.querySelectorAll('.browser-tab').forEach(b => b.classList.remove('active'));
         const tabBtn = document.getElementById(`am-tab-${tab}`);
         if(tabBtn) tabBtn.classList.add('active');
 
-        ['down', 'console', 'setup', 'config', 'wrapper'].forEach(t => {
+        ['down', 'queue', 'console', 'setup', 'config', 'wrapper'].forEach(t => {
             const el = document.getElementById(`am-view-${t}`);
             if(el) el.style.display = 'none';
         });
@@ -91,6 +91,15 @@ const appleMusic = {
         if (tab !== 'console' && appleMusic.downloaderPollInterval) {
              clearInterval(appleMusic.downloaderPollInterval);
              appleMusic.downloaderPollInterval = null;
+        }
+
+        // Queue Poll
+        if (tab === 'queue') {
+            appleMusic.loadQueue();
+            appleMusic.queuePollInterval = setInterval(appleMusic.loadQueue, 2000);
+        } else if (appleMusic.queuePollInterval) {
+            clearInterval(appleMusic.queuePollInterval);
+            appleMusic.queuePollInterval = null;
         }
 
         if (tab === 'config') {
@@ -275,6 +284,7 @@ const appleMusic = {
         input.type = 'text';
         input.value = value || '';
         input.dataset.key = key; // Ensure dataset.key is set for saveConfig
+        input.id = `am-config-${key}`; // Add ID for robustness
         input.className = 'am-template-input';
         input.style.width = '100%';
         input.style.padding = '10px';
@@ -614,18 +624,11 @@ const appleMusic = {
         }
     },
 
-    // --- REAL DOWNLOADER LOGIC ---
+    // --- REAL DOWNLOADER LOGIC (Legacy Direct Start - Removed in favor of Queue) ---
+    // Replaced by addToQueue Logic below
 
-    handleFetch: async () => {
-        const url = document.getElementById('am-url-input').value;
-        if (!url) {
-            showToast("Please enter an Apple Music URL", "error");
-            return;
-        }
-
+    getDownloadArgs: () => {
         const args = {};
-
-        // Gather Options
         if (document.getElementById('am-opt-atmos').checked) args.atmos = true;
         if (document.getElementById('am-opt-aac').checked) args.aac = true;
         if (document.getElementById('am-opt-song').checked) args.song = true;
@@ -636,40 +639,106 @@ const appleMusic = {
             if (sel) args.select = sel;
         }
 
-        // MV Options
         if (document.getElementById('am-opt-mv').checked) {
-            // Wait, does the tool have a --mv flag? User said default is MV Downloader?
-            // "this is Music Video Downloader by default you gave --mv-max 2160"
-            // Assuming passing URL to a MV automatically downloads it, but --mv-max controls quality.
-            // But if it's an album and we want MVs?
-            // Usually tools auto-detect.
-            // However, to pass --mv-max, we need to read the input.
             const max = document.getElementById('am-opt-mv-max').value;
             if(max) args['mv-max'] = parseInt(max);
         }
+        return args;
+    },
 
-        if(!confirm(`Start download for:\n${url}`)) return;
+    handleFetch: async () => {
+        // Renamed/Aliased to Add to Queue
+        const url = document.getElementById('am-url-input').value.trim();
+        if (!url) { showToast("Please enter URL", "error"); return; }
+
+        const args = appleMusic.getDownloadArgs();
 
         try {
-            const res = await fetch('/api/apps/apple-music/download', {
+            const res = await fetch('/api/apps/apple-music/queue/add', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ url: url, args: args })
             });
-            const data = await res.json();
+            const json = await res.json();
 
-            if (data.status === 'queued') {
-                showToast("Download Started!", "success");
+            if(json.status === 'success') {
+                showToast("Added to Queue", "success");
                 document.getElementById('am-url-input').value = '';
-
-                // Start Polling Console
-                appleMusic.startConsolePoll();
+                // Optional: Switch to Queue Tab?
+                // appleMusic.switchTab('queue');
             } else {
-                showToast("Error: " + data.error, "error");
+                showToast("Queue Failed: " + json.error, "error");
             }
-        } catch (e) {
-            showToast("Request Failed: " + e, "error");
+        } catch(e) {
+            showToast("Error: " + e, "error");
         }
+    },
+
+    // --- QUEUE TAB LOGIC ---
+    queuePollInterval: null,
+
+    loadQueue: async () => {
+        try {
+            const res = await fetch('/api/apps/apple-music/queue');
+            const items = await res.json();
+
+            const container = document.getElementById('am-queue-table-body');
+            if(!container) return;
+            container.innerHTML = '';
+
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+
+                // Parse Args
+                let argStr = '';
+                try {
+                    const a = JSON.parse(item.args);
+                    argStr = Object.keys(a).map(k => k + (a[k]===true?'':`=${a[k]}`)).join(', ');
+                } catch(e) {}
+
+                // Status Color
+                let statusColor = 'gray';
+                if(item.status === 'processing') statusColor = '#7aa2f7';
+                if(item.status === 'completed') statusColor = '#9ece6a';
+                if(item.status === 'failed') statusColor = '#f7768e';
+
+                tr.innerHTML = `
+                    <td style="padding:10px; color:#565f89;">#${item.id}</td>
+                    <td style="padding:10px; color:#c0caf5; font-family:monospace; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.url}</td>
+                    <td style="padding:10px; font-size:0.85em; color:#bb9af7;">${argStr}</td>
+                    <td style="padding:10px;"><span class="badge" style="background:${statusColor}">${item.status.toUpperCase()}</span></td>
+                    <td style="padding:10px; text-align:right;">
+                        ${item.status === 'pending' || item.status === 'failed' || item.status === 'completed' ?
+                        `<button class="icon-btn danger" onclick="appleMusic.deleteQueueItem(${item.id})">✖</button>` : ''}
+                    </td>
+                `;
+                container.appendChild(tr);
+            });
+
+            if(items.length === 0) {
+                container.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Queue is empty</td></tr>';
+            }
+
+        } catch(e) { console.error("Queue load error", e); }
+    },
+
+    deleteQueueItem: async (id) => {
+        if(!confirm("Remove item?")) return;
+        await fetch(`/api/apps/apple-music/queue/${id}`, {method: 'DELETE'});
+        appleMusic.loadQueue();
+    },
+
+    startQueue: async () => {
+        const res = await fetch('/api/apps/apple-music/queue/start', {method: 'POST'});
+        const json = await res.json();
+        if(json.status === 'started') showToast("Queue Processor Started", "success");
+        else showToast("Status: " + json.status, "info");
+    },
+
+    stopQueue: async () => {
+        const res = await fetch('/api/apps/apple-music/queue/stop', {method: 'POST'});
+        const json = await res.json();
+        showToast("Queue stopping after current job...", "warning");
     },
 
     // --- CONSOLE LOGIC ---

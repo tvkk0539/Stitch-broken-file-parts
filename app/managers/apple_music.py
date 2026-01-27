@@ -1,5 +1,7 @@
 import os
 import sqlite3
+import json
+import threading
 from ruamel.yaml import YAML
 from app.core.job_manager import log, job_manager
 from app.managers.notification import NotificationManager
@@ -38,12 +40,26 @@ class AppleMusicDB:
     def _init_db(self):
         try:
             with self._get_conn() as conn:
+                # Config Table
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS config (
                         key TEXT PRIMARY KEY,
                         value TEXT
                     )
                 """)
+
+                # Queue Table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS download_queue (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        url TEXT NOT NULL,
+                        args TEXT, -- JSON
+                        status TEXT DEFAULT 'pending', -- pending, processing, completed, failed
+                        error TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
                 conn.commit()
         except Exception as e:
             log(f"AM-DB Init Error: {e}")
@@ -101,6 +117,64 @@ class AppleMusicDB:
         except:
             return True
 
+    # --- Queue DB Operations ---
+
+    def add_queue_item(self, url, args):
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO download_queue (url, args, status) VALUES (?, ?, 'pending')",
+                    (url, json.dumps(args))
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            log(f"AM-Queue Add Error: {e}")
+            return False
+
+    def get_queue_items(self):
+        try:
+            items = []
+            with self._get_conn() as conn:
+                rows = conn.execute("SELECT * FROM download_queue ORDER BY created_at ASC").fetchall()
+                for row in rows:
+                    items.append(dict(row))
+            return items
+        except Exception as e:
+            log(f"AM-Queue Get Error: {e}")
+            return []
+
+    def update_queue_status(self, item_id, status, error=None):
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "UPDATE download_queue SET status = ?, error = ? WHERE id = ?",
+                    (status, error, item_id)
+                )
+                conn.commit()
+        except Exception as e:
+            log(f"AM-Queue Update Error: {e}")
+
+    def delete_queue_item(self, item_id):
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM download_queue WHERE id = ?", (item_id,))
+                conn.commit()
+            return True
+        except Exception as e:
+            log(f"AM-Queue Delete Error: {e}")
+            return False
+
+    def get_next_pending(self):
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute("SELECT * FROM download_queue WHERE status = 'pending' ORDER BY id ASC LIMIT 1").fetchone()
+                if row:
+                    return dict(row)
+        except Exception as e:
+            log(f"AM-Queue Next Error: {e}")
+        return None
+
 class AppleMusicManager:
     """
     Manager for handling Apple Music Downloader configuration and interactions.
@@ -112,6 +186,10 @@ class AppleMusicManager:
     # Shared state for isolated logging
     _log_history = []
     _running_process = None
+
+    # Queue Control
+    _queue_active = False
+    _stop_requested = False
 
     def __init__(self):
         self.yaml = YAML()
@@ -350,6 +428,134 @@ class AppleMusicManager:
         except Exception as e:
             log(f"Error reloading config: {e}")
             return {'error': f"Failed to reload config: {str(e)}"}
+
+    # --- Queue Management Logic ---
+
+    def add_to_queue(self, url, args):
+        if self.db.add_queue_item(url, args):
+            return {'status': 'success', 'message': 'Added to queue'}
+        return {'error': 'Failed to add to queue'}
+
+    def get_queue(self):
+        return self.db.get_queue_items()
+
+    def remove_from_queue(self, item_id):
+        if self.db.delete_queue_item(item_id):
+            return {'status': 'success'}
+        return {'error': 'Failed to delete'}
+
+    def stop_queue(self):
+        """Signals the queue processor to stop after current job."""
+        if AppleMusicManager._queue_active:
+            AppleMusicManager._stop_requested = True
+            log("AM-Queue: Stopping after current job...")
+            return {'status': 'stopping'}
+        return {'status': 'not_running'}
+
+    def start_queue(self):
+        """Starts the queue processor if not running."""
+        if AppleMusicManager._queue_active:
+            return {'status': 'already_running'}
+
+        AppleMusicManager._queue_active = True
+        AppleMusicManager._stop_requested = False
+
+        # Run in background via JobManager to not block request
+        # But wait, JobManager runs TASKS. The Queue Processor is a Daemon-like loop.
+        # Ideally, we submit a "Queue Processor" job to JobManager.
+        job_manager.add_job(
+            "Apple Music Queue Processor",
+            self._process_queue_loop,
+            args=()
+        )
+        return {'status': 'started'}
+
+    def _process_queue_loop(self):
+        """
+        Worker loop that picks pending items and runs them.
+        """
+        log("AM-Queue: Processor Started")
+
+        while True:
+            if AppleMusicManager._stop_requested:
+                log("AM-Queue: Stop requested. Exiting loop.")
+                break
+
+            item = self.db.get_next_pending()
+            if not item:
+                log("AM-Queue: No pending items. Finished.")
+                break
+
+            # Process Item
+            log(f"AM-Queue: Processing Item #{item['id']} - {item['url']}")
+            self.db.update_queue_status(item['id'], 'processing')
+
+            try:
+                # Parse args
+                args = json.loads(item['args']) if item['args'] else {}
+
+                # Execute Download (Synchronous within this thread)
+                # We reuse run_download_job logic but need it to raise exception on failure
+                # to mark status correctly.
+                success = self._run_download_sync(item['url'], args)
+
+                if success:
+                    self.db.update_queue_status(item['id'], 'completed')
+                else:
+                    self.db.update_queue_status(item['id'], 'failed', 'Download process returned error')
+
+            except Exception as e:
+                log(f"AM-Queue Error processing #{item['id']}: {e}")
+                self.db.update_queue_status(item['id'], 'failed', str(e))
+
+        AppleMusicManager._queue_active = False
+        AppleMusicManager._stop_requested = False
+        log("AM-Queue: Processor Stopped")
+
+    def _run_download_sync(self, url, args):
+        """
+        Internal helper to run download synchronously and return Success (bool).
+        Similar to run_download_job but returns status instead of just logging.
+        """
+        work_dir = self.find_install_path()
+        if not work_dir:
+            raise Exception("Downloader not found")
+
+        cmd = ['go', 'run', 'main.go']
+        if args:
+            for k, v in args.items():
+                if v is True: cmd.append(f"--{k}")
+                elif v:
+                    cmd.append(f"--{k}")
+                    cmd.append(str(v))
+        cmd.append(url)
+
+        process = subprocess.Popen(
+            cmd,
+            cwd=work_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            universal_newlines=True,
+            env={**os.environ, 'PATH': os.environ.get('PATH', '')}
+        )
+
+        job_manager.set_current_process(process)
+        AppleMusicManager._running_process = process
+
+        for line in process.stdout:
+            line = line.strip()
+            if line:
+                is_prog = line.startswith("Downloading...") or line.startswith("Decrypting...")
+                if not is_prog: log(f"[AM-Queue] {line}")
+                AppleMusicManager._append_log(line)
+                if "Downloading" in line:
+                    job_manager.update_job_details({'action': f"Queue Item: {line}"})
+
+        process.wait()
+        AppleMusicManager._running_process = None
+
+        return process.returncode == 0
 
     @staticmethod
     def run_download_job(url, args=None):
