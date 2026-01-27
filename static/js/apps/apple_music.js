@@ -624,8 +624,59 @@ const appleMusic = {
         }
     },
 
-    // --- REAL DOWNLOADER LOGIC (Legacy Direct Start - Removed in favor of Queue) ---
-    // Replaced by addToQueue Logic below
+    // --- DOWNLOADER LOGIC ---
+
+    startDirectDownload: async () => {
+        const url = document.getElementById('am-url-input').value.trim();
+        if (!url) { showToast("Please enter URL", "error"); return; }
+
+        // 1. Check Status (Mutual Exclusion)
+        try {
+            const statusRes = await fetch('/api/apps/apple-music/downloader/status');
+            const status = await statusRes.json();
+
+            if (status.running) {
+                if (status.queue_active) {
+                    if (!confirm("The Queue is currently running.\nStop it to start this download immediately?")) return;
+
+                    // Stop Queue
+                    await appleMusic.stopQueue();
+                    showToast("Stopping queue... please wait.", "warning");
+
+                    // We should wait until it actually stops, but for now simple delay or just proceeding
+                    // (the backend might reject if process is still running, but stop request sets flag)
+                    // Ideally we poll until running=false.
+                    await new Promise(r => setTimeout(r, 1000));
+                } else {
+                    showToast("A direct download is already running!", "error");
+                    return;
+                }
+            }
+        } catch(e) { console.error("Status check failed", e); }
+
+        const args = appleMusic.getDownloadArgs();
+
+        if(!confirm(`Start Direct Download?\n${url}`)) return;
+
+        try {
+            const res = await fetch('/api/apps/apple-music/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ url: url, args: args })
+            });
+            const data = await res.json();
+
+            if (data.status === 'queued') {
+                showToast("Download Started!", "success");
+                document.getElementById('am-url-input').value = '';
+                appleMusic.startConsolePoll();
+            } else {
+                showToast("Error: " + data.error, "error");
+            }
+        } catch (e) {
+            showToast("Request Failed: " + e, "error");
+        }
+    },
 
     getDownloadArgs: () => {
         const args = {};
@@ -729,6 +780,16 @@ const appleMusic = {
     },
 
     startQueue: async () => {
+        // Mutual Exclusion Check
+        try {
+            const statusRes = await fetch('/api/apps/apple-music/downloader/status');
+            const status = await statusRes.json();
+            if (status.running && !status.queue_active) {
+                showToast("A direct download is currently running.\nPlease wait for it to finish.", "error");
+                return;
+            }
+        } catch(e) {}
+
         const res = await fetch('/api/apps/apple-music/queue/start', {method: 'POST'});
         const json = await res.json();
         if(json.status === 'started') showToast("Queue Processor Started", "success");

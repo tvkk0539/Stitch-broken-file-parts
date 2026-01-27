@@ -313,6 +313,7 @@ class AppleMusicManager:
         running = cls._running_process is not None and cls._running_process.poll() is None
         return {
             'running': running,
+            'queue_active': cls._queue_active,
             'logs': cls._log_history
         }
 
