@@ -140,6 +140,37 @@ This release is generated automatically by the backup-daemon. Please do not modi
             return None
 
     @staticmethod
+    def restore_from_dict(mapping, target_dir):
+        """
+        Restores files using a dictionary mapping {fake: real}.
+        """
+        if not mapping:
+            return False, "Empty mapping provided"
+
+        log(f"♻️  Restoring {len(mapping)} files in {target_dir}")
+        count = 0
+        try:
+            for fake, real in mapping.items():
+                fake_path = os.path.join(target_dir, fake)
+                real_path = os.path.join(target_dir, real)
+
+                # Check if already restored (real exists, fake doesn't)
+                if os.path.exists(real_path) and not os.path.exists(fake_path):
+                    continue
+
+                if os.path.exists(fake_path):
+                    try:
+                        os.rename(fake_path, real_path)
+                        count += 1
+                        log(f"   ✨ Restored: {real}")
+                    except Exception as ex:
+                        log(f"   ❌ Failed to restore {fake}: {ex}")
+
+            return True, f"Restored {count} files."
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
     def restore_from_map(map_path, target_dir):
         """
         Restores files using a map file.
@@ -148,7 +179,7 @@ This release is generated automatically by the backup-daemon. Please do not modi
             return False, "Map file not found"
 
         log(f"♻️  Restoring from map: {map_path}")
-        count = 0
+        mapping = {}
         try:
             with open(map_path, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -159,15 +190,8 @@ This release is generated automatically by the backup-daemon. Please do not modi
 
                     fake = parts[0].strip()
                     real = parts[1].strip()
+                    mapping[fake] = real
 
-                    fake_path = os.path.join(target_dir, fake)
-                    real_path = os.path.join(target_dir, real)
-
-                    if os.path.exists(fake_path):
-                        os.rename(fake_path, real_path)
-                        count += 1
-                        log(f"   ✨ Restored: {real}")
-
-            return True, f"Restored {count} files."
+            return ObfuscationManager.restore_from_dict(mapping, target_dir)
         except Exception as e:
             return False, str(e)
