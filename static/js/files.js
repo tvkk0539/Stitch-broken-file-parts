@@ -250,9 +250,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('arc-fmt').onchange = (e) => {
         const isRar = e.target.value === 'rar';
+        const is7z = e.target.value === '7z';
         const nameGrp = document.getElementById('arc-naming-group');
         const rrGrp = document.getElementById('arc-rr-group');
-        if(nameGrp) nameGrp.style.display = isRar ? 'block' : 'none';
+
+        // Hide Naming Scheme for RAR (it defaults to standard part1.rar)
+        // Show Naming Scheme for 7z (if supported/requested)
+        if(nameGrp) nameGrp.style.display = is7z ? 'block' : 'none';
+
+        // Recovery Record only for RAR
         if(rrGrp) rrGrp.style.display = isRar ? 'block' : 'none';
     };
 

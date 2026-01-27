@@ -440,13 +440,17 @@ function updateStepConfigUI(select) {
         `;
         c1 = ensureSelect(c1, sizeOpts);
 
-        // Config 2: Naming
-        const namingOpts = `
-            <option value="part1">part1.rar</option>
-            <option value="part01">part01.rar</option>
-            <option value="part001" selected>part001.rar (Scene)</option>
-        `;
-        c2 = ensureSelect(c2, namingOpts);
+        // Config 2: Naming - HIDDEN for RAR (since we enforce standard naming)
+        // We will repurpose C2 for Format Selection eventually?
+        // But Automation currently assumes RAR.
+        // If we want to support 7z in Automation, we need a Format selector.
+        // For now, Pack step is RAR-centric in code.
+        // To follow the pattern: Hide Naming for RAR.
+        // Since Automation is RAR-only currently (format='rar' hardcoded in saveWorkflow),
+        // we should HIDE this field completely to avoid confusion.
+
+        c2.style.display = 'none'; // Hide Naming Scheme
+        c2.value = 'part1'; // Default value
 
         // Config 3: Obfuscation
         const obfOpts = `
@@ -455,7 +459,7 @@ function updateStepConfigUI(select) {
         `;
         c3 = ensureSelect(c3, obfOpts);
 
-        desc.textContent = "Creates split RAR archives. Select naming and obfuscation options.";
+        desc.textContent = "Creates split RAR archives. (Standard naming enforced).";
 
     } else if (type === 'github_publish') {
         // Config 1: Repo (Hybrid with Datalist)
