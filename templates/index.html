@@ -304,6 +304,8 @@
                 <div class="browser-header" style="margin-bottom: 20px;">
                     <div class="browser-tabs">
                         <button id="am-tab-down" class="browser-tab active" onclick="appleMusic.switchTab('down')">Downloader</button>
+                        <button id="am-tab-queue" class="browser-tab" onclick="appleMusic.switchTab('queue')">Queue</button>
+                        <button id="am-tab-history" class="browser-tab" onclick="appleMusic.switchTab('history')">History</button>
                         <button id="am-tab-console" class="browser-tab" onclick="appleMusic.switchTab('console')">Console</button>
                         <button id="am-tab-config" class="browser-tab" onclick="appleMusic.switchTab('config')">Config</button>
                         <button id="am-tab-wrapper" class="browser-tab" onclick="appleMusic.switchTab('wrapper')">Wrapper</button>
@@ -374,21 +376,73 @@
                                 </div>
                             </div>
 
-                            <button id="am-fetch-btn" class="purple-btn" style="width:100%; padding:15px; font-size:1.2em; font-weight:bold; display:flex; justify-content:center; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(118, 77, 255, 0.4);" onclick="appleMusic.handleFetch()">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                Start Download
-                            </button>
+                            <div style="display:flex; gap:15px; margin-top:20px;">
+                                <button id="am-direct-dl-btn" class="purple-btn" style="flex:1; padding:15px; font-size:1.1em; font-weight:bold; display:flex; justify-content:center; align-items:center; gap:10px; box-shadow:0 4px 15px rgba(118, 77, 255, 0.4);" onclick="appleMusic.startDirectDownload()">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                    Download Now
+                                </button>
+
+                                <button id="am-fetch-btn" class="secondary" style="flex:1; padding:15px; font-size:1.1em; font-weight:bold; display:flex; justify-content:center; align-items:center; gap:10px; border:1px solid var(--border-color);" onclick="appleMusic.handleFetch()">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    Add to Queue
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Queue (Mini) -->
-                        <div style="background:var(--panel-bg); border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
-                            <div style="padding:10px 15px; background:#13141c; border-bottom:1px solid var(--border-color);">
-                                <h3 style="margin:0; font-size:0.9em; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted);">Recent Jobs</h3>
-                            </div>
-                            <div id="am-queue-list" style="max-height:200px; overflow-y:auto; padding:10px;">
-                                <div style="text-align:center; color:var(--text-muted);">No recent jobs</div>
-                            </div>
+                    </div>
+                </div>
+
+                <!-- TAB: QUEUE (Dedicated) -->
+                <div id="am-view-queue" style="display:none; padding:20px; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); height:calc(100vh - 200px); flex-direction:column;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
+                        <h3 style="margin:0;">Active Queue</h3>
+                        <div style="display:flex; gap:10px;">
+                            <button class="secondary success-btn" onclick="appleMusic.startQueue()" style="background:#9ece6a; color:#1a1b26;">▶ Start Queue</button>
+                            <button class="danger" onclick="appleMusic.stopQueue()">⏹ Stop after current</button>
                         </div>
+                    </div>
+
+                    <div style="flex:1; overflow-y:auto;">
+                        <table style="width:100%; border-collapse:collapse; text-align:left;">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-size:0.9em;">
+                                    <th style="padding:10px;">ID</th>
+                                    <th style="padding:10px;">URL</th>
+                                    <th style="padding:10px;">Arguments</th>
+                                    <th style="padding:10px;">Status</th>
+                                    <th style="padding:10px; text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="am-queue-table-body">
+                                <!-- JS Injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB: HISTORY (Dedicated) -->
+                <div id="am-view-history" style="display:none; padding:20px; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); height:calc(100vh - 200px); flex-direction:column;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
+                        <h3 style="margin:0;">Download History</h3>
+                        <button class="secondary" onclick="appleMusic.clearHistory()" style="flex:0; white-space:nowrap;">🗑️ Clear All History</button>
+                    </div>
+
+                    <div style="flex:1; overflow-y:auto;">
+                        <table style="width:100%; border-collapse:collapse; text-align:left;">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-size:0.9em;">
+                                    <th style="padding:10px;">ID</th>
+                                    <th style="padding:10px;">URL</th>
+                                    <th style="padding:10px;">Arguments</th>
+                                    <th style="padding:10px;">Status</th>
+                                    <th style="padding:10px;">Details</th>
+                                    <th style="padding:10px; text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="am-history-table-body">
+                                <!-- JS Injected -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -454,7 +508,8 @@
                             <h3 style="margin:0;">Configuration Editor</h3>
                             <div style="display:flex; gap:10px; align-items:center;">
                                 <div id="am-config-path" style="font-family:monospace; font-size:0.8em; color:var(--text-muted); max-width:400px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
-                                <button class="secondary" onclick="appleMusic.loadConfig()">🔄 Refresh</button>
+                                <button id="am-config-reload-btn" class="warning-btn" style="background:#e0af68; color:#1a1b26;" onclick="appleMusic.reloadConfig()">📂 Reload from Disk</button>
+                                <button class="secondary" onclick="appleMusic.loadConfig()">🔄 Refresh UI</button>
                                 <button class="purple-btn" onclick="appleMusic.saveConfig()">💾 Save Changes</button>
                             </div>
                         </div>
