@@ -1,9 +1,105 @@
 import os
+import sqlite3
 from ruamel.yaml import YAML
 from app.core.job_manager import log, job_manager
 from app.managers.notification import NotificationManager
 import subprocess
 import shutil
+
+class AppleMusicDB:
+    """
+    Dedicated SQLite storage for Apple Music Downloader configuration.
+    """
+    DB_NAME = 'apple_music.db'
+
+    def __init__(self):
+        # Store in data/apple_music.db (isolated)
+        # We place the DB in 'data' directory (sibling to downloads usually, or inside it if mapped)
+        # But per instruction, "data/apple_music.db".
+        # Assuming app root 'data' is better for config persistence.
+        # Let's use the project root 'data' folder for consistency with catalog.db if possible,
+        # but user asked for "separate".
+
+        # We will put it in the same base 'data' directory where 'catalog.db' usually lives if not synced.
+        # However, to be safe and simple, we'll put it in the standard 'data' volume.
+
+        self.db_dir = 'data'
+        if not os.path.exists(self.db_dir):
+            os.makedirs(self.db_dir, exist_ok=True)
+
+        self.db_path = os.path.join(self.db_dir, self.DB_NAME)
+        self._init_db()
+
+    def _get_conn(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_db(self):
+        try:
+            with self._get_conn() as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS config (
+                        key TEXT PRIMARY KEY,
+                        value TEXT
+                    )
+                """)
+                conn.commit()
+        except Exception as e:
+            log(f"AM-DB Init Error: {e}")
+
+    def get_all(self):
+        """Returns all settings as a dictionary."""
+        try:
+            with self._get_conn() as conn:
+                rows = conn.execute("SELECT key, value FROM config").fetchall()
+                return {row['key']: row['value'] for row in rows}
+        except Exception as e:
+            log(f"AM-DB Get All Error: {e}")
+            return {}
+
+    def get(self, key):
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
+                if row:
+                    return row['value']
+        except Exception as e:
+            log(f"AM-DB Get Error: {e}")
+        return None
+
+    def set(self, key, value):
+        """Sets a single value. Value is converted to string."""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
+                    (key, str(value))
+                )
+                conn.commit()
+        except Exception as e:
+            log(f"AM-DB Set Error: {e}")
+
+    def bulk_update(self, data_dict):
+        """Updates multiple keys."""
+        try:
+            with self._get_conn() as conn:
+                for k, v in data_dict.items():
+                    conn.execute(
+                        "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
+                        (k, str(v))
+                    )
+                conn.commit()
+        except Exception as e:
+            log(f"AM-DB Bulk Update Error: {e}")
+
+    def is_empty(self):
+        try:
+            with self._get_conn() as conn:
+                count = conn.execute("SELECT count(*) FROM config").fetchone()[0]
+                return count == 0
+        except:
+            return True
 
 class AppleMusicManager:
     """
@@ -21,6 +117,102 @@ class AppleMusicManager:
         self.yaml = YAML()
         self.yaml.preserve_quotes = True
         self.yaml.indent(mapping=2, sequence=4, offset=2)
+
+        self.db = AppleMusicDB()
+        self._ensure_synced()
+
+    def _ensure_synced(self):
+        """
+        Ensures DB and File are in sync on startup.
+        Priority:
+        1. If DB is empty -> Import from File (Initial Migration).
+        2. If DB has data -> We assume DB is truth (Lazy Sync is handled on save, but we can verify here).
+        """
+        if self.db.is_empty():
+            log("AM-Manager: DB is empty. Attempting import from config.yaml...")
+            self._sync_from_yaml_to_db()
+
+    def _sync_from_yaml_to_db(self):
+        """Reads config.yaml (if exists) and populates DB."""
+        path = self.find_config_path()
+        if not path or not os.path.exists(path):
+            return
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = self.yaml.load(f)
+
+            if data:
+                # Convert complex types if necessary, but simple dict is expected
+                flat_data = {}
+                for k, v in data.items():
+                    # Check for non-scalar types if any
+                    flat_data[k] = v
+
+                self.db.bulk_update(flat_data)
+                log(f"AM-Manager: Imported {len(flat_data)} keys from {path}")
+        except Exception as e:
+            log(f"AM-Manager Import Error: {e}")
+
+    def _sync_from_db_to_yaml(self):
+        """
+        Writes DB values to config.yaml.
+        Crucial: Preserves comments by reading the file first.
+        """
+        path = self.find_config_path()
+        if not path:
+            return {'error': 'Config file not found on disk.'}
+
+        try:
+            # 1. Read File (Template)
+            with open(path, 'r', encoding='utf-8') as f:
+                yaml_data = self.yaml.load(f)
+
+            # 2. Get DB Values
+            db_values = self.db.get_all()
+
+            # 3. Update Yaml Object (Preserving Types)
+            for key, str_val in db_values.items():
+                if key in yaml_data:
+                    current_val = yaml_data[key]
+
+                    # Type Inference to preserve YAML types
+                    # Because DB stores everything as TEXT
+                    new_val = str_val
+
+                    if isinstance(current_val, bool):
+                        new_val = str(str_val).lower() == 'true'
+                    elif isinstance(current_val, int):
+                        try:
+                            new_val = int(str_val)
+                        except:
+                            pass # Fallback to string
+                    elif current_val is None:
+                        # If yaml had null, try to guess from string
+                        if str_val.lower() == 'true': new_val = True
+                        elif str_val.lower() == 'false': new_val = False
+                        elif str_val.isdigit(): new_val = int(str_val)
+
+                    yaml_data[key] = new_val
+                else:
+                    # New key (not in file)
+                    # We add it, but it won't have comments.
+                    # Try to infer type
+                    if str_val.lower() == 'true': yaml_data[key] = True
+                    elif str_val.lower() == 'false': yaml_data[key] = False
+                    elif str_val.isdigit(): yaml_data[key] = int(str_val)
+                    else: yaml_data[key] = str_val
+
+            # 4. Write Back
+            with open(path, 'w', encoding='utf-8') as f:
+                self.yaml.dump(yaml_data, f)
+
+            log(f"AM-Manager: Synced DB to {path}")
+            return {'status': 'success'}
+
+        except Exception as e:
+            log(f"AM-Manager Sync Export Error: {e}")
+            return {'error': str(e)}
 
     @classmethod
     def _append_log(cls, message):
@@ -89,64 +281,59 @@ class AppleMusicManager:
 
     def get_config(self):
         """
-        Reads the config.yaml file.
-        Returns a dict with 'path' and 'data'.
+        Returns configuration from the Database.
         """
         path = self.find_config_path()
         if not path:
             return {'error': 'Configuration file not found. Please import the repository first.'}
 
         try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = self.yaml.load(f)
+            # Return DB values
+            # We return them as a dict. The frontend expects 'data'.
+            # Note: DB values are strings. The frontend handles string->bool/int
+            # rendering via schema types, but sending proper types is nicer.
+            # However, since we store as text, we send text.
+            # The UI schema (apple_music.js) handles 'bool' type fields by checking 'true'/'false'.
 
-            # Convert to pure dict for JSON serialization if needed,
-            # but we want to return it to frontend.
-            # ruamel objects are dict-like, so jsonify usually handles them,
-            # but strictly speaking we might need to cast simple types if frontend creates issues.
-            # For now, let's trust jsonify.
+            data = self.db.get_all()
+
+            # Simple Type Casting for standard UI expectations (optional but good)
+            # Actually, let's keep it raw strings to be safe with DB storage,
+            # and let the frontend schema handle display logic (checked=value=='true').
+            # But wait, frontend apple_music.js: input.checked = field.value === true;
+            # So we SHOULD convert "true" to True for the frontend.
+
+            clean_data = {}
+            for k, v in data.items():
+                if v.lower() == 'true': clean_data[k] = True
+                elif v.lower() == 'false': clean_data[k] = False
+                elif v.isdigit(): clean_data[k] = int(v)
+                else: clean_data[k] = v
+
             return {
                 'path': path,
-                'data': data
+                'data': clean_data
             }
         except Exception as e:
-            log(f"Error reading config: {e}")
-            return {'error': f"Failed to read config file: {str(e)}"}
+            log(f"Error reading config from DB: {e}")
+            return {'error': f"Failed to read config: {str(e)}"}
 
     def update_config(self, updates):
         """
-        Updates the config.yaml file with provided key-value pairs.
-        Preserves comments and structure.
+        Updates the Database then Syncs to config.yaml.
         """
-        path = self.find_config_path()
-        if not path:
-            return {'error': 'Configuration file not found.'}
-
         try:
-            # Read first to get the CommentedMap object
-            with open(path, 'r', encoding='utf-8') as f:
-                data = self.yaml.load(f)
+            # 1. Update Database
+            self.db.bulk_update(updates)
 
-            # Apply updates
-            for key, value in updates.items():
-                if key in data:
-                    # Basic type casting if necessary (frontend might send strings for bools)
-                    current_val = data[key]
-                    if isinstance(current_val, bool) and not isinstance(value, bool):
-                        value = str(value).lower() == 'true'
-                    elif isinstance(current_val, int) and not isinstance(value, int):
-                        try:
-                            value = int(value)
-                        except:
-                            pass # Keep as is if conversion fails
+            # 2. Sync to File (Preserving comments)
+            result = self._sync_from_db_to_yaml()
 
-                    data[key] = value
+            if 'error' in result:
+                return result
 
-            # Write back
-            with open(path, 'w', encoding='utf-8') as f:
-                self.yaml.dump(data, f)
+            return {'status': 'success', 'message': 'Configuration saved to DB and Disk.'}
 
-            return {'status': 'success', 'message': 'Configuration saved successfully.'}
         except Exception as e:
             log(f"Error saving config: {e}")
             return {'error': f"Failed to save config: {str(e)}"}
