@@ -384,10 +384,16 @@ function renderStepUI(stepDiv, type, config = {}) {
             <div style="background:#15161e; border:1px solid #414868; border-radius:4px; padding:15px;">
                 <h4 style="margin:0 0 10px 0; color:#7dcfff; font-size:0.9em; display:flex; align-items:center; gap:5px;">
                     ❄️ Cold Storage Protocol
-                    <label style="margin-left:auto; font-size:0.9em; display:flex; align-items:center; gap:5px; cursor:pointer;">
-                        <input type="checkbox" class="wf-gh-camo"> Enable Camouflage
-                    </label>
                 </h4>
+
+                <div style="display:flex; gap:15px; margin-bottom:5px;">
+                    <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Renames files to look like System Logs">
+                        <input type="checkbox" class="wf-opt-camo"> 🛡️ Camouflage Mode
+                    </label>
+                    <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Scrambles the Release Title (Base64)">
+                        <input type="checkbox" class="wf-gh-obf-title" checked> 🔒 Obfuscate Title
+                    </label>
+                </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                     <div>
@@ -414,7 +420,8 @@ function renderStepUI(stepDiv, type, config = {}) {
         if(config.repo) contentDiv.querySelector('.wf-gh-repo').value = config.repo;
         if(config.strategy) contentDiv.querySelector('.wf-gh-strat').value = config.strategy;
         if(config.release_content) contentDiv.querySelector('.wf-gh-content').value = config.release_content;
-        if(config.camouflage !== undefined) contentDiv.querySelector('.wf-gh-camo').checked = config.camouflage;
+        if(config.camouflage !== undefined) contentDiv.querySelector('.wf-opt-camo').checked = config.camouflage;
+        if(config.obfuscate_title !== undefined) contentDiv.querySelector('.wf-gh-obf-title').checked = config.obfuscate_title;
 
         if(config.span_limit) contentDiv.querySelector('.wf-gh-lim-repo').value = config.span_limit;
         if(config.account_limit) contentDiv.querySelector('.wf-gh-lim-acc').value = config.account_limit;
@@ -517,7 +524,11 @@ async function saveWorkflow() {
 
              const strat = contentDiv.querySelector('.wf-gh-strat').value;
              const content = contentDiv.querySelector('.wf-gh-content').value;
-             const camo = contentDiv.querySelector('.wf-gh-camo').checked;
+
+             // Get Options Container
+             const optsDiv = div.querySelector('.wf-opts-container');
+             const camo = optsDiv ? optsDiv.querySelector('.wf-opt-camo').checked : false;
+             const obfTitle = optsDiv ? optsDiv.querySelector('.wf-gh-obf-title').checked : true;
 
              const repoLim = parseInt(contentDiv.querySelector('.wf-gh-lim-repo').value) || 40;
              const accLim = parseInt(contentDiv.querySelector('.wf-gh-lim-acc').value) || 45;
@@ -530,12 +541,12 @@ async function saveWorkflow() {
                  strategy: strat,
                  release_content: content,
                  camouflage: camo,
+                 obfuscate_title: obfTitle,
                  span_limit: repoLim,
                  account_limit: accLim,
                  safety_sleep_seconds: sleep,
                  rate_limit_seconds: rate,
                  span_repos: true, // Always active with limits
-                 obfuscate_title: true, // Force secure default
                  tag_template: 'v{date}_{name}'
              };
 
