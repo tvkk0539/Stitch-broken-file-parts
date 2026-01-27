@@ -356,7 +356,8 @@ class WorkflowManager:
                 camouflage=camouflage,
                 meta=meta,
                 rate_limit_sleep=int(conf.get('rate_limit_seconds', 15)),
-                safety_sleep=int(conf.get('safety_sleep_seconds', 3600))
+                safety_sleep=int(conf.get('safety_sleep_seconds', 3600)),
+                strategy=conf.get('strategy', 'relay')
             )
 
             # Inject private body into result for Catalog

@@ -176,6 +176,7 @@ function editWorkflow(id) {
              const optsDiv = stepDiv.querySelector('.wf-opts-container');
              if(optsDiv) {
                  optsDiv.querySelector('.wf-gh-content').value = conf.release_content || 'standard';
+                 optsDiv.querySelector('.wf-gh-strat').value = conf.strategy || 'relay';
                  optsDiv.querySelector('.wf-opt-camo').checked = (conf.camouflage === true);
 
                  // Numeric options
@@ -577,11 +578,15 @@ function updateStepConfigUI(select) {
         }
 
         optsDiv.innerHTML = `
-            <div style="margin-bottom:5px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; margin-bottom:5px;">
                 <select class="wf-gh-content" style="width:100%; background:#13141c; color:#c0caf5; border:1px solid #414868; padding:3px;">
                     <option value="standard">Standard Body</option>
                     <option value="tree_only" selected>Tree Only Body</option>
                     <option value="clean">Clean Body</option>
+                </select>
+                <select class="wf-gh-strat" style="width:100%; background:#13141c; color:#c0caf5; border:1px solid #414868; padding:3px;" title="Upload Strategy">
+                    <option value="relay" selected>🔄 Relay (Sequential)</option>
+                    <option value="scatter">🔀 Scatter (Round Robin)</option>
                 </select>
             </div>
 
@@ -692,6 +697,7 @@ async function saveWorkflow() {
             // Get Options from c4 div
             const optsDiv = div.querySelector('.wf-opts-container');
             const content = optsDiv ? optsDiv.querySelector('.wf-gh-content').value : 'standard';
+            const strat = optsDiv ? optsDiv.querySelector('.wf-gh-strat').value : 'relay';
             const camo = optsDiv ? optsDiv.querySelector('.wf-opt-camo').checked : false;
 
             // Numeric Configs
@@ -714,8 +720,9 @@ async function saveWorkflow() {
                 account_id: accIds, // Comma separated list
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
                 release_content: content,
+                strategy: strat,
                 camouflage: camo,
-                span_repos: true, // Always active if limit provided? Or implicit? Let's assume active if limit > 0
+                span_repos: true,
                 span_limit: repoLim,
                 account_limit: accLim,
                 safety_sleep_seconds: sleepSec,
