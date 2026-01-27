@@ -260,11 +260,12 @@ class WorkflowManager:
             split,
             conf.get('password'),
             conf.get('format', 'rar'),
-            True, # Create Par2
+            conf.get('create_par2', True), # Create Par2 (Configurable)
             False,
             None, "",
             conf.get('naming', 'part1'),
-            conf.get('recovery', True)
+            conf.get('recovery', True),
+            conf.get('encrypt_filenames', False)
         )
 
         # Scan for output files (RAR/PAR2) in the parent dir

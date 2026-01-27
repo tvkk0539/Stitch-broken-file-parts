@@ -153,6 +153,16 @@ function editWorkflow(id) {
              c1.value = conf.split || '1024M';
              c2.value = conf.naming || 'part001';
              c3.value = (conf.obfuscate === true || conf.obfuscate === 'true') ? 'true' : 'false';
+
+             // Populate Options (c4 is now a div)
+             // We need to wait for UI update or handle it here if updated
+             // updateStepConfigUI runs before this, so c4 should be the div
+             const optsDiv = stepDiv.querySelector('.wf-opts-container');
+             if (optsDiv) {
+                 optsDiv.querySelector('.wf-opt-par2').checked = (conf.create_par2 !== false); // Default True
+                 optsDiv.querySelector('.wf-opt-rr').checked = (conf.recovery !== false); // Default True
+                 optsDiv.querySelector('.wf-opt-encname').checked = (conf.encrypt_filenames === true); // Default False
+             }
         } else if (step.type === 'github_publish') {
              c1.value = conf.repo || '';
              c2.value = conf.account_id || '';
@@ -459,7 +469,40 @@ function updateStepConfigUI(select) {
         `;
         c3 = ensureSelect(c3, obfOpts);
 
-        desc.textContent = "Creates split RAR archives. (Standard naming enforced).";
+        // Config 4: Options (Multi-Checkboxes)
+        c4.style.display = 'block';
+
+        // We need a custom container for checkboxes if c4 is a select/input
+        // Strategy: Replace c4 with a div container
+        let optsDiv = c4;
+        if (c4.tagName !== 'DIV' || !c4.classList.contains('wf-opts-container')) {
+            optsDiv = document.createElement('div');
+            optsDiv.className = 'wf-conf-4 wf-opts-container';
+            optsDiv.style.flex = '1';
+            optsDiv.style.display = 'flex';
+            optsDiv.style.flexDirection = 'column';
+            optsDiv.style.gap = '5px';
+            optsDiv.style.background = '#1a1b26';
+            optsDiv.style.padding = '5px';
+            optsDiv.style.border = '1px solid #414868';
+            optsDiv.style.maxHeight = '80px';
+            optsDiv.style.overflowY = 'auto';
+            c4.replaceWith(optsDiv);
+        }
+
+        optsDiv.innerHTML = `
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;">
+                <input type="checkbox" class="wf-opt-par2" checked> Create PAR2
+            </label>
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;">
+                <input type="checkbox" class="wf-opt-rr" checked> Recovery Record
+            </label>
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;">
+                <input type="checkbox" class="wf-opt-encname"> Encrypt File Names
+            </label>
+        `;
+
+        desc.textContent = "Creates split RAR archives. Configure recovery and encryption options.";
 
     } else if (type === 'github_publish') {
         // Config 1: Repo (Hybrid with Datalist)
@@ -548,11 +591,19 @@ async function saveWorkflow() {
 
         let config = {};
         if(type === 'pack') {
+            // Get Options from c4 div
+            const optsDiv = div.querySelector('.wf-opts-container');
+            const par2 = optsDiv ? optsDiv.querySelector('.wf-opt-par2').checked : true;
+            const rr = optsDiv ? optsDiv.querySelector('.wf-opt-rr').checked : true;
+            const encName = optsDiv ? optsDiv.querySelector('.wf-opt-encname').checked : false;
+
             config = {
                 split: conf1 || '1024M',
                 naming: conf2 || 'part001',
                 format: 'rar',
-                recovery: true,
+                recovery: rr,
+                create_par2: par2,
+                encrypt_filenames: encName,
                 obfuscate: (conf3 && conf3.toLowerCase() === 'true')
             };
         } else if(type === 'github_publish') {
