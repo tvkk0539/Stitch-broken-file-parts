@@ -138,83 +138,9 @@ function editWorkflow(id) {
     container.innerHTML = '';
 
     wf.steps.forEach(step => {
-        // Create UI
-        const stepDiv = addWorkflowStepUI(); // Modified to return the div
-
-        // Populate Values
+        const stepDiv = addWorkflowStepUI();
         stepDiv.querySelector('.wf-step-type').value = step.type;
-        updateStepConfigUI(stepDiv.querySelector('.wf-step-type'));
-
-        // Populate Config
-        const conf = step.config;
-        const c1 = stepDiv.querySelector('.wf-conf-1');
-        const c2 = stepDiv.querySelector('.wf-conf-2');
-        const c3 = stepDiv.querySelector('.wf-conf-3'); // This might be the tag container
-        const c4 = stepDiv.querySelector('.wf-conf-4'); // New Config 4
-        const cLong = stepDiv.querySelector('.wf-conf-long');
-
-        if (step.type === 'pack') {
-             c1.value = conf.split || '1024M';
-             c2.value = conf.naming || 'part001';
-             c3.value = (conf.obfuscate === true || conf.obfuscate === 'true') ? 'true' : 'false';
-
-             // Populate Options (c4 is now a div)
-             // We need to wait for UI update or handle it here if updated
-             // updateStepConfigUI runs before this, so c4 should be the div
-             const optsDiv = stepDiv.querySelector('.wf-opts-container');
-             if (optsDiv) {
-                 optsDiv.querySelector('.wf-opt-par2').checked = (conf.create_par2 !== false); // Default True
-                 optsDiv.querySelector('.wf-opt-rr').checked = (conf.recovery !== false); // Default True
-                 optsDiv.querySelector('.wf-opt-encname').checked = (conf.encrypt_filenames === true); // Default False
-             }
-        } else if (step.type === 'github_publish') {
-             c1.value = conf.repo || '';
-             c2.value = conf.account_id || '';
-             c3.value = (conf.obfuscate_title === true || conf.obfuscate_title === 'true') ? 'true' : 'false';
-
-             // Populate Options
-             const optsDiv = stepDiv.querySelector('.wf-opts-container');
-             if(optsDiv) {
-                 optsDiv.querySelector('.wf-gh-content').value = conf.release_content || 'standard';
-                 optsDiv.querySelector('.wf-gh-strat').value = conf.strategy || 'relay';
-                 optsDiv.querySelector('.wf-opt-camo').checked = (conf.camouflage === true);
-
-                 // Numeric options
-                 optsDiv.querySelector('.wf-val-repo-lim').value = conf.span_limit || 40;
-                 optsDiv.querySelector('.wf-val-acc-lim').value = conf.account_limit || 45;
-                 optsDiv.querySelector('.wf-val-sleep').value = conf.safety_sleep_seconds || 3600;
-                 optsDiv.querySelector('.wf-val-rate').value = conf.rate_limit_seconds || 15;
-             }
-
-             // Populate Account IDs (Tokenizer)
-             // c2 is tag container
-             const accIds = (conf.account_id || '').split(',').filter(t => t.trim());
-             const accInput = c2.querySelector('.tag-input');
-             if(accInput) {
-                 c2.querySelectorAll('.tag-pill').forEach(p => p.remove());
-                 accIds.forEach(t => addTagPill(c2, accInput, t.trim()));
-                 updateHiddenTagValue(c2);
-             }
-
-        } else if (step.type === 'enrich_metadata') {
-             c1.value = conf.reference_url || '';
-             if(cLong) cLong.value = conf.description || '';
-        } else if (step.type === 'catalog_add') {
-             c1.value = conf.category || '';
-             c2.value = conf.priority || '1';
-
-             // Populate Tag Tokenizer
-             // c3 is now a div.tag-container
-             // We need to re-initialize the tags inside it
-             const tags = (conf.tags || '').split(',').filter(t => t.trim());
-             // Clear existing pills except input
-             const input = c3.querySelector('.tag-input');
-             if(input) {
-                 c3.querySelectorAll('.tag-pill').forEach(p => p.remove());
-                 tags.forEach(t => addTagPill(c3, input, t.trim()));
-                 updateHiddenTagValue(c3);
-             }
-        }
+        renderStepUI(stepDiv, step.type, step.config);
     });
 }
 
@@ -222,7 +148,6 @@ function addWorkflowStepUI() {
     const container = document.getElementById('wf-editor-steps');
     const stepDiv = document.createElement('div');
     stepDiv.className = 'wf-step';
-    // Enhanced Styling for Full Page
     stepDiv.style.background = 'var(--panel-bg)';
     stepDiv.style.padding = '20px';
     stepDiv.style.marginBottom = '15px';
@@ -232,7 +157,7 @@ function addWorkflowStepUI() {
 
     stepDiv.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
-            <select class="wf-step-type" style="width:auto;" onchange="updateStepConfigUI(this)">
+            <select class="wf-step-type" style="width:auto;" onchange="renderStepUI(this.closest('.wf-step'), this.value)">
                 <option value="analyze_source">1. Analyze Source (Pre-Index)</option>
                 <option value="pack">2. Pack (Archive)</option>
                 <option value="github_publish">3. GitHub Publish</option>
@@ -241,20 +166,13 @@ function addWorkflowStepUI() {
             </select>
             <button class="danger" onclick="this.parentElement.parentElement.remove()" style="padding:2px 8px; font-size:0.8em; flex:0;">X</button>
         </div>
-        <div class="wf-step-config" style="display:flex; gap:5px; flex-wrap:wrap;">
-            <input type="text" class="wf-conf-1" placeholder="Config 1" style="flex:1;">
-            <input type="text" class="wf-conf-2" placeholder="Config 2" style="flex:1;">
-            <input type="text" class="wf-conf-3" placeholder="Config 3" style="flex:1;">
-            <input type="text" class="wf-conf-4" placeholder="Config 4" style="flex:1; display:none;">
-            <textarea class="wf-conf-long" placeholder="Description/Content" style="display:none; width:100%; height:100px; margin-top:5px; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; padding:10px;"></textarea>
-        </div>
-        <div class="wf-step-desc" style="font-size:0.8em; color:gray; margin-top:5px;">
-            Select a step type to see details.
+        <div class="wf-step-content">
+            <!-- Dynamic Content -->
         </div>
     `;
     container.appendChild(stepDiv);
-    // Trigger update to show correct placeholders
-    updateStepConfigUI(stepDiv.querySelector('.wf-step-type'));
+    // Init with default
+    renderStepUI(stepDiv, 'analyze_source');
     return stepDiv;
 }
 
@@ -383,272 +301,180 @@ window.fetchReposForAccount = function(input) {
 };
 
 
-function updateStepConfigUI(select) {
-    const type = select.value;
-    const container = select.closest('.wf-step');
-    let c1 = container.querySelector('.wf-conf-1');
-    let c2 = container.querySelector('.wf-conf-2');
-    let c3 = container.querySelector('.wf-conf-3');
-    let c4 = container.querySelector('.wf-conf-4');
-    const cLong = container.querySelector('.wf-conf-long');
-    const desc = container.querySelector('.wf-step-desc');
+// --- New Form Rendering System ---
 
-    c1.style.display = 'block'; c2.style.display = 'block'; c3.style.display = 'block';
-    c4.style.display = 'none'; // Default hidden
-    if(cLong) cLong.style.display = 'none';
-
-    // --- Helpers ---
-    const ensureInput = (el, listId=null) => {
-        // If it's a TAG CONTAINER (div), revert to input
-        if (el.tagName === 'DIV' && el.classList.contains('tag-container')) {
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = 'wf-conf-3'; // Restore original class
-            el.replaceWith(inp);
-            return inp;
-        }
-
-        if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && el.getAttribute('list') !== listId)) {
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.className = el.className;
-            if(listId) inp.setAttribute('list', listId);
-            else inp.removeAttribute('list');
-
-            // Clean specific event listeners
-            inp.onchange = null;
-
-            el.replaceWith(inp);
-            return inp;
-        }
-        return el;
-    };
-
-    const ensureSelect = (el, optionsHTML) => {
-        // Revert div to select if needed
-        if (el.tagName === 'DIV' && el.classList.contains('tag-container')) {
-             const sel = document.createElement('select');
-             sel.className = 'wf-conf-3';
-             sel.innerHTML = optionsHTML;
-             // Apply styles
-             sel.style.background = '#1a1b26'; sel.style.color = '#c0caf5'; sel.style.border = '1px solid #414868'; sel.style.padding = '5px'; sel.style.flex = '1';
-             el.replaceWith(sel);
-             return sel;
-        }
-
-        const sel = document.createElement('select');
-        sel.className = el.className;
-        sel.innerHTML = optionsHTML;
-        sel.style.background = '#1a1b26';
-        sel.style.color = '#c0caf5';
-        sel.style.border = '1px solid #414868';
-        sel.style.padding = '5px';
-        sel.style.flex = '1';
-        el.replaceWith(sel);
-        return sel;
-    };
+function renderStepUI(stepDiv, type, config = {}) {
+    const contentDiv = stepDiv.querySelector('.wf-step-content');
+    contentDiv.innerHTML = ''; // Clear old
 
     if (type === 'analyze_source') {
-        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
-        c1.style.display = 'none'; c2.style.display = 'none'; c3.style.display = 'none';
-        desc.textContent = "Scans folder, builds file tree, calculates original sizes.";
+        contentDiv.innerHTML = `
+            <div style="padding:10px; color:gray; font-style:italic;">
+                No configuration required. Scans the input folder recursively.
+            </div>
+        `;
 
     } else if (type === 'pack') {
-        // Config 1: Split Size
-        const sizeOpts = `
-            <option value="1024M" selected>1 GB (Standard)</option>
-            <option value="1536M">1.5 GB</option>
-            <option value="2048M">2 GB</option>
-            <option value="2560M">2.5 GB</option>
-            <option value="3072M">3 GB</option>
-            <option value="3584M">3.5 GB</option>
-            <option value="4096M">4 GB</option>
-            <option value="4608M">4.5 GB</option>
-            <option value="5120M">5 GB</option>
-            <option disabled>--- Small ---</option>
-            <option value="50M">50 MB</option>
-            <option value="100M">100 MB</option>
-            <option value="200M">200 MB</option>
-            <option value="300M">300 MB</option>
-            <option value="400M">400 MB</option>
-            <option value="500M">500 MB</option>
-            <option value="600M">600 MB</option>
-            <option value="700M">700 MB</option>
-            <option value="800M">800 MB</option>
-            <option value="900M">900 MB</option>
-            <option disabled>--- Other ---</option>
-            <option value="0">No Split</option>
+        contentDiv.innerHTML = `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                <div>
+                    <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Split Size</label>
+                    <select class="wf-pack-split" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="1024M" selected>1 GB (Standard)</option>
+                        <option value="2048M">2 GB</option>
+                        <option value="5120M">5 GB</option>
+                        <option value="50M">50 MB</option>
+                        <option value="0">No Split</option>
+                    </select>
+                </div>
+                <div>
+                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Format</label>
+                     <select class="wf-pack-fmt" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="rar" selected>RAR</option>
+                     </select>
+                </div>
+            </div>
+            <div style="background:#1a1b26; padding:10px; border-radius:4px;">
+                <label style="display:block; color:var(--accent-color); font-size:0.8em; margin-bottom:10px;">Security & Protection</label>
+                <div style="display:flex; gap:15px; flex-wrap:wrap;">
+                    <label style="display:flex; align-items:center; gap:5px; color:#c0caf5;"><input type="checkbox" class="wf-pack-enc" checked> Encrypt Names</label>
+                    <label style="display:flex; align-items:center; gap:5px; color:#c0caf5;"><input type="checkbox" class="wf-pack-rr" checked> Recovery Record</label>
+                    <label style="display:flex; align-items:center; gap:5px; color:#c0caf5;"><input type="checkbox" class="wf-pack-par2" checked> Create PAR2</label>
+                    <label style="display:flex; align-items:center; gap:5px; color:#c0caf5;"><input type="checkbox" class="wf-pack-obf"> Obfuscate (Simple)</label>
+                </div>
+            </div>
         `;
-        c1 = ensureSelect(c1, sizeOpts);
-
-        // Config 2: Naming - HIDDEN for RAR (since we enforce standard naming)
-        // We will repurpose C2 for Format Selection eventually?
-        // But Automation currently assumes RAR.
-        // If we want to support 7z in Automation, we need a Format selector.
-        // For now, Pack step is RAR-centric in code.
-        // To follow the pattern: Hide Naming for RAR.
-        // Since Automation is RAR-only currently (format='rar' hardcoded in saveWorkflow),
-        // we should HIDE this field completely to avoid confusion.
-
-        c2.style.display = 'none'; // Hide Naming Scheme
-        c2.value = 'part1'; // Default value
-
-        // Config 3: Obfuscation
-        const obfOpts = `
-            <option value="false">No Obfuscation</option>
-            <option value="true" selected>Base64 Scramble</option>
-        `;
-        c3 = ensureSelect(c3, obfOpts);
-
-        // Config 4: Options (Multi-Checkboxes)
-        c4.style.display = 'block';
-
-        // We need a custom container for checkboxes if c4 is a select/input
-        // Strategy: Replace c4 with a div container
-        let optsDiv = c4;
-        if (c4.tagName !== 'DIV' || !c4.classList.contains('wf-opts-container')) {
-            optsDiv = document.createElement('div');
-            optsDiv.className = 'wf-conf-4 wf-opts-container';
-            optsDiv.style.flex = '1';
-            optsDiv.style.display = 'flex';
-            optsDiv.style.flexDirection = 'column';
-            optsDiv.style.gap = '5px';
-            optsDiv.style.background = '#1a1b26';
-            optsDiv.style.padding = '5px';
-            optsDiv.style.border = '1px solid #414868';
-            optsDiv.style.maxHeight = '80px';
-            optsDiv.style.overflowY = 'auto';
-            c4.replaceWith(optsDiv);
-        }
-
-        optsDiv.innerHTML = `
-            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;">
-                <input type="checkbox" class="wf-opt-par2" checked> Create PAR2
-            </label>
-            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;">
-                <input type="checkbox" class="wf-opt-rr" checked> Recovery Record
-            </label>
-            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;">
-                <input type="checkbox" class="wf-opt-encname"> Encrypt File Names
-            </label>
-        `;
-
-        desc.textContent = "Creates split RAR archives. Configure recovery and encryption options.";
+        // Populate
+        if(config.split) contentDiv.querySelector('.wf-pack-split').value = config.split;
+        if(config.encrypt_filenames !== undefined) contentDiv.querySelector('.wf-pack-enc').checked = config.encrypt_filenames;
+        if(config.recovery !== undefined) contentDiv.querySelector('.wf-pack-rr').checked = config.recovery;
+        if(config.create_par2 !== undefined) contentDiv.querySelector('.wf-pack-par2').checked = config.create_par2;
+        if(config.obfuscate !== undefined) contentDiv.querySelector('.wf-pack-obf').checked = config.obfuscate;
 
     } else if (type === 'github_publish') {
-        // Config 1: Repo (Hybrid with Datalist)
-        c1 = ensureInput(c1, 'gh-repo-list');
-        c1.placeholder = "Repo (user/repo)";
-
-        // Config 2: Account IDs (Tokenizer for Relay)
-        // Check if already tokenizer?
-        if (!c2.classList.contains('tag-container')) {
-            // Convert to tokenizer using Account Datalist
-            c2 = createTagInput(c2, 'gh-acc-list');
-        }
-        c2.style.display = 'flex';
-        // Add specific placeholder to input inside container
-        const c2Input = c2.querySelector('.tag-input');
-        if(c2Input) c2Input.placeholder = "Add Account IDs (Relay)...";
-
-        // Config 3: Obfuscate Title (Dropdown)
-        const obfTitleOpts = `
-            <option value="false">No (Original Title)</option>
-            <option value="true" selected>Yes (Base64 Scramble)</option>
-        `;
-        c3 = ensureSelect(c3, obfTitleOpts);
-
-        // Config 4: Options Container (Repo Span + Camouflage + Content)
-        c4.style.display = 'block';
-
-        let optsDiv = c4;
-        if (c4.tagName !== 'DIV' || !c4.classList.contains('wf-opts-container')) {
-            optsDiv = document.createElement('div');
-            optsDiv.className = 'wf-conf-4 wf-opts-container';
-            optsDiv.style.flex = '1';
-            optsDiv.style.display = 'flex';
-            optsDiv.style.flexDirection = 'column';
-            optsDiv.style.gap = '5px';
-            optsDiv.style.background = '#1a1b26';
-            optsDiv.style.padding = '5px';
-            optsDiv.style.border = '1px solid #414868';
-            optsDiv.style.maxHeight = '100px';
-            optsDiv.style.overflowY = 'auto';
-            c4.replaceWith(optsDiv);
-        }
-
-        optsDiv.innerHTML = `
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; margin-bottom:5px;">
-                <select class="wf-gh-content" style="width:100%; background:#13141c; color:#c0caf5; border:1px solid #414868; padding:3px;">
-                    <option value="standard">Standard Body</option>
-                    <option value="tree_only" selected>Tree Only Body</option>
-                    <option value="clean">Clean Body</option>
-                </select>
-                <select class="wf-gh-strat" style="width:100%; background:#13141c; color:#c0caf5; border:1px solid #414868; padding:3px;" title="Upload Strategy">
-                    <option value="relay" selected>🔄 Relay (Sequential)</option>
-                    <option value="scatter">🔀 Scatter (Round Robin)</option>
-                </select>
+        contentDiv.innerHTML = `
+            <div style="margin-bottom:15px;">
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Repository (Base Name)</label>
+                <input type="text" class="wf-gh-repo" placeholder="user/backup-repo" list="gh-repo-list" style="width:100%; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff;">
             </div>
 
-            <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5; margin-bottom:5px;" title="Renames files to look like System Logs">
-                <input type="checkbox" class="wf-opt-camo"> 🛡️ Camouflage Mode
-            </label>
+            <div style="margin-bottom:15px;">
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Relay Accounts (Multi-Select)</label>
+                <div class="wf-gh-acc-container"></div>
+            </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-top:1px solid #414868; padding-top:5px;">
-                <div title="Max size per Repository before creating new one">
-                    <label style="font-size:0.75em; color:#7aa2f7;">Repo Limit (GB)</label>
-                    <input type="number" class="wf-val-repo-lim" value="40" style="width:100%; background:#13141c; border:1px solid #414868; color:#fff; padding:2px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                <div>
+                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Upload Strategy</label>
+                     <select class="wf-gh-strat" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="relay" selected>🔄 Relay (Sequential)</option>
+                        <option value="scatter">🔀 Scatter (Round Robin)</option>
+                     </select>
                 </div>
-                <div title="Max upload per Account before switching">
-                    <label style="font-size:0.75em; color:#7aa2f7;">Account Limit (GB)</label>
-                    <input type="number" class="wf-val-acc-lim" value="45" style="width:100%; background:#13141c; border:1px solid #414868; color:#fff; padding:2px;">
+                <div>
+                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Content</label>
+                     <select class="wf-gh-content" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="tree_only" selected>Tree Only (Stealth)</option>
+                        <option value="standard">Standard</option>
+                        <option value="clean">Clean</option>
+                     </select>
                 </div>
             </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; margin-top:5px;">
-                <div title="Sleep time when switching accounts">
-                    <label style="font-size:0.75em; color:#e0af68;">Safety Sleep (s)</label>
-                    <input type="number" class="wf-val-sleep" value="3600" style="width:100%; background:#13141c; border:1px solid #414868; color:#fff; padding:2px;">
-                </div>
-                <div title="Sleep time after each file upload">
-                    <label style="font-size:0.75em; color:#e0af68;">Rate Limit (s)</label>
-                    <input type="number" class="wf-val-rate" value="15" style="width:100%; background:#13141c; border:1px solid #414868; color:#fff; padding:2px;">
+            <div style="background:#15161e; border:1px solid #414868; border-radius:4px; padding:15px;">
+                <h4 style="margin:0 0 10px 0; color:#7dcfff; font-size:0.9em; display:flex; align-items:center; gap:5px;">
+                    ❄️ Cold Storage Protocol
+                    <label style="margin-left:auto; font-size:0.9em; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="checkbox" class="wf-gh-camo"> Enable Camouflage
+                    </label>
+                </h4>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div>
+                        <label style="font-size:0.75em; color:var(--text-muted);">Repo Limit (GB)</label>
+                        <input type="number" class="wf-gh-lim-repo" value="40" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75em; color:var(--text-muted);">Account Limit (GB)</label>
+                        <input type="number" class="wf-gh-lim-acc" value="45" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75em; color:var(--text-muted);">Safety Sleep (s)</label>
+                        <input type="number" class="wf-gh-sleep" value="3600" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75em; color:var(--text-muted);">Rate Limit (s)</label>
+                        <input type="number" class="wf-gh-rate" value="15" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
+                    </div>
                 </div>
             </div>
         `;
 
-        desc.textContent = "Advanced Cold Storage: Configure limits, camouflage, and relay timers.";
+        // Populate
+        if(config.repo) contentDiv.querySelector('.wf-gh-repo').value = config.repo;
+        if(config.strategy) contentDiv.querySelector('.wf-gh-strat').value = config.strategy;
+        if(config.release_content) contentDiv.querySelector('.wf-gh-content').value = config.release_content;
+        if(config.camouflage !== undefined) contentDiv.querySelector('.wf-gh-camo').checked = config.camouflage;
 
-    } else if (type === 'enrich_metadata') {
-        c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
-        c1.placeholder = "Reference URL (e.g. IMDB/Wikipedia)";
-        c2.style.display = 'none';
-        c3.style.display = 'none';
-        if(cLong) cLong.style.display = 'block';
-        desc.textContent = "Injects custom URL and Long Description into the catalog entry.";
+        if(config.span_limit) contentDiv.querySelector('.wf-gh-lim-repo').value = config.span_limit;
+        if(config.account_limit) contentDiv.querySelector('.wf-gh-lim-acc').value = config.account_limit;
+        if(config.safety_sleep_seconds) contentDiv.querySelector('.wf-gh-sleep').value = config.safety_sleep_seconds;
+        if(config.rate_limit_seconds) contentDiv.querySelector('.wf-gh-rate').value = config.rate_limit_seconds;
+
+        // Tokenizer for Accounts
+        const accContainer = contentDiv.querySelector('.wf-gh-acc-container');
+        const tokenizer = createTagInput(accContainer, 'gh-acc-list');
+        const tokenInput = tokenizer.querySelector('.tag-input');
+        tokenInput.placeholder = "Add Account IDs...";
+
+        if(config.account_id) {
+            const ids = config.account_id.split(',').filter(x=>x.trim());
+            ids.forEach(id => addTagPill(tokenizer, tokenInput, id));
+            updateHiddenTagValue(tokenizer);
+        }
 
     } else if (type === 'catalog_add') {
-        // Config 1: Category (Hybrid Datalist)
-        c1 = ensureInput(c1, 'cat-datalist');
-        c1.placeholder = "Category (Movies/4K)";
+         contentDiv.innerHTML = `
+            <div style="margin-bottom:10px;">
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Category</label>
+                <input type="text" class="wf-cat-cat" placeholder="Movies/4K" list="cat-datalist" style="width:100%; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+            </div>
+            <div style="margin-bottom:10px;">
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Priority</label>
+                <select class="wf-cat-pri" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                    <option value="2">🔥 Necessary (High)</option>
+                    <option value="1" selected>Normal</option>
+                    <option value="0">💤 Unnecessary (Low)</option>
+                </select>
+            </div>
+            <div style="margin-bottom:10px;">
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Tags</label>
+                <div class="wf-cat-tags"></div>
+            </div>
+         `;
+         if(config.category) contentDiv.querySelector('.wf-cat-cat').value = config.category;
+         if(config.priority) contentDiv.querySelector('.wf-cat-pri').value = config.priority;
 
-        // Config 2: Priority (Dropdown)
-        const priOpts = `
-            <option value="2">🔥 Necessary (High)</option>
-            <option value="1" selected>Normal</option>
-            <option value="0">💤 Unnecessary (Low)</option>
-        `;
-        c2 = ensureSelect(c2, priOpts);
-
-        // Config 3: Tags (TOKENIZER)
-        // Check if already tokenizer?
-        if (!c3.classList.contains('tag-container')) {
-            // Convert to tokenizer
-            c3 = createTagInput(c3, 'tag-datalist');
-        }
-        c3.style.display = 'flex'; // Ensure flex for container
-
-        desc.textContent = "Adds to local index with download links and syncs to bridge.";
+         const tagCont = contentDiv.querySelector('.wf-cat-tags');
+         const tagTok = createTagInput(tagCont, 'tag-datalist');
+         const tagInp = tagTok.querySelector('.tag-input');
+         if(config.tags) {
+             config.tags.split(',').forEach(t => addTagPill(tagTok, tagInp, t.trim()));
+             updateHiddenTagValue(tagTok);
+         }
+    } else if (type === 'enrich_metadata') {
+         contentDiv.innerHTML = `
+            <div style="margin-bottom:10px;">
+                <label>Reference URL</label>
+                <input type="text" class="wf-meta-url" style="width:100%; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+            </div>
+            <div>
+                <label>Description</label>
+                <textarea class="wf-meta-desc" style="width:100%; height:100px; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff;"></textarea>
+            </div>
+         `;
+         if(config.reference_url) contentDiv.querySelector('.wf-meta-url').value = config.reference_url;
+         if(config.description) contentDiv.querySelector('.wf-meta-desc').value = config.description;
     }
 }
 
@@ -659,94 +485,80 @@ async function saveWorkflow() {
 
     stepDivs.forEach(div => {
         const type = div.querySelector('.wf-step-type').value;
-        // Use simpler selector logic or defaults to avoid errors if elements are hidden/replaced
-        const c1El = div.querySelector('.wf-conf-1');
-        const c2El = div.querySelector('.wf-conf-2');
-
-        const conf1 = c1El ? c1El.value : '';
-        // c2 might be a tag container now
-        let conf2 = '';
-        if (c2El) {
-             if (c2El.classList.contains('tag-container')) {
-                 conf2 = c2El.querySelector('.tag-value').value;
-             } else {
-                 conf2 = c2El.value;
-             }
-        }
-
-        // c3 logic
-        const c3El = div.querySelector('.wf-conf-3');
-        let conf3 = '';
-        if (c3El) {
-            if (c3El.classList.contains('tag-container')) {
-                conf3 = c3El.querySelector('.tag-value').value;
-            } else {
-                conf3 = c3El.value;
-            }
-        }
-
-        // c4 logic (might be div container or input)
-        const c4El = div.querySelector('.wf-conf-4');
-        const conf4 = (c4El && c4El.tagName !== 'DIV') ? c4El.value : '';
-
-        const confLong = div.querySelector('.wf-conf-long') ? div.querySelector('.wf-conf-long').value : '';
-
+        const contentDiv = div.querySelector('.wf-step-content');
         let config = {};
-        if(type === 'pack') {
-            // Get Options from c4 div
-            const optsDiv = div.querySelector('.wf-opts-container');
-            const par2 = optsDiv ? optsDiv.querySelector('.wf-opt-par2').checked : true;
-            const rr = optsDiv ? optsDiv.querySelector('.wf-opt-rr').checked : true;
-            const encName = optsDiv ? optsDiv.querySelector('.wf-opt-encname').checked : false;
 
-            config = {
-                split: conf1 || '1024M',
-                naming: conf2 || 'part001',
-                format: 'rar',
-                recovery: rr,
-                create_par2: par2,
-                encrypt_filenames: encName,
-                obfuscate: (conf3 && conf3.toLowerCase() === 'true')
-            };
-        } else if(type === 'github_publish') {
-            // Get Options from c4 div
-            const optsDiv = div.querySelector('.wf-opts-container');
-            const content = optsDiv ? optsDiv.querySelector('.wf-gh-content').value : 'standard';
-            const strat = optsDiv ? optsDiv.querySelector('.wf-gh-strat').value : 'relay';
-            const camo = optsDiv ? optsDiv.querySelector('.wf-opt-camo').checked : false;
+        if (type === 'analyze_source') {
+             // No config needed
+        } else if (type === 'pack') {
+             const split = contentDiv.querySelector('.wf-pack-split').value;
+             const fmt = contentDiv.querySelector('.wf-pack-fmt').value;
+             const encName = contentDiv.querySelector('.wf-pack-enc').checked;
+             const rr = contentDiv.querySelector('.wf-pack-rr').checked;
+             const par2 = contentDiv.querySelector('.wf-pack-par2').checked;
+             const obf = contentDiv.querySelector('.wf-pack-obf').checked;
 
-            // Numeric Configs
-            const repoLim = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-repo-lim').value) || 40) : 40;
-            const accLim = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-acc-lim').value) || 45) : 45;
-            const sleepSec = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-sleep').value) || 3600) : 3600;
-            const rateSec = optsDiv ? (parseInt(optsDiv.querySelector('.wf-val-rate').value) || 15) : 15;
+             config = {
+                 split: split,
+                 format: fmt,
+                 encrypt_filenames: encName,
+                 recovery: rr,
+                 create_par2: par2,
+                 obfuscate: obf,
+                 naming: 'part1' // Default enforced by backend for RAR
+             };
 
-            config = {
-                repo: conf1,
-                account_id: conf2, // Already extracted (supports Tokenizer or Text)
-                obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
-                release_content: content,
-                strategy: strat,
-                camouflage: camo,
-                span_repos: true,
-                span_limit: repoLim,
-                account_limit: accLim,
-                safety_sleep_seconds: sleepSec,
-                rate_limit_seconds: rateSec,
-                tag_template: 'v{date}_{name}'
-            };
-        } else if(type === 'enrich_metadata') {
-            config = {
-                reference_url: conf1,
-                description: confLong
-            };
-        } else if(type === 'catalog_add') {
-            // Include tags in config
-            config = {
-                category: conf1 || 'General',
-                priority: parseInt(conf2) || 1,
-                tags: conf3 // Capture tags string
-            };
+        } else if (type === 'github_publish') {
+             const repo = contentDiv.querySelector('.wf-gh-repo').value;
+
+             // Account Tokenizer
+             const accContainer = contentDiv.querySelector('.wf-gh-acc-container .tag-container');
+             const accIds = accContainer ? accContainer.querySelector('.tag-value').value : '';
+
+             const strat = contentDiv.querySelector('.wf-gh-strat').value;
+             const content = contentDiv.querySelector('.wf-gh-content').value;
+             const camo = contentDiv.querySelector('.wf-gh-camo').checked;
+
+             const repoLim = parseInt(contentDiv.querySelector('.wf-gh-lim-repo').value) || 40;
+             const accLim = parseInt(contentDiv.querySelector('.wf-gh-lim-acc').value) || 45;
+             const sleep = parseInt(contentDiv.querySelector('.wf-gh-sleep').value) || 3600;
+             const rate = parseInt(contentDiv.querySelector('.wf-gh-rate').value) || 15;
+
+             config = {
+                 repo: repo,
+                 account_id: accIds,
+                 strategy: strat,
+                 release_content: content,
+                 camouflage: camo,
+                 span_limit: repoLim,
+                 account_limit: accLim,
+                 safety_sleep_seconds: sleep,
+                 rate_limit_seconds: rate,
+                 span_repos: true, // Always active with limits
+                 obfuscate_title: true, // Force secure default
+                 tag_template: 'v{date}_{name}'
+             };
+
+        } else if (type === 'catalog_add') {
+             const cat = contentDiv.querySelector('.wf-cat-cat').value;
+             const pri = contentDiv.querySelector('.wf-cat-pri').value;
+
+             const tagContainer = contentDiv.querySelector('.wf-cat-tags .tag-container');
+             const tags = tagContainer ? tagContainer.querySelector('.tag-value').value : '';
+
+             config = {
+                 category: cat,
+                 priority: parseInt(pri),
+                 tags: tags
+             };
+
+        } else if (type === 'enrich_metadata') {
+             const url = contentDiv.querySelector('.wf-meta-url').value;
+             const desc = contentDiv.querySelector('.wf-meta-desc').value;
+             config = {
+                 reference_url: url,
+                 description: desc
+             };
         }
 
         steps.push({ type: type, config: config });
