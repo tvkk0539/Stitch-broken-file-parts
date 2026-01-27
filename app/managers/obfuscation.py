@@ -4,6 +4,7 @@ import json
 import shutil
 from datetime import datetime
 from app.core.job_manager import log
+import random
 
 class ObfuscationManager:
     """
@@ -12,6 +13,62 @@ class ObfuscationManager:
     """
 
     MAPS_DIR = os.path.join(os.environ.get('DOWNLOAD_ROOT', '/data/downloads'), 'maps')
+
+    @staticmethod
+    def generate_boring_metadata(mode='log_rotation'):
+        """
+        Generates realistic, boring release metadata based on templates.
+        Modes: 'log_rotation' (default), 'crash_dump', 'infrastructure'
+        """
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        # Random Build ID (1000-9999)
+        build_id = random.randint(1000, 9999)
+
+        # Template 1: Log Rotation (Safest)
+        if mode == 'log_rotation':
+            tag = f"v{date_str}-logs-{build_id}"
+            title = f"System Log Rotation: {date_str} (Build {build_id})"
+            body = f"""Automated archival of server logs for node-us-east-{random.randint(1,9)}.
+Compression: Raw/Binary
+Retention Policy: 90 Days
+Status: Verified
+Build ID: {build_id}
+
+Warning: These files are encrypted for security compliance. Do not attempt to parse without the decryption key."""
+
+        # Template 2: Crash Dump
+        elif mode == 'crash_dump':
+            tag = f"dump-build-{build_id}"
+            title = f"Core Dump Analysis - Incident #{random.randint(100,999)}"
+            body = f"""Memory dump and heap snapshots captured during load testing.
+Artifacts split for easier transport.
+
+Contains:
+- Kernel traces
+- Heap allocation maps
+- Binary core dumps (sanitized)
+
+Hash verification passed."""
+
+        # Template 3: Infrastructure
+        elif mode == 'infrastructure':
+            tag = f"snapshot-v1.{random.randint(4,9)}.{random.randint(0,10)}"
+            title = f"Weekly Infrastructure Snapshot (Encrypted)"
+            body = f"""Full incremental snapshot of the production cluster.
+
+Type: Cold Storage
+Encryption: AES-256
+Chunk Size: 1024MB
+
+This release is generated automatically by the backup-daemon. Please do not modify assets manually."""
+
+        else:
+            # Fallback
+            tag = f"backup-{date_str}-{build_id}"
+            title = f"Backup {date_str}"
+            body = "Automated backup."
+
+        return {'tag': tag, 'title': title, 'body': body}
 
     @staticmethod
     def camouflage_files(file_paths):

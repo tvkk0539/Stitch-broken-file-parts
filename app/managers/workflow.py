@@ -352,7 +352,9 @@ class WorkflowManager:
                 private=True, # Enforce private for cold storage
                 span_limit_gb=40,
                 camouflage=camouflage,
-                meta=meta
+                meta=meta,
+                rate_limit_sleep=15 if conf.get('rate_limit') else 0,
+                safety_sleep=3600 if conf.get('safety_sleep') else 0
             )
 
             # Inject private body into result for Catalog

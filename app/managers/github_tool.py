@@ -871,19 +871,37 @@ class GitHubManager:
             return {'error': str(e)}
 
     @staticmethod
-    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, camouflage=False, meta=None):
+    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0):
         """
-        Publishes files across multiple repositories if needed.
-        Handles Camouflage renaming if enabled.
+        Publishes files across multiple repositories and accounts if needed.
+        Handles Camouflage renaming and Boring Templates if enabled.
+        account_id can be a single ID or a list of IDs (Multi-Account Relay).
         """
         from app.managers.obfuscation import ObfuscationManager
+        import time
 
-        log(f"Starting Smart Publish: {len(files)} files -> {base_repo_name}*")
+        # Normalize account_id to list
+        account_ids = []
+        if isinstance(account_id, list):
+            account_ids = account_id
+        elif isinstance(account_id, str) and ',' in account_id:
+            account_ids = [aid.strip() for aid in account_id.split(',') if aid.strip()]
+        else:
+            account_ids = [str(account_id)]
+
+        current_acc_idx = 0
+        current_acc_id = account_ids[0]
+
+        log(f"Starting Smart Publish: {len(files)} files -> {base_repo_name}* (Accounts: {len(account_ids)})")
 
         restore_map = {}
         active_files = files
 
         # 1. Camouflage Logic
+        release_tag = tag
+        release_title = f"Archive {tag}"
+        release_body = body
+
         if camouflage:
             log("🛡️ Camouflage Mode: ON")
             job_manager.update_job_details({'action': 'Obfuscating file names...'})
@@ -896,24 +914,31 @@ class GitHubManager:
             # Save local map for backup
             ObfuscationManager.save_map_file(mapping, base_repo_name)
 
+            # Generate Boring Metadata
+            boring = ObfuscationManager.generate_boring_metadata('log_rotation')
+            release_tag = boring['tag']
+            release_title = boring['title']
+            release_body = boring['body']
+            log(f"🎭 Using Cover Story: {release_title}")
+
         # 2. Repo Spanning Logic
         current_repo_index = 1
         current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
 
-        # Helper to get/create repo
-        def ensure_repo(name):
+        # Helper to get/create repo (Bound to current account)
+        def ensure_repo(name, acc_id):
             # Check existence
-            user_info = GitHubManager._fetch_user_profile(GitHubManager._get_token_for_account(account_id))
+            user_info = GitHubManager._fetch_user_profile(GitHubManager._get_token_for_account(acc_id))
             owner = user_info['username']
             full_name = f"{owner}/{name}"
 
-            details = GitHubManager.get_repo_details(full_name, account_id)
+            details = GitHubManager.get_repo_details(full_name, acc_id)
             if 'error' not in details:
                 return full_name, details['size'] # size is in KB
 
             # Create if missing
-            log(f"Creating repository: {name}")
-            res = GitHubManager.create_repository(name, private, description, account_id)
+            log(f"Creating repository: {name} on account {acc_id}")
+            res = GitHubManager.create_repository(name, private, description, acc_id)
             if 'error' in res:
                 raise Exception(f"Failed to create repo {name}: {res['error']}")
 
@@ -923,21 +948,19 @@ class GitHubManager:
         uploaded_assets = []
 
         try:
-            repo_full, repo_size_kb = ensure_repo(current_repo_name)
+            repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id)
             current_size_gb = repo_size_kb / (1024 * 1024)
-
-            # We need to create a release in the current repo
-            # Or assume run_publish_job logic but adapted for loop
+            current_acc_uploaded_gb = 0 # Track session usage per account
 
             # Helper to create release return upload_url
-            def get_release_upload_url(r_name, t_name):
-                token = GitHubManager._get_token_for_account(account_id)
+            def get_release_upload_url(r_name, t_name, acc_id):
+                token = GitHubManager._get_token_for_account(acc_id)
                 headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
                 create_url = f"https://api.github.com/repos/{r_name}/releases"
                 payload = {
                     "tag_name": t_name,
-                    "name": f"Archive {t_name}",
-                    "body": body or "Automated Archive",
+                    "name": release_title,
+                    "body": release_body,
                     "draft": False,
                     "prerelease": False
                 }
@@ -954,7 +977,7 @@ class GitHubManager:
                     return pr.json()['upload_url']
                 raise Exception(f"Failed to create release on {r_name}")
 
-            upload_url_template = get_release_upload_url(repo_full, tag)
+            upload_url_template = get_release_upload_url(repo_full, release_tag, current_acc_id)
 
             total_files = len(active_files)
 
@@ -963,20 +986,41 @@ class GitHubManager:
 
                 file_size_gb = os.path.getsize(file_path) / (1024 * 1024 * 1024)
 
-                # Check limits
-                if current_size_gb + file_size_gb > span_limit_gb:
-                    log(f"Repo {current_repo_name} full ({current_size_gb:.2f}GB). Switching...")
+                # Check Repo Limit (40GB) OR Account Switch Requirement (45GB)
+                repo_limit_reached = (current_size_gb + file_size_gb > span_limit_gb)
+                account_limit_reached = (current_acc_uploaded_gb + file_size_gb > 45) # Hard limit 45GB per account/session
+
+                if repo_limit_reached or account_limit_reached:
+                    # Switch Repo or Account?
+
+                    if account_limit_reached and len(account_ids) > 1:
+                        # Rotate Account
+                        log(f"Account {current_acc_id} limit reached ({current_acc_uploaded_gb:.2f}GB). Switching...")
+
+                        if safety_sleep > 0:
+                            log(f"💤 Safety Sleep for {safety_sleep}s...")
+                            job_manager.update_job_details({'action': f"Cooling down ({safety_sleep}s)..."})
+                            time.sleep(safety_sleep)
+
+                        current_acc_idx = (current_acc_idx + 1) % len(account_ids)
+                        current_acc_id = account_ids[current_acc_idx]
+                        current_acc_uploaded_gb = 0
+                        log(f"Switched to Account: {current_acc_id}")
+
+                    # Always rotate Repo Name when limit reached (simplifies logic vs appending to same repo with new account)
+                    log(f"Switching Repository...")
                     current_repo_index += 1
                     current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
-                    repo_full, _ = ensure_repo(current_repo_name)
+
+                    repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
                     current_size_gb = 0
-                    upload_url_template = get_release_upload_url(repo_full, tag)
+                    upload_url_template = get_release_upload_url(repo_full, release_tag, current_acc_id)
 
                 # Upload
                 fname = os.path.basename(file_path)
-                job_manager.update_job_details({'action': f"Uploading {idx+1}/{total_files}: {fname} to {current_repo_name}"})
+                job_manager.update_job_details({'action': f"Uploading {idx+1}/{total_files}: {fname} to {current_repo_name} ({current_acc_id})"})
 
-                token = GitHubManager._get_token_for_account(account_id)
+                token = GitHubManager._get_token_for_account(current_acc_id)
                 headers = {'Authorization': f'token {token}', 'Content-Type': 'application/octet-stream'}
 
                 real_upload_url = upload_url_template.split('{')[0] + f"?name={fname}"
@@ -995,6 +1039,11 @@ class GitHubManager:
                         'repo': repo_full
                     })
                     current_size_gb += file_size_gb
+                    current_acc_uploaded_gb += file_size_gb
+
+                    # Rate Limit Sleep
+                    if rate_limit_sleep > 0:
+                        time.sleep(rate_limit_sleep)
 
             # Cleanup Camouflaged files
             if camouflage:

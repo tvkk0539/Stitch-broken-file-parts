@@ -178,7 +178,23 @@ function editWorkflow(id) {
                  optsDiv.querySelector('.wf-gh-content').value = conf.release_content || 'standard';
                  optsDiv.querySelector('.wf-opt-camo').checked = (conf.camouflage === true);
                  optsDiv.querySelector('.wf-opt-span').checked = (conf.span_repos === true);
+                 // New options
+                 const safeCb = optsDiv.querySelector('.wf-opt-safe');
+                 if(safeCb) safeCb.checked = (conf.safety_sleep === true);
+                 const rateCb = optsDiv.querySelector('.wf-opt-rate');
+                 if(rateCb) rateCb.checked = (conf.rate_limit === true);
              }
+
+             // Populate Account IDs (Tokenizer)
+             // c2 is tag container
+             const accIds = (conf.account_id || '').split(',').filter(t => t.trim());
+             const accInput = c2.querySelector('.tag-input');
+             if(accInput) {
+                 c2.querySelectorAll('.tag-pill').forEach(p => p.remove());
+                 accIds.forEach(t => addTagPill(c2, accInput, t.trim()));
+                 updateHiddenTagValue(c2);
+             }
+
         } else if (step.type === 'enrich_metadata') {
              c1.value = conf.reference_url || '';
              if(cLong) cLong.value = conf.description || '';
@@ -523,10 +539,16 @@ function updateStepConfigUI(select) {
         c1 = ensureInput(c1, 'gh-repo-list');
         c1.placeholder = "Repo (user/repo)";
 
-        // Config 2: Account ID (Hybrid with Datalist + OnChange)
-        c2 = ensureInput(c2, 'gh-acc-list');
-        c2.placeholder = "Account ID";
-        c2.onchange = function() { window.fetchReposForAccount(this); };
+        // Config 2: Account IDs (Tokenizer for Relay)
+        // Check if already tokenizer?
+        if (!c2.classList.contains('tag-container')) {
+            // Convert to tokenizer using Account Datalist
+            c2 = createTagInput(c2, 'gh-acc-list');
+        }
+        c2.style.display = 'flex';
+        // Add specific placeholder to input inside container
+        const c2Input = c2.querySelector('.tag-input');
+        if(c2Input) c2Input.placeholder = "Add Account IDs (Relay)...";
 
         // Config 3: Obfuscate Title (Dropdown)
         const obfTitleOpts = `
@@ -566,11 +588,19 @@ function updateStepConfigUI(select) {
                 <input type="checkbox" class="wf-opt-camo"> 🛡️ Camouflage (Cold Storage)
             </label>
             <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Auto-create new repos if >40GB">
-                <input type="checkbox" class="wf-opt-span"> 📦 Smart Repo Spanning
+                <input type="checkbox" class="wf-opt-span"> 📦 Smart Repo Spanning (40GB/Repo)
             </label>
+            <div style="border-top:1px solid #414868; margin-top:5px; padding-top:5px;">
+                <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Sleep 1 hour when switching accounts">
+                    <input type="checkbox" class="wf-opt-safe"> 🛌 Safety Sleep (1hr Relay)
+                </label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Sleep 15s between files">
+                    <input type="checkbox" class="wf-opt-rate"> 🐌 Rate Limit (15s/File)
+                </label>
+            </div>
         `;
 
-        desc.textContent = "Uploads archives. Supports Cold Storage Camouflage & Multi-Repo Spanning.";
+        desc.textContent = "Uploads archives. Supports Multi-Account Relay, Camouflage, and Safety Pauses.";
 
     } else if (type === 'enrich_metadata') {
         c1 = ensureInput(c1); c2 = ensureInput(c2); c3 = ensureInput(c3);
@@ -652,14 +682,27 @@ async function saveWorkflow() {
             const content = optsDiv ? optsDiv.querySelector('.wf-gh-content').value : 'standard';
             const camo = optsDiv ? optsDiv.querySelector('.wf-opt-camo').checked : false;
             const span = optsDiv ? optsDiv.querySelector('.wf-opt-span').checked : false;
+            const safe = optsDiv ? optsDiv.querySelector('.wf-opt-safe').checked : false;
+            const rate = optsDiv ? optsDiv.querySelector('.wf-opt-rate').checked : false;
+
+            // Get Account IDs from Tokenizer (c2)
+            // c2 is div.tag-container
+            let accIds = '';
+            if (div.querySelector('.wf-conf-2').classList.contains('tag-container')) {
+                 accIds = div.querySelector('.wf-conf-2 .tag-value').value;
+            } else {
+                 accIds = conf2; // Fallback
+            }
 
             config = {
                 repo: conf1,
-                account_id: conf2,
+                account_id: accIds, // Comma separated list
                 obfuscate_title: (conf3 && conf3.toLowerCase() === 'true'),
                 release_content: content,
                 camouflage: camo,
                 span_repos: span,
+                safety_sleep: safe,
+                rate_limit: rate,
                 tag_template: 'v{date}_{name}'
             };
         } else if(type === 'enrich_metadata') {
