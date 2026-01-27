@@ -665,4 +665,3 @@ window.addWorkflowStepUI = addWorkflowStepUI;
 window.saveWorkflow = saveWorkflow;
 window.runWorkflow = runWorkflow;
 window.deleteWorkflow = deleteWorkflow;
-window.updateStepConfigUI = updateStepConfigUI;
