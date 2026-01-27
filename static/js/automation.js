@@ -386,10 +386,24 @@ function renderStepUI(stepDiv, type, config = {}) {
                     ❄️ Cold Storage Protocol
                 </h4>
 
-                <div style="display:flex; gap:15px; margin-bottom:5px;">
+                <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:10px; align-items:center;">
                     <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Renames files to look like System Logs">
-                        <input type="checkbox" class="wf-opt-camo"> 🛡️ Camouflage Mode
+                        <input type="checkbox" class="wf-opt-camo" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'block' : 'none'"> 🛡️ Camouflage Mode
                     </label>
+
+                    <div style="display:none;" class="wf-camo-template-container">
+                        <select class="wf-opt-camo-template" style="padding:2px 5px; background:#1a1b26; border:1px solid #414868; color:#fff; font-size:0.8em; border-radius:4px;">
+                             <option value="log_rotation" selected>Log Rotation (Default)</option>
+                             <option value="random">🎲 Random Template</option>
+                             <option value="crash_dump">💥 Crash Dump</option>
+                             <option value="infrastructure">🏗️ Infrastructure</option>
+                             <option value="db_backup">🗄️ DB Backup</option>
+                             <option value="ai_weights">🧠 AI Weights</option>
+                             <option value="cdn_cache">⚡ CDN Cache</option>
+                             <option value="debug_symbols">🐛 Debug Symbols</option>
+                        </select>
+                    </div>
+
                     <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Scrambles the Release Title (Base64)">
                         <input type="checkbox" class="wf-gh-obf-title" checked> 🔒 Obfuscate Title
                     </label>
@@ -420,7 +434,14 @@ function renderStepUI(stepDiv, type, config = {}) {
         if(config.repo) contentDiv.querySelector('.wf-gh-repo').value = config.repo;
         if(config.strategy) contentDiv.querySelector('.wf-gh-strat').value = config.strategy;
         if(config.release_content) contentDiv.querySelector('.wf-gh-content').value = config.release_content;
-        if(config.camouflage !== undefined) contentDiv.querySelector('.wf-opt-camo').checked = config.camouflage;
+        if(config.camouflage !== undefined) {
+             const cb = contentDiv.querySelector('.wf-opt-camo');
+             cb.checked = config.camouflage;
+             // Trigger visibility
+             contentDiv.querySelector('.wf-camo-template-container').style.display = config.camouflage ? 'block' : 'none';
+        }
+        if(config.camo_template) contentDiv.querySelector('.wf-opt-camo-template').value = config.camo_template;
+
         if(config.obfuscate_title !== undefined) contentDiv.querySelector('.wf-gh-obf-title').checked = config.obfuscate_title;
 
         if(config.span_limit) contentDiv.querySelector('.wf-gh-lim-repo').value = config.span_limit;
@@ -529,6 +550,7 @@ async function saveWorkflow() {
              // Get Options Container
              const optsDiv = div.querySelector('.wf-opts-container');
              const camo = optsDiv ? optsDiv.querySelector('.wf-opt-camo').checked : false;
+             const camoTemplate = optsDiv ? optsDiv.querySelector('.wf-opt-camo-template').value : 'log_rotation';
              const obfTitle = optsDiv ? optsDiv.querySelector('.wf-gh-obf-title').checked : true;
 
              const repoLim = parseInt(contentDiv.querySelector('.wf-gh-lim-repo').value) || 40;
@@ -542,6 +564,7 @@ async function saveWorkflow() {
                  strategy: strat,
                  release_content: content,
                  camouflage: camo,
+                 camo_template: camoTemplate,
                  obfuscate_title: obfTitle,
                  span_limit: repoLim,
                  account_limit: accLim,

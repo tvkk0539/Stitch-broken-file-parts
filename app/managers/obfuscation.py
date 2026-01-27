@@ -15,17 +15,33 @@ class ObfuscationManager:
     MAPS_DIR = os.path.join(os.environ.get('DOWNLOAD_ROOT', '/data/downloads'), 'maps')
 
     @staticmethod
-    def generate_boring_metadata(mode='log_rotation'):
+    def generate_boring_metadata(template='log_rotation'):
         """
         Generates realistic, boring release metadata based on templates.
-        Modes: 'log_rotation' (default), 'crash_dump', 'infrastructure'
+        Templates: 'log_rotation', 'crash_dump', 'infrastructure', 'db_backup', 'ai_weights', 'cdn_cache', 'debug_symbols'
+        If 'random' is passed, selects one randomly.
         """
+        templates = [
+            'log_rotation', 'crash_dump', 'infrastructure', 'db_backup',
+            'ai_weights', 'cdn_cache', 'debug_symbols'
+        ]
+
+        if template == 'random':
+            template = random.choice(templates)
+
+        # Default fallback
+        if template not in templates:
+            template = 'log_rotation'
+
         date_str = datetime.now().strftime('%Y-%m-%d')
-        # Random Build ID (1000-9999)
         build_id = random.randint(1000, 9999)
 
-        # Template 1: Log Rotation (Safest)
-        if mode == 'log_rotation':
+        tag = ""
+        title = ""
+        body = ""
+
+        # 1. Log Rotation
+        if template == 'log_rotation':
             tag = f"v{date_str}-logs-{build_id}"
             title = f"System Log Rotation: {date_str} (Build {build_id})"
             body = f"""Automated archival of server logs for node-us-east-{random.randint(1,9)}.
@@ -36,8 +52,8 @@ Build ID: {build_id}
 
 Warning: These files are encrypted for security compliance. Do not attempt to parse without the decryption key."""
 
-        # Template 2: Crash Dump
-        elif mode == 'crash_dump':
+        # 2. Crash Dump
+        elif template == 'crash_dump':
             tag = f"dump-build-{build_id}"
             title = f"Core Dump Analysis - Incident #{random.randint(100,999)}"
             body = f"""Memory dump and heap snapshots captured during load testing.
@@ -50,8 +66,8 @@ Contains:
 
 Hash verification passed."""
 
-        # Template 3: Infrastructure
-        elif mode == 'infrastructure':
+        # 3. Infrastructure
+        elif template == 'infrastructure':
             tag = f"snapshot-v1.{random.randint(4,9)}.{random.randint(0,10)}"
             title = f"Weekly Infrastructure Snapshot (Encrypted)"
             body = f"""Full incremental snapshot of the production cluster.
@@ -62,11 +78,47 @@ Chunk Size: 1024MB
 
 This release is generated automatically by the backup-daemon. Please do not modify assets manually."""
 
-        else:
-            # Fallback
-            tag = f"backup-{date_str}-{build_id}"
-            title = f"Backup {date_str}"
-            body = "Automated backup."
+        # 4. Database Backup
+        elif template == 'db_backup':
+            tag = f"wal-arch-{date_str}-{build_id}"
+            title = f"Postgres WAL Archive: {date_str}"
+            body = f"""Write-Ahead Log (WAL) segments for partial recovery.
+DB Version: 14.2
+Cluster ID: cl-{random.randint(1000,9999)}
+Compression: LZ4
+
+Warning: Contains transactional data. Access restricted to DBA group."""
+
+        # 5. AI Weights
+        elif template == 'ai_weights':
+            tag = f"ckpt-epoch-{random.randint(50,200)}-{build_id}"
+            title = f"Model Checkpoints (fp16) - Epoch {random.randint(50,200)}"
+            body = f"""Intermediate training checkpoints for LLM fine-tuning.
+Precision: fp16
+Optimizer State: Included
+Batch Size: 512
+
+Use `torch.load` with map_location='cpu' for inspection."""
+
+        # 6. CDN Cache
+        elif template == 'cdn_cache':
+            tag = f"assets-v{random.randint(1,5)}.{random.randint(0,9)}-{build_id}"
+            title = f"Static Assets Bundle (Edge Cache)"
+            body = f"""Pre-warmed cache dump for region: eu-central-1.
+Content-Type: application/octet-stream
+TTL: 24h
+
+This bundle is used for cache hydration during cold starts."""
+
+        # 7. Debug Symbols
+        elif template == 'debug_symbols':
+            tag = f"sym-v{random.randint(10,20)}.{build_id}"
+            title = f"DWARF Debug Symbols (Release Build)"
+            body = f"""Detached debug symbols for stack trace symbolication.
+Platform: Linux x86_64
+Compiler: GCC 11.2
+
+Required for gdb/lldb analysis of production binaries."""
 
         return {'tag': tag, 'title': title, 'body': body}
 

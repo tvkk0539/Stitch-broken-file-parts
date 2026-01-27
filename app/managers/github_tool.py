@@ -914,11 +914,16 @@ class GitHubManager:
             ObfuscationManager.save_map_file(mapping, base_repo_name)
 
             # Generate Boring Metadata
-            boring = ObfuscationManager.generate_boring_metadata('log_rotation')
+            # Check for passed template in meta
+            camo_template = 'log_rotation'
+            if meta and 'camo_template' in meta:
+                camo_template = meta['camo_template']
+
+            boring = ObfuscationManager.generate_boring_metadata(camo_template)
             release_tag = boring['tag']
             release_title = boring['title']
             release_body = boring['body']
-            log(f"🎭 Using Cover Story: {release_title}")
+            log(f"🎭 Using Cover Story: {release_title} ({camo_template})")
 
         # 2. Repo Spanning Logic
         current_repo_index = 1

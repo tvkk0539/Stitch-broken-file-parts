@@ -344,6 +344,10 @@ class WorkflowManager:
             else:
                 base_repo_name = clean_repo
 
+            # Inject camo_template into meta
+            if conf.get('camo_template'):
+                meta['camo_template'] = conf.get('camo_template')
+
             result = GitHubManager.smart_publish_job(
                 files,
                 base_repo_name,
