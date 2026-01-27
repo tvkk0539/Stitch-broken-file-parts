@@ -262,6 +262,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if(rrGrp) rrGrp.style.display = isRar ? 'block' : 'none';
     };
 
+    // Show/Hide Encrypt Filenames based on Password input
+    document.getElementById('arc-pass').oninput = (e) => {
+        const hasPass = e.target.value.length > 0;
+        document.getElementById('arc-enc-name-group').style.display = hasPass ? 'block' : 'none';
+        if (!hasPass) document.getElementById('arc-enc-name').checked = false;
+    };
+
     document.getElementById('start-arc').onclick = async () => {
          const naming = document.getElementById('arc-naming').value;
          localStorage.setItem('arc-naming-pref', naming);
@@ -278,6 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  format: document.getElementById('arc-fmt').value,
                  naming_scheme: naming,
                  rar_recovery_record: document.getElementById('arc-rr').checked,
+                 encrypt_filenames: document.getElementById('arc-enc-name').checked,
                  create_par2: document.getElementById('arc-par2').checked,
                  upload: document.getElementById('arc-upload').checked,
                  remote: document.getElementById('arc-remote').value,

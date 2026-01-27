@@ -8,7 +8,7 @@ import re
 
 class ArchiveManager:
     @staticmethod
-    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path='', naming_scheme='part1', rar_recovery_record=True):
+    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path='', naming_scheme='part1', rar_recovery_record=True, encrypt_filenames=False):
         parent_dir = os.path.dirname(source_path)
         base_name = os.path.basename(source_path)
 
@@ -39,7 +39,12 @@ class ArchiveManager:
             if rar_recovery_record:
                 cmd.append('-rr5p')
             if password:
-                cmd.append(f'-hp{password}')
+                # -hp: Encrypt both file data and headers (filenames)
+                # -p: Encrypt files only
+                if encrypt_filenames:
+                    cmd.append(f'-hp{password}')
+                else:
+                    cmd.append(f'-p{password}')
             cmd.append(archive_name)
             cmd.append(source_path)
         else:
@@ -48,7 +53,10 @@ class ArchiveManager:
             cmd = ['7z', 'a', f'-v{size_arg}', '-mx0', '-y']
             if password:
                 cmd.append(f'-p{password}')
-                cmd.append('-mhe=on')
+                if encrypt_filenames:
+                    cmd.append('-mhe=on')
+                else:
+                    cmd.append('-mhe=off')
             cmd.append(archive_name)
             cmd.append(source_path)
 
