@@ -10,6 +10,12 @@ const appleMusic = {
 
     // Schema mapping for "Professional" UI generation
     configSchema: {
+        // Naming Templates (with Variable Builder)
+        'album-folder-format': { label: 'Album Folder Format', type: 'template', group: 'Naming & Formatting' },
+        'playlist-folder-format': { label: 'Playlist Folder Format', type: 'template', group: 'Naming & Formatting' },
+        'song-file-format': { label: 'Song File Format', type: 'template', group: 'Naming & Formatting' },
+        'artist-folder-format': { label: 'Artist Folder Format', type: 'template', group: 'Naming & Formatting' },
+
         // Authentication
         'media-user-token': { label: 'Media User Token', type: 'password', group: 'Authentication' },
         'authorization-token': { label: 'Authorization Token', type: 'password', group: 'Authentication' },
@@ -43,6 +49,14 @@ const appleMusic = {
         'convert-after-download': { label: 'Convert After Download', type: 'bool', group: 'Conversion' },
         'convert-format': { label: 'Target Format', type: 'select', options: ['flac', 'mp3', 'opus', 'wav', 'copy'], group: 'Conversion' },
         'convert-keep-original': { label: 'Keep Original File', type: 'bool', group: 'Conversion' }
+    },
+
+    // Allowed Variables for Templates
+    templateVariables: {
+        'album-folder-format': ['{AlbumId}', '{AlbumName}', '{ArtistName}', '{ReleaseDate}', '{ReleaseYear}', '{UPC}', '{Copyright}', '{Quality}', '{Codec}', '{Tag}', '{RecordLabel}'],
+        'playlist-folder-format': ['{PlaylistId}', '{PlaylistName}', '{ArtistName}', '{Quality}', '{Codec}', '{Tag}'],
+        'song-file-format': ['{SongId}', '{SongNumer}', '{SongName}', '{DiscNumber}', '{TrackNumber}', '{Quality}', '{Codec}', '{Tag}'],
+        'artist-folder-format': ['{ArtistId}', '{ArtistName}', '{UrlArtistName}']
     },
 
     init: () => {
@@ -242,6 +256,68 @@ const appleMusic = {
 
     // --- CONFIGURATION LOGIC ---
 
+    // Helper: Insert text at cursor position in an input
+    insertAtCursor: (input, text) => {
+        if (!input) return;
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        const val = input.value;
+        input.value = val.substring(0, start) + text + val.substring(end);
+        input.selectionStart = input.selectionEnd = start + text.length;
+        input.focus();
+    },
+
+    renderTemplateBuilder: (key, value, variables) => {
+        const container = document.createElement('div');
+
+        // Input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = value || '';
+        input.dataset.key = key; // Ensure dataset.key is set for saveConfig
+        input.className = 'am-template-input';
+        input.style.width = '100%';
+        input.style.padding = '10px';
+        input.style.background = '#13141c';
+        input.style.border = '1px solid var(--border-color)';
+        input.style.color = '#7aa2f7'; // Distinct color for templates
+        input.style.fontFamily = 'monospace';
+        input.style.borderRadius = '4px';
+        input.style.marginBottom = '8px';
+        input.style.boxSizing = 'border-box';
+        input.placeholder = '{ArtistName} - {AlbumName}';
+
+        // Variable Cloud
+        const cloud = document.createElement('div');
+        cloud.style.display = 'flex';
+        cloud.style.flexWrap = 'wrap';
+        cloud.style.gap = '6px';
+
+        variables.forEach(v => {
+            const pill = document.createElement('span');
+            pill.innerText = v;
+            pill.style.background = '#24283b';
+            pill.style.color = '#c0caf5';
+            pill.style.border = '1px solid #414868';
+            pill.style.borderRadius = '4px';
+            pill.style.padding = '2px 6px';
+            pill.style.fontSize = '0.8em';
+            pill.style.cursor = 'pointer';
+            pill.style.fontFamily = 'monospace';
+            pill.style.transition = 'background 0.2s';
+
+            pill.onmouseover = () => pill.style.background = '#414868';
+            pill.onmouseout = () => pill.style.background = '#24283b';
+            pill.onclick = () => appleMusic.insertAtCursor(input, v);
+
+            cloud.appendChild(pill);
+        });
+
+        container.appendChild(input);
+        container.appendChild(cloud);
+        return container;
+    },
+
     loadConfig: async () => {
         const loader = document.getElementById('am-config-loader');
         const form = document.getElementById('am-config-form');
@@ -330,7 +406,17 @@ const appleMusic = {
 
                 let input;
 
-                if (field.schema.type === 'bool') {
+                if (field.schema.type === 'template') {
+                    // Template Builder UI
+                    formGroup.appendChild(label);
+                    const builder = appleMusic.renderTemplateBuilder(
+                        field.key,
+                        field.value,
+                        appleMusic.templateVariables[field.key] || []
+                    );
+                    formGroup.appendChild(builder);
+
+                } else if (field.schema.type === 'bool') {
                     // Toggle Switch UI
                     formGroup.style.display = 'flex';
                     formGroup.style.justifyContent = 'space-between';
@@ -447,6 +533,31 @@ const appleMusic = {
         } finally {
             btn.innerText = originalText;
             btn.disabled = false;
+        }
+    },
+
+    reloadConfig: async () => {
+        if(!confirm("Reload configuration from disk?\nThis will overwrite any unsaved changes in the UI with values from the config.yaml file.")) return;
+
+        const btn = document.getElementById('am-config-reload-btn');
+        if(btn) btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/apps/apple-music/config/reload', { method: 'POST' });
+            const json = await res.json();
+
+            if (json.error) {
+                showToast("Reload Failed: " + json.error, "error");
+            } else {
+                showToast("Configuration Reloaded", "success");
+                // Refresh Form
+                appleMusic.state.config = json.data;
+                appleMusic.renderConfigForm(json.data);
+            }
+        } catch (e) {
+            showToast("Network Error: " + e, "error");
+        } finally {
+            if(btn) btn.disabled = false;
         }
     },
 
