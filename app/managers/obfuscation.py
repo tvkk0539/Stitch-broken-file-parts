@@ -200,7 +200,11 @@ Required for gdb/lldb analysis of production binaries."""
             return False, "Empty mapping provided"
 
         log(f"♻️  Restoring {len(mapping)} files in {target_dir}")
-        count = 0
+        found_count = 0
+        already_restored_count = 0
+        missing_count = 0
+        first_missing = None
+
         try:
             for fake, real in mapping.items():
                 fake_path = os.path.join(target_dir, fake)
@@ -208,17 +212,36 @@ Required for gdb/lldb analysis of production binaries."""
 
                 # Check if already restored (real exists, fake doesn't)
                 if os.path.exists(real_path) and not os.path.exists(fake_path):
+                    already_restored_count += 1
                     continue
 
                 if os.path.exists(fake_path):
                     try:
                         os.rename(fake_path, real_path)
-                        count += 1
+                        found_count += 1
                         log(f"   ✨ Restored: {real}")
                     except Exception as ex:
                         log(f"   ❌ Failed to restore {fake}: {ex}")
+                else:
+                    missing_count += 1
+                    if not first_missing:
+                        first_missing = fake
 
-            return True, f"Restored {count} files."
+            if found_count == 0 and already_restored_count == 0:
+                log(f"⚠️ No matching files found in {target_dir}")
+                if first_missing:
+                    log(f"   Expected example: {first_missing}")
+                return False, f"No files found. Expected e.g. '{first_missing}'"
+
+            msg = f"Restored {found_count} files."
+            if already_restored_count > 0:
+                msg += f" ({already_restored_count} already restored)"
+            if missing_count > 0:
+                msg += f" ({missing_count} missing)"
+
+            log(f"✅ {msg}")
+            return True, msg
+
         except Exception as e:
             return False, str(e)
 
