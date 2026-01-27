@@ -51,48 +51,54 @@ class RcloneManager:
         if not valid_paths: return True
 
         try:
-            # Create temp file for --files-from
-            # Note: rclone expects the file list to match the source root passed to command.
-            # Our source root is effectively DOWNLOAD_ROOT (or common parent).
-            # But `source_paths` are absolute local paths.
-            # To use --files-from efficiently, we pass "/" as source and absolute paths in list?
-            # Rclone warns about using / as source.
+            # Optimization: Single Item (Bypass --files-from logic)
+            if len(valid_paths) == 1:
+                item_path = valid_paths[0]
+                basename = os.path.basename(item_path)
 
-            # Better strategy: Group by parent directory?
-            # Or just use the loop BUT spawn them in parallel using Popen?
-            # Python threading is easier if we want to track progress.
-            # But the user asked for "rclone parallel", which rclone does best itself.
+                # Construct target: remote:base/basename
+                # This ensures we are copying the item INTO the target folder (or AS the name if file)
+                # But rclone copyto logic:
+                # If source is folder, copy contents to dest.
+                # If we want to copy FolderA to Remote:FolderA, dest must be Remote:FolderA.
 
-            # Let's try the --files-from approach with common parent.
-            # Assuming all paths are under DOWNLOAD_ROOT.
-            common_root = os.path.dirname(os.path.commonprefix(valid_paths))
-            if not common_root or common_root == '/':
-                 common_root = os.path.dirname(valid_paths[0])
+                target_path = f"{remote}:{base_upload_path}{basename}"
 
-            # Prepare list relative to common_root
-            rel_paths = []
-            for p in valid_paths:
-                rel = os.path.relpath(p, common_root)
-                rel_paths.append(rel)
+                log(f"Uploading single item: {basename} -> {target_path}")
+                job_manager.update_job_details({
+                    'action': f"Uploading {basename}",
+                    'current_item': basename
+                })
 
-            with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_file:
-                tmp_file.write('\n'.join(rel_paths))
-                tmp_path = tmp_file.name
+                # Use copyto to ensure exact destination mapping
+                cmd = ['rclone', 'copyto', item_path, target_path] + perf_flags
 
-            # One Big Command
-            log(f"Batch Uploading {len(valid_paths)} items from {common_root}...")
-            job_manager.update_job_details({
-                'action': f"Batch Uploading {len(valid_paths)} items",
-                'current_item': "Processing..."
-            })
+            else:
+                # Batch Strategy: --files-from
+                # Assuming all paths are under DOWNLOAD_ROOT.
+                common_root = os.path.dirname(os.path.commonprefix(valid_paths))
+                if not common_root or common_root == '/':
+                     common_root = os.path.dirname(valid_paths[0])
 
-            # Destination logic is tricky with files-from.
-            # If we copy to remote:base_upload_path, rclone preserves directory structure from the 'root'.
-            # E.g. root=/data, file=sub/file.txt -> remote:base/sub/file.txt
-            # This is usually desired behavior for bulk uploads.
+                # Prepare list relative to common_root
+                rel_paths = []
+                for p in valid_paths:
+                    rel = os.path.relpath(p, common_root)
+                    rel_paths.append(rel)
 
-            cmd = ['rclone', 'copy', common_root, f"{remote}:{base_upload_path}",
-                   '--files-from', tmp_path] + perf_flags
+                with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_file:
+                    tmp_file.write('\n'.join(rel_paths))
+                    tmp_path = tmp_file.name
+
+                # One Big Command
+                log(f"Batch Uploading {len(valid_paths)} items from {common_root}...")
+                job_manager.update_job_details({
+                    'action': f"Batch Uploading {len(valid_paths)} items",
+                    'current_item': "Processing..."
+                })
+
+                cmd = ['rclone', 'copy', common_root, f"{remote}:{base_upload_path}",
+                       '--files-from', tmp_path] + perf_flags
 
             process = subprocess.Popen(
                 cmd,
@@ -111,7 +117,8 @@ class RcloneManager:
                     log(f"[RCLONE ERROR] {line}")
 
             process.wait()
-            os.remove(tmp_path)
+            if 'tmp_path' in locals():
+                os.remove(tmp_path)
 
             if process.returncode != 0:
                 if job_manager.is_cancelled():
