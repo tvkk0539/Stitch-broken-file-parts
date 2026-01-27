@@ -232,11 +232,20 @@ class CatalogManager:
         """Converts a SQLite Row to a Dictionary."""
         d = dict(row)
         # Parse JSON fields
-        if d.get('tags'): d['tags'] = json.loads(d['tags'])
+        if d.get('tags'):
+            try: d['tags'] = json.loads(d['tags'])
+            except: d['tags'] = []
         else: d['tags'] = []
 
-        if d.get('assets'): d['assets'] = json.loads(d['assets'])
+        if d.get('assets'):
+            try: d['assets'] = json.loads(d['assets'])
+            except: d['assets'] = []
         else: d['assets'] = []
+
+        if d.get('restore_map'):
+            try: d['restore_map'] = json.loads(d['restore_map'])
+            except: d['restore_map'] = {}
+        else: d['restore_map'] = {}
 
         d['is_encrypted'] = bool(d['is_encrypted'])
         return d
