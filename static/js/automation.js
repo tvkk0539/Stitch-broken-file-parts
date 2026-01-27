@@ -40,12 +40,16 @@ function renderWorkflows() {
     });
 }
 
-function openWorkflowModal() {
+function openWorkflowEditor() {
     currentEditingId = null; // Reset for new
-    document.getElementById('workflow-modal').style.display = 'block';
-    document.getElementById('wf-name').value = '';
-    document.getElementById('wf-steps-container').innerHTML = '';
-    document.querySelector('#workflow-modal h3').textContent = "Create Workflow";
+
+    // Switch View
+    switchView('workflow-editor');
+
+    // Reset Form
+    document.getElementById('wf-editor-name').value = '';
+    document.getElementById('wf-editor-steps').innerHTML = '';
+    document.getElementById('wf-editor-title').textContent = "Create Workflow";
 
     // Inject Datalist for Categories if not exists
     if(!document.getElementById('cat-datalist')) {
@@ -124,13 +128,13 @@ function editWorkflow(id) {
     if (!wf) return;
 
     // Ensure datalist is populated even in edit mode
-    openWorkflowModal(); // Re-use init logic (title/value override below)
+    openWorkflowEditor(); // Re-use init logic (title/value override below)
 
     currentEditingId = id;
-    document.querySelector('#workflow-modal h3').textContent = "Edit Workflow";
-    document.getElementById('wf-name').value = wf.name;
+    document.getElementById('wf-editor-title').textContent = "Edit Workflow";
+    document.getElementById('wf-editor-name').value = wf.name;
 
-    const container = document.getElementById('wf-steps-container');
+    const container = document.getElementById('wf-editor-steps');
     container.innerHTML = '';
 
     wf.steps.forEach(step => {
@@ -198,16 +202,19 @@ function editWorkflow(id) {
 }
 
 function addWorkflowStepUI() {
-    const container = document.getElementById('wf-steps-container');
+    const container = document.getElementById('wf-editor-steps');
     const stepDiv = document.createElement('div');
     stepDiv.className = 'wf-step';
-    stepDiv.style.background = '#13141c';
-    stepDiv.style.padding = '10px';
-    stepDiv.style.marginBottom = '10px';
+    // Enhanced Styling for Full Page
+    stepDiv.style.background = 'var(--panel-bg)';
+    stepDiv.style.padding = '20px';
+    stepDiv.style.marginBottom = '15px';
+    stepDiv.style.borderRadius = '8px';
     stepDiv.style.border = '1px solid var(--border-color)';
+    stepDiv.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
 
     stepDiv.innerHTML = `
-        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
             <select class="wf-step-type" style="width:auto;" onchange="updateStepConfigUI(this)">
                 <option value="analyze_source">1. Analyze Source (Pre-Index)</option>
                 <option value="pack">2. Pack (Archive)</option>
@@ -599,7 +606,7 @@ function updateStepConfigUI(select) {
 }
 
 async function saveWorkflow() {
-    const name = document.getElementById('wf-name').value;
+    const name = document.getElementById('wf-editor-name').value;
     const stepDivs = document.querySelectorAll('.wf-step');
     const steps = [];
 
@@ -694,12 +701,16 @@ async function saveWorkflow() {
             showToast("Workflow Saved!");
         }
 
-        document.getElementById('workflow-modal').style.display = 'none';
-        currentEditingId = null;
+        closeWorkflowEditor();
         loadWorkflows();
     } catch(e) {
         alert("Save failed: " + e);
     }
+}
+
+function closeWorkflowEditor() {
+    switchView('automation');
+    currentEditingId = null;
 }
 
 async function runWorkflow(id) {
@@ -750,7 +761,8 @@ async function deleteWorkflow(id) {
 
 // Global Exposure
 window.initAutomation = initAutomation;
-window.openWorkflowModal = openWorkflowModal;
+window.openWorkflowEditor = openWorkflowEditor;
+window.closeWorkflowEditor = closeWorkflowEditor;
 window.editWorkflow = editWorkflow;
 window.addWorkflowStepUI = addWorkflowStepUI;
 window.saveWorkflow = saveWorkflow;

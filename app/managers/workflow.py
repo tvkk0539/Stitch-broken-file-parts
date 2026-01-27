@@ -260,7 +260,7 @@ class WorkflowManager:
             split,
             conf.get('password'),
             conf.get('format', 'rar'),
-            conf.get('create_par2', True), # Create Par2 (Configurable)
+            conf.get('create_par2', True),
             False,
             None, "",
             conf.get('naming', 'part1'),

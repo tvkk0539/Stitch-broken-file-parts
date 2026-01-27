@@ -228,10 +228,50 @@
             <div id="view-automation" class="view-section">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <h2 style="margin:0; border:none;">Workflow Automation</h2>
-                    <button class="secondary" onclick="openWorkflowModal()">+ Create Workflow</button>
+                    <button class="secondary" onclick="openWorkflowEditor()">+ Create Workflow</button>
                 </div>
                 <div id="workflow-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
                     <!-- JS Injected -->
+                </div>
+            </div>
+
+            <!-- VIEW: WORKFLOW EDITOR (Full Page) -->
+            <div id="view-workflow-editor" class="view-section">
+                <div style="max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; height: 100%;">
+
+                    <!-- Header -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <button onclick="closeWorkflowEditor()" class="icon-btn" style="border:1px solid var(--border-color); padding:5px 10px;">⬅ Back</button>
+                            <h2 style="margin:0; border:none;" id="wf-editor-title">Create Workflow</h2>
+                        </div>
+                        <button onclick="saveWorkflow()" class="purple-btn" style="padding:10px 25px; font-size:1em;">💾 Save Workflow</button>
+                    </div>
+
+                    <!-- Name Input -->
+                    <div style="background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:20px;">
+                        <label style="color:var(--text-muted); font-size:0.9em; display:block; margin-bottom:5px;">WORKFLOW NAME</label>
+                        <input type="text" id="wf-editor-name" placeholder="e.g. Cold Storage Backup Protocol"
+                               style="width:100%; font-size:1.5em; background:transparent; border:none; border-bottom:1px solid var(--border-color); color:#fff; padding:5px;">
+                    </div>
+
+                    <!-- Steps Area -->
+                    <div style="flex:1; overflow-y:auto; padding-bottom:50px;">
+                        <label style="color:var(--text-muted); font-size:0.9em; display:block; margin-bottom:10px;">PIPELINE STEPS</label>
+
+                        <div id="wf-editor-steps" style="display:flex; flex-direction:column; gap:15px;">
+                            <!-- Steps Injected Here -->
+                        </div>
+
+                        <!-- Add Button -->
+                        <div onclick="addWorkflowStepUI()" style="margin-top:20px; border:2px dashed var(--border-color); border-radius:8px; padding:20px; text-align:center; cursor:pointer; color:var(--text-muted); transition:all 0.2s;"
+                             onmouseover="this.style.borderColor='var(--accent-color)'; this.style.color='var(--accent-color)';"
+                             onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-muted)';">
+                            <div style="font-size:1.5em; margin-bottom:5px;">+ Add Step</div>
+                            <div style="font-size:0.9em;">Click to append a new action to the pipeline</div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -1097,25 +1137,6 @@
         </div>
     </div>
 
-    <!-- Workflow Create Modal -->
-    <div id="workflow-modal" class="modal" style="z-index: 1030;">
-        <div class="modal-content" style="width: 600px;">
-            <div class="modal-header"><h3>Create Workflow</h3></div>
-            <div class="form-group">
-                <label>Workflow Name</label>
-                <input type="text" id="wf-name" placeholder="e.g. Pack & Upload to GitHub">
-            </div>
-            <div id="wf-steps-container" style="border:1px solid var(--border-color); padding:10px; margin-bottom:15px; max-height:300px; overflow-y:auto;">
-                <!-- Steps injected here -->
-            </div>
-            <button class="icon-btn" onclick="addWorkflowStepUI()" style="width:100%; border:1px dashed var(--text-muted);">+ Add Step</button>
-
-            <div class="modal-actions">
-                <button onclick="document.getElementById('workflow-modal').style.display='none'" class="danger">Cancel</button>
-                <button onclick="saveWorkflow()" class="secondary">Save Workflow</button>
-            </div>
-        </div>
-    </div>
 
     <!-- GitHub Login Modal -->
     <div id="gh-login-modal" class="modal">
