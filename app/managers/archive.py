@@ -18,13 +18,10 @@ class ArchiveManager:
         elif clean_name.lower().endswith('.7z'): clean_name = clean_name[:-3]
 
         # 2. Construct Output Name based on Scheme
+        # For RAR, we rely on the archiver's auto-naming for parts.
+        # Manually appending .part001.rar causes double extensions (e.g. .part001.part1.rar).
         if fmt == 'rar':
-            if naming_scheme == 'part001':
-                archive_name = f"{clean_name}.part001.rar"
-            elif naming_scheme == 'part01':
-                archive_name = f"{clean_name}.part01.rar"
-            else:
-                archive_name = f"{clean_name}.rar"
+            archive_name = f"{clean_name}.rar"
         else:
             archive_name = f"{clean_name}.7z"
 
