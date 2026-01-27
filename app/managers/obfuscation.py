@@ -243,6 +243,7 @@ Required for gdb/lldb analysis of production binaries."""
             return True, msg
 
         except Exception as e:
+            log(f"❌ Restore Error: {e}")
             return False, str(e)
 
     @staticmethod
