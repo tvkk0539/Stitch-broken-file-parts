@@ -69,12 +69,12 @@ const appleMusic = {
     },
 
     switchTab: (tab) => {
-        // Tabs: 'down', 'queue', 'console', 'config', 'wrapper', 'setup'
+        // Tabs: 'down', 'queue', 'history', 'console', 'config', 'wrapper', 'setup'
         document.querySelectorAll('.browser-tab').forEach(b => b.classList.remove('active'));
         const tabBtn = document.getElementById(`am-tab-${tab}`);
         if(tabBtn) tabBtn.classList.add('active');
 
-        ['down', 'queue', 'console', 'setup', 'config', 'wrapper'].forEach(t => {
+        ['down', 'queue', 'history', 'console', 'setup', 'config', 'wrapper'].forEach(t => {
             const el = document.getElementById(`am-view-${t}`);
             if(el) el.style.display = 'none';
         });
@@ -93,11 +93,16 @@ const appleMusic = {
              appleMusic.downloaderPollInterval = null;
         }
 
-        // Queue Poll
-        if (tab === 'queue') {
-            appleMusic.loadQueue();
-            appleMusic.queuePollInterval = setInterval(appleMusic.loadQueue, 2000);
-        } else if (appleMusic.queuePollInterval) {
+        // Queue Poll (Active & History share data but separate views)
+        if (tab === 'queue' || tab === 'history') {
+            appleMusic.loadQueue(); // Poll immediately
+            // Only auto-poll active queue for updates
+            if (tab === 'queue' && !appleMusic.queuePollInterval) {
+                appleMusic.queuePollInterval = setInterval(appleMusic.loadQueue, 2000);
+            }
+        }
+
+        if (tab !== 'queue' && appleMusic.queuePollInterval) {
             clearInterval(appleMusic.queuePollInterval);
             appleMusic.queuePollInterval = null;
         }
@@ -725,58 +730,126 @@ const appleMusic = {
         }
     },
 
-    // --- QUEUE TAB LOGIC ---
+    // --- QUEUE & HISTORY LOGIC ---
     queuePollInterval: null,
 
     loadQueue: async () => {
         try {
             const res = await fetch('/api/apps/apple-music/queue');
-            const items = await res.json();
+            const allItems = await res.json();
 
-            const container = document.getElementById('am-queue-table-body');
-            if(!container) return;
-            container.innerHTML = '';
+            // Split into Active and History
+            const activeItems = allItems.filter(i => i.status === 'pending' || i.status === 'processing');
+            const historyItems = allItems.filter(i => i.status === 'completed' || i.status === 'failed');
 
-            items.forEach(item => {
-                const tr = document.createElement('tr');
+            // 1. Render Active Queue
+            const qContainer = document.getElementById('am-queue-table-body');
+            if(qContainer) {
+                qContainer.innerHTML = '';
+                if(activeItems.length === 0) {
+                    qContainer.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Queue is empty</td></tr>';
+                } else {
+                    activeItems.forEach(item => qContainer.appendChild(appleMusic.renderQueueRow(item, false)));
+                }
+            }
 
-                // Parse Args
-                let argStr = '';
-                try {
-                    const a = JSON.parse(item.args);
-                    argStr = Object.keys(a).map(k => k + (a[k]===true?'':`=${a[k]}`)).join(', ');
-                } catch(e) {}
-
-                // Status Color
-                let statusColor = 'gray';
-                if(item.status === 'processing') statusColor = '#7aa2f7';
-                if(item.status === 'completed') statusColor = '#9ece6a';
-                if(item.status === 'failed') statusColor = '#f7768e';
-
-                tr.innerHTML = `
-                    <td style="padding:10px; color:#565f89;">#${item.id}</td>
-                    <td style="padding:10px; color:#c0caf5; font-family:monospace; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.url}</td>
-                    <td style="padding:10px; font-size:0.85em; color:#bb9af7;">${argStr}</td>
-                    <td style="padding:10px;"><span class="badge" style="background:${statusColor}">${item.status.toUpperCase()}</span></td>
-                    <td style="padding:10px; text-align:right;">
-                        ${item.status === 'pending' || item.status === 'failed' || item.status === 'completed' ?
-                        `<button class="icon-btn danger" onclick="appleMusic.deleteQueueItem(${item.id})">✖</button>` : ''}
-                    </td>
-                `;
-                container.appendChild(tr);
-            });
-
-            if(items.length === 0) {
-                container.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Queue is empty</td></tr>';
+            // 2. Render History
+            const hContainer = document.getElementById('am-history-table-body');
+            if(hContainer) {
+                hContainer.innerHTML = '';
+                if(historyItems.length === 0) {
+                    hContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">History is empty</td></tr>';
+                } else {
+                    historyItems.reverse().forEach(item => hContainer.appendChild(appleMusic.renderQueueRow(item, true)));
+                }
             }
 
         } catch(e) { console.error("Queue load error", e); }
     },
 
+    renderQueueRow: (item, isHistory) => {
+        const tr = document.createElement('tr');
+
+        // Parse Args
+        let argStr = '';
+        try {
+            const a = JSON.parse(item.args);
+            argStr = Object.keys(a).map(k => k + (a[k]===true?'':`=${a[k]}`)).join(', ');
+        } catch(e) {}
+
+        // Status Color
+        let statusColor = 'gray';
+        if(item.status === 'processing') statusColor = '#7aa2f7';
+        if(item.status === 'completed') statusColor = '#9ece6a';
+        if(item.status === 'failed') statusColor = '#f7768e';
+
+        // History specific details
+        let details = '';
+        if (isHistory) {
+            if (item.status === 'failed') details = `<span style="color:#f7768e; font-size:0.8em;">${item.error || 'Unknown error'}</span>`;
+            else details = `<span style="color:var(--text-muted); font-size:0.8em;">${item.created_at || ''}</span>`;
+        }
+
+        // Actions
+        let actions = '';
+        if (isHistory) {
+            // Retry & Delete
+            actions = `
+                <button class="icon-btn" onclick="appleMusic.retryItem(${item.id})" title="Retry" style="color:var(--accent-color);">🔄</button>
+                <button class="icon-btn danger" onclick="appleMusic.deleteQueueItem(${item.id})" title="Delete">✖</button>
+            `;
+        } else {
+            // Active: Delete if pending
+            if (item.status === 'pending') {
+                actions = `<button class="icon-btn danger" onclick="appleMusic.deleteQueueItem(${item.id})">✖</button>`;
+            }
+        }
+
+        tr.innerHTML = `
+            <td style="padding:10px; color:#565f89;">#${item.id}</td>
+            <td style="padding:10px; color:#c0caf5; font-family:monospace; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.url}</td>
+            <td style="padding:10px; font-size:0.85em; color:#bb9af7;">${argStr}</td>
+            <td style="padding:10px;"><span class="badge" style="background:${statusColor}">${item.status.toUpperCase()}</span></td>
+            ${isHistory ? `<td style="padding:10px;">${details}</td>` : ''}
+            <td style="padding:10px; text-align:right;">${actions}</td>
+        `;
+        return tr;
+    },
+
     deleteQueueItem: async (id) => {
-        if(!confirm("Remove item?")) return;
+        if(!confirm("Remove item from database?")) return;
         await fetch(`/api/apps/apple-music/queue/${id}`, {method: 'DELETE'});
         appleMusic.loadQueue();
+    },
+
+    retryItem: async (id) => {
+        if(!confirm("Retry this download?\nIt will be moved back to the Pending Queue.")) return;
+        try {
+            const res = await fetch(`/api/apps/apple-music/queue/${id}/retry`, {method: 'POST'});
+            const json = await res.json();
+            if(json.status === 'success') {
+                showToast("Item moved to Queue", "success");
+                appleMusic.loadQueue();
+            } else {
+                showToast("Retry failed", "error");
+            }
+        } catch(e) {
+            showToast("Error: " + e, "error");
+        }
+    },
+
+    clearHistory: async () => {
+        if(!confirm("Clear all Completed and Failed items from history?")) return;
+        try {
+            const res = await fetch('/api/apps/apple-music/queue/history', {method: 'DELETE'});
+            const json = await res.json();
+            if(json.status === 'success') {
+                showToast("History Cleared", "success");
+                appleMusic.loadQueue();
+            }
+        } catch(e) {
+            showToast("Error: " + e, "error");
+        }
     },
 
     startQueue: async () => {

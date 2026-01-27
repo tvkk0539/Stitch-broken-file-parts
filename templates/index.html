@@ -305,6 +305,7 @@
                     <div class="browser-tabs">
                         <button id="am-tab-down" class="browser-tab active" onclick="appleMusic.switchTab('down')">Downloader</button>
                         <button id="am-tab-queue" class="browser-tab" onclick="appleMusic.switchTab('queue')">Queue</button>
+                        <button id="am-tab-history" class="browser-tab" onclick="appleMusic.switchTab('history')">History</button>
                         <button id="am-tab-console" class="browser-tab" onclick="appleMusic.switchTab('console')">Console</button>
                         <button id="am-tab-config" class="browser-tab" onclick="appleMusic.switchTab('config')">Config</button>
                         <button id="am-tab-wrapper" class="browser-tab" onclick="appleMusic.switchTab('wrapper')">Wrapper</button>
@@ -394,7 +395,7 @@
                 <!-- TAB: QUEUE (Dedicated) -->
                 <div id="am-view-queue" style="display:none; padding:20px; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); height:calc(100vh - 200px); flex-direction:column;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
-                        <h3 style="margin:0;">Download Queue</h3>
+                        <h3 style="margin:0;">Active Queue</h3>
                         <div style="display:flex; gap:10px;">
                             <button class="secondary success-btn" onclick="appleMusic.startQueue()" style="background:#9ece6a; color:#1a1b26;">▶ Start Queue</button>
                             <button class="danger" onclick="appleMusic.stopQueue()">⏹ Stop after current</button>
@@ -413,6 +414,32 @@
                                 </tr>
                             </thead>
                             <tbody id="am-queue-table-body">
+                                <!-- JS Injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB: HISTORY (Dedicated) -->
+                <div id="am-view-history" style="display:none; padding:20px; background:var(--panel-bg); border-radius:8px; border:1px solid var(--border-color); height:calc(100vh - 200px); flex-direction:column;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
+                        <h3 style="margin:0;">Download History</h3>
+                        <button class="secondary" onclick="appleMusic.clearHistory()" style="flex:0; white-space:nowrap;">🗑️ Clear All History</button>
+                    </div>
+
+                    <div style="flex:1; overflow-y:auto;">
+                        <table style="width:100%; border-collapse:collapse; text-align:left;">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-size:0.9em;">
+                                    <th style="padding:10px;">ID</th>
+                                    <th style="padding:10px;">URL</th>
+                                    <th style="padding:10px;">Arguments</th>
+                                    <th style="padding:10px;">Status</th>
+                                    <th style="padding:10px;">Details</th>
+                                    <th style="padding:10px; text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="am-history-table-body">
                                 <!-- JS Injected -->
                             </tbody>
                         </table>

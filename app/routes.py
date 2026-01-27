@@ -1148,6 +1148,14 @@ def apple_music_queue_start():
 def apple_music_queue_stop():
     return jsonify(apple_music_manager.stop_queue())
 
+@bp.route('/api/apps/apple-music/queue/<int:item_id>/retry', methods=['POST'])
+def apple_music_queue_retry(item_id):
+    return jsonify(apple_music_manager.retry_item(item_id))
+
+@bp.route('/api/apps/apple-music/queue/history', methods=['DELETE'])
+def apple_music_clear_history():
+    return jsonify(apple_music_manager.clear_history())
+
 # --- Apps: Apple Music Wrapper ---
 am_wrapper = AppleMusicWrapperManager()
 

@@ -165,6 +165,29 @@ class AppleMusicDB:
             log(f"AM-Queue Delete Error: {e}")
             return False
 
+    def retry_queue_item(self, item_id):
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "UPDATE download_queue SET status = 'pending', error = NULL, created_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (item_id,)
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            log(f"AM-Queue Retry Error: {e}")
+            return False
+
+    def clear_queue_history(self):
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM download_queue WHERE status IN ('completed', 'failed')")
+                conn.commit()
+            return True
+        except Exception as e:
+            log(f"AM-Queue Clear History Error: {e}")
+            return False
+
     def get_next_pending(self):
         try:
             with self._get_conn() as conn:
@@ -444,6 +467,16 @@ class AppleMusicManager:
         if self.db.delete_queue_item(item_id):
             return {'status': 'success'}
         return {'error': 'Failed to delete'}
+
+    def retry_item(self, item_id):
+        if self.db.retry_queue_item(item_id):
+            return {'status': 'success'}
+        return {'error': 'Failed to retry'}
+
+    def clear_history(self):
+        if self.db.clear_queue_history():
+            return {'status': 'success'}
+        return {'error': 'Failed to clear history'}
 
     def stop_queue(self):
         """Signals the queue processor to stop after current job."""
