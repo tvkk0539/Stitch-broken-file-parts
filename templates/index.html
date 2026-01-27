@@ -454,7 +454,8 @@
                             <h3 style="margin:0;">Configuration Editor</h3>
                             <div style="display:flex; gap:10px; align-items:center;">
                                 <div id="am-config-path" style="font-family:monospace; font-size:0.8em; color:var(--text-muted); max-width:400px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
-                                <button class="secondary" onclick="appleMusic.loadConfig()">🔄 Refresh</button>
+                                <button id="am-config-reload-btn" class="warning-btn" style="background:#e0af68; color:#1a1b26;" onclick="appleMusic.reloadConfig()">📂 Reload from Disk</button>
+                                <button class="secondary" onclick="appleMusic.loadConfig()">🔄 Refresh UI</button>
                                 <button class="purple-btn" onclick="appleMusic.saveConfig()">💾 Save Changes</button>
                             </div>
                         </div>

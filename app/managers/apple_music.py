@@ -338,6 +338,19 @@ class AppleMusicManager:
             log(f"Error saving config: {e}")
             return {'error': f"Failed to save config: {str(e)}"}
 
+    def reload_config_from_disk(self):
+        """
+        Manually triggers a sync from Disk -> DB.
+        Useful if the user manually edited config.yaml.
+        """
+        try:
+            log("AM-Manager: Manual reload requested.")
+            self._sync_from_yaml_to_db()
+            return self.get_config()
+        except Exception as e:
+            log(f"Error reloading config: {e}")
+            return {'error': f"Failed to reload config: {str(e)}"}
+
     @staticmethod
     def run_download_job(url, args=None):
         """
