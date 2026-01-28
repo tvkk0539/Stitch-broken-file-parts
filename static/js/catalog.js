@@ -329,6 +329,7 @@ const catalog = {
                             <span class="link-name" title="${a.name}">${a.name}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
+                            ${a.username ? `<span class="tag tag-secure" style="font-size:0.8em; padding:2px 6px;" title="Source Account">👤 ${a.username}</span>` : ''}
                             <span class="link-meta">${catalog._formatBytes(a.size)}</span>
                             <button onclick="catalog.copySingleLink('${a.url}')" class="icon-btn" style="padding:4px 8px; font-size:0.9em; background:#2f3549; border:1px solid #414868;" title="Copy Link">📋</button>
                         </div>

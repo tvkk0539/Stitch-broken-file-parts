@@ -891,6 +891,10 @@ class GitHubManager:
         current_acc_idx = 0
         current_acc_id = account_ids[0]
 
+        # Build Username Map for Smart Identity
+        accounts_list = GitHubManager.list_accounts()
+        id_to_user = {str(a['id']): a['username'] for a in accounts_list}
+
         log(f"Starting Smart Publish: {len(files)} files -> {base_repo_name}* (Accounts: {len(account_ids)})")
 
         restore_map = {}
@@ -1077,7 +1081,9 @@ class GitHubManager:
                         'name': fname,
                         'size': os.path.getsize(file_path),
                         'url': adata.get('browser_download_url', ''),
-                        'repo': repo_full
+                        'repo': repo_full,
+                        'account_id': str(current_acc_id),
+                        'username': id_to_user.get(str(current_acc_id), 'Unknown')
                     })
                     current_size_gb += file_size_gb
                     current_acc_uploaded_gb += file_size_gb
@@ -1123,24 +1129,44 @@ class GitHubManager:
         if not os.path.exists(dest_root):
             os.makedirs(dest_root, exist_ok=True)
 
-        token = GitHubManager._get_token_for_account(account_id)
-        headers = {}
-        if token:
-            headers['Authorization'] = f'token {token}'
-            headers['Accept'] = 'application/octet-stream'
+        # Default Token (Fallback)
+        default_token = GitHubManager._get_token_for_account(account_id)
+        default_headers = {}
+        if default_token:
+            default_headers['Authorization'] = f'token {default_token}'
+            default_headers['Accept'] = 'application/octet-stream'
+
+        # Smart Identity: Pre-fetch tokens for all involved accounts
+        identity_tokens = {}
+        for asset in assets:
+            aid = asset.get('account_id')
+            if aid and aid not in identity_tokens:
+                t = GitHubManager._get_token_for_account(aid)
+                if t: identity_tokens[aid] = t
 
         completed = 0
         errors = 0
 
         def download_one(asset):
             url = asset['url']
-            name = asset['filename']
+            # Support both 'filename' (API) and 'name' (Catalog) keys
+            name = asset.get('filename') or asset.get('name')
+            if not name: return False
+
             path = os.path.join(dest_root, name)
+
+            # Determine Headers (Smart Switch)
+            use_headers = default_headers.copy()
+            aid = asset.get('account_id')
+            if aid and aid in identity_tokens:
+                use_headers['Authorization'] = f"token {identity_tokens[aid]}"
+                use_headers['Accept'] = 'application/octet-stream'
+                # log(f"Using Smart Identity for {name}: Account {aid}")
 
             try:
                 # Basic download without progress tracking per file to simplify batch logic
                 # We trust requests.get handling redirects
-                with requests.get(url, headers=headers, stream=True) as r:
+                with requests.get(url, headers=use_headers, stream=True) as r:
                     r.raise_for_status()
                     with open(path, 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
