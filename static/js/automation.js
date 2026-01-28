@@ -647,8 +647,7 @@ function renderProfiles() {
 
 function openProfileEditor(id = null) {
     currentProfileId = id;
-    const modal = document.getElementById('profile-editor-modal');
-    modal.style.display = 'block';
+    switchView('profile-editor'); // Switch to Full View
 
     // Clear / Default
     document.getElementById('prof-editor-name').value = '';
@@ -656,15 +655,24 @@ function openProfileEditor(id = null) {
     toggleProfileFields('relay');
     document.getElementById('prof-editor-base').value = '';
     document.getElementById('prof-editor-pool').value = '';
+    document.getElementById('prof-editor-content').value = 'tree_only';
 
     // Limits
     document.getElementById('prof-editor-lim-repo').value = '40';
     document.getElementById('prof-editor-lim-acc').value = '45';
+    document.getElementById('prof-editor-sleep').value = '3600';
+    document.getElementById('prof-editor-rate').value = '15';
 
     // Accounts
     const accContainer = document.getElementById('prof-editor-accs');
     accContainer.innerHTML = ''; // Clear
     createTagInput(accContainer, 'gh-acc-list'); // Re-init
+
+    // Camo Defaults
+    document.getElementById('prof-editor-camo').checked = false;
+    document.getElementById('prof-camo-opts').style.display = 'none';
+    document.getElementById('prof-editor-template').value = 'log_rotation';
+    document.getElementById('prof-editor-obf-title').checked = true;
 
     if (id) {
         const p = profiles.find(x => x.id === id);
@@ -676,6 +684,7 @@ function openProfileEditor(id = null) {
 
             document.getElementById('prof-editor-base').value = p.config.repo || '';
             document.getElementById('prof-editor-pool').value = p.config.repo_pool || '';
+            document.getElementById('prof-editor-content').value = p.config.release_content || 'tree_only';
 
             // Limits
             if(p.config.span_limit) document.getElementById('prof-editor-lim-repo').value = p.config.span_limit;
@@ -702,6 +711,11 @@ function openProfileEditor(id = null) {
     }
 }
 
+function closeProfileEditor() {
+    switchView('automation');
+    switchAutoTab('prof');
+}
+
 function toggleProfileFields(strat) {
     if (strat === 'pool') {
         document.getElementById('prof-repo-std').style.display = 'none';
@@ -726,6 +740,7 @@ async function saveProfile() {
         strategy: strat,
         repo: document.getElementById('prof-editor-base').value,
         repo_pool: document.getElementById('prof-editor-pool').value,
+        release_content: document.getElementById('prof-editor-content').value,
         account_id: accIds,
 
         span_limit: parseInt(document.getElementById('prof-editor-lim-repo').value),
@@ -757,7 +772,7 @@ async function saveProfile() {
         }
 
         if (res.ok) {
-            document.getElementById('profile-editor-modal').style.display = 'none';
+            closeProfileEditor();
             loadProfiles();
             showToast("Strategy Saved!");
         } else {
