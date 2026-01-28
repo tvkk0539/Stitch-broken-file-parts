@@ -435,6 +435,12 @@ function renderStepUI(stepDiv, type, config = {}) {
                     </label>
                 </div>
 
+                <div style="margin-bottom:10px;">
+                    <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#ff9e64;" title="Enforces 1 Repo per Account (Max 45GB). Switches account immediately if full.">
+                        <input type="checkbox" class="wf-gh-strict" onchange="const el=this.closest('.wf-opts-container').querySelector('.wf-gh-lim-repo'); el.disabled = this.checked; el.style.opacity = this.checked ? 0.5 : 1;"> 🔒 Strict Mode (1 Account = 1 Repo)
+                    </label>
+                </div>
+
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                     <div>
                         <label style="font-size:0.75em; color:var(--text-muted);">Repo Limit (GB)</label>
@@ -585,6 +591,10 @@ async function saveWorkflow() {
              const camoTemplate = optsDiv ? optsDiv.querySelector('.wf-opt-camo-template').value : 'log_rotation';
              const obfTitle = optsDiv ? optsDiv.querySelector('.wf-gh-obf-title').checked : true;
 
+             // Strict Mode
+             const strictCb = optsDiv ? optsDiv.querySelector('.wf-gh-strict') : null;
+             const useStrict = strictCb ? strictCb.checked : false;
+
              // Stealth Logic
              const stealthCb = optsDiv ? optsDiv.querySelector('.wf-gh-stealth') : null;
              const useStealth = stealthCb ? stealthCb.checked : false;
@@ -605,6 +615,7 @@ async function saveWorkflow() {
                  camo_template: camoTemplate,
                  obfuscate_title: obfTitle,
                  use_stealth_import: useStealth,
+                 strict_mode: useStrict,
                  span_limit: repoLim,
                  account_limit: accLim,
                  safety_sleep_seconds: sleep,

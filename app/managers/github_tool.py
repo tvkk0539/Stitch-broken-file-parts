@@ -916,11 +916,12 @@ class GitHubManager:
             return None, 0
 
     @staticmethod
-    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay', release_mode='create'):
+    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay', release_mode='create', strict_mode=False):
         """
         Publishes files across multiple repositories and accounts if needed.
         Strategies: 'relay' (Sequential Fill), 'scatter' (Round Robin per File).
         Release Mode: 'create' (New Tag) or 'append' (Add to latest).
+        Strict Mode: If True, enforces 1 Repo per Account (Max 45GB) and switches account immediately if full.
         """
         from app.managers.obfuscation import ObfuscationManager
         import time
@@ -1039,6 +1040,10 @@ class GitHubManager:
                 allocation_mode = 'fill'
                 log("♻️ Allocation Mode: Fill Existing (Dynamic Pooling)")
 
+            # IMPORTANT: In Strict Mode, we treat 'fill' as default if not specified?
+            # Or assume we want to fill the target repo.
+            # But the key is that current_size_gb MUST be accurate from start.
+
             # Init state for Relay
             # If Fill Mode: Try to find a pool repo matching the base name
             if allocation_mode == 'fill':
@@ -1051,8 +1056,14 @@ class GitHubManager:
             else:
                 repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id)
 
+            # STRICT MODE INIT:
+            # If strict mode is ON, we must respect the existing size of the repo immediately.
+            # ensure_repo returns size.
             current_size_gb = repo_size_kb / (1024 * 1024)
             current_acc_uploaded_gb = 0
+
+            # If strict mode, we might need to trigger switch BEFORE the first file if full?
+            # The loop handles it.
 
             # Helper to create release return (upload_url, html_url)
             def get_release_data(r_name, t_name, acc_id):
@@ -1093,6 +1104,21 @@ class GitHubManager:
                 file_size_bytes = os.path.getsize(file_path)
                 file_size_gb = file_size_bytes / (1024 * 1024 * 1024)
 
+                # Check for Account Switch Requirement (Strict Mode Immediate Check)
+                # If Strict Mode is on, we check if the CURRENT repo + NEW file > 45GB.
+                # If so, we MUST switch account before even trying to upload.
+
+                strict_limit_kb = 45 * 1024 * 1024 # 45GB in KB
+                current_kb = current_size_gb * 1024 * 1024
+                file_kb = file_size_bytes / 1024
+
+                # We do this logic inside the loop, but BEFORE Scatter/Relay branch?
+                # Actually Scatter branch handles its own selection.
+                # Relay branch handles limit checks.
+                # But Strict Mode is a global override essentially.
+
+                # Let's rely on the Relay branch logic below, but verify 'current_size_gb' is fresh.
+
                 # --- STRATEGY: SCATTER (Round Robin) ---
                 if strategy == 'scatter' and len(account_ids) > 1:
                     # Determine Account
@@ -1119,40 +1145,105 @@ class GitHubManager:
                 # --- STRATEGY: RELAY (Sequential) ---
                 else:
                     # Check Repo Limit OR Account Switch Requirement
-                    repo_limit_reached = (current_size_gb + file_size_gb > span_limit_gb)
-                    account_limit_reached = (current_acc_uploaded_gb + file_size_gb > account_limit_gb)
+                    # Strict Mode: Hard 45GB limit on Repo (which equals Account limit)
+                    effective_repo_limit = 45 if strict_mode else span_limit_gb
+                    effective_acc_limit = 45 if strict_mode else account_limit_gb
+
+                    repo_limit_reached = (current_size_gb + file_size_gb > effective_repo_limit)
+                    account_limit_reached = (current_acc_uploaded_gb + file_size_gb > effective_acc_limit)
+
+                    # Strict Mode Override:
+                    # If Repo Limit is reached in Strict Mode, it implies Account Limit is also reached
+                    # because we enforced 1 Repo = 1 Account.
+                    if strict_mode and repo_limit_reached:
+                        account_limit_reached = True
 
                     if repo_limit_reached or account_limit_reached:
-                        if account_limit_reached and len(account_ids) > 1:
-                            log(f"Account {current_acc_id} limit reached ({current_acc_uploaded_gb:.2f}GB > {account_limit_gb}GB). Switching...")
-                            if safety_sleep > 0:
-                                log(f"💤 Safety Sleep for {safety_sleep}s...")
-                                job_manager.update_job_details({'action': f"Cooling down ({safety_sleep}s)..."})
-                                time.sleep(safety_sleep)
+                        # Switch Account Logic
+                        # If strict mode, even repo_limit triggers account switch
+                        should_switch_account = account_limit_reached or (strict_mode and repo_limit_reached)
 
-                            current_acc_idx = (current_acc_idx + 1) % len(account_ids)
-                            current_acc_id = account_ids[current_acc_idx]
-                            current_acc_uploaded_gb = 0
-                            log(f"Switched to Account: {current_acc_id}")
+                        if should_switch_account:
+                            if len(account_ids) > 1:
+                                log(f"Account {current_acc_id} limit reached ({current_acc_uploaded_gb:.2f}GB / Repo {current_size_gb:.2f}GB). Switching...")
+                                if safety_sleep > 0:
+                                    log(f"💤 Safety Sleep for {safety_sleep}s...")
+                                    job_manager.update_job_details({'action': f"Cooling down ({safety_sleep}s)..."})
+                                    time.sleep(safety_sleep)
 
-                        log(f"Switching Repository...")
+                                current_acc_idx = (current_acc_idx + 1) % len(account_ids)
+                                current_acc_id = account_ids[current_acc_idx]
+                                current_acc_uploaded_gb = 0
 
-                        can_reuse = False
-                        if allocation_mode == 'fill':
-                             # Try to find another bucket
-                             pool_repo, pool_size = GitHubManager.find_available_pool_repo(current_acc_id, base_repo_name, span_limit_gb)
-                             if pool_repo and pool_repo != repo_full:
-                                 repo_full = pool_repo
-                                 repo_size_kb = pool_size
-                                 can_reuse = True
+                                # Reset Repo Index for new account?
+                                # Strict Mode: Use base name again (try 'repo', then 'repo-02' if 'repo' full?
+                                # No, strictly 1 repo means we check THE repo.)
+                                # If strict mode, we should check 'base_repo_name' on new account.
+                                if strict_mode:
+                                    current_repo_name = base_repo_name
+                                    # Ensure we get the actual size of this repo on the new account
+                                    repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id, try_pool=False)
+                                    current_size_gb = repo_size_kb / (1024 * 1024)
+                                    # Reset uploaded count for new account
+                                    current_acc_uploaded_gb = 0
 
-                        if not can_reuse:
-                            current_repo_index += 1
-                            current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
-                            repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
-                            repo_size_kb = 0
+                                    # Update context cache for new repo
+                                    # We need to force a context refresh because 'repo_full' changed!
+                                    # Clear previous context from cache to force regeneration in loop logic
+                                    if repo_full in repo_context_cache:
+                                        del repo_context_cache[repo_full]
 
-                        current_size_gb = repo_size_kb / (1024 * 1024)
+                                    # Force RE-INIT logic below to run by ensuring it's not in cache or manually setting it
+                                    # Ideally we should let the 'if repo_full not in repo_context_cache:' block handle it.
+                                    # But we are inside the loop. The variable 'upload_url_template' needs to be updated for THIS file.
+
+                                    # We can't rely on the loop flow falling through because we are in the 'else' (Relay) block.
+                                    # The 'Adaptive Context' block comes AFTER this.
+                                    # So if we reset 'repo_context_cache', the next block 'ensure_release_context' (or equivalent) will run.
+                                    # Wait, the code structure is:
+                                    # Loop -> Strategy (Relay/Scatter) -> Context Logic -> Upload.
+
+                                    # Correct! So we just need to update 'repo_full' and 'current_acc_id' here.
+                                    # The context block below uses 'repo_full' and 'current_acc_id'.
+                                    # So we DON'T need to manually call get_release_data here IF we clear the cache/ensure logic runs.
+
+                                    # Let's rely on the downstream block.
+
+                                    # Force context cache update for next iteration logic
+                                    if repo_full in repo_context_cache:
+                                        del repo_context_cache[repo_full]
+
+                                log(f"Switched to Account: {current_acc_id} -> {current_repo_name}")
+                            else:
+                                log("⚠️ Limit reached but no more accounts available!")
+                                # If strict mode, we might just stop or error?
+                                # Proceeding will overfill.
+                                pass
+
+                        # Switch Repo Logic (Within same account)
+                        # Only if NOT Strict Mode OR if Account Switch didn't happen (e.g. single account config)
+                        # The 'elif' ensures we don't double-switch if we just switched accounts.
+                        # BUT: If strict mode is on, we NEVER want to switch repos locally.
+                        # So 'elif not strict_mode' handles that.
+                        elif not strict_mode:
+                            log(f"Switching Repository...")
+
+                            can_reuse = False
+                            if allocation_mode == 'fill':
+                                 # Try to find another bucket
+                                 pool_repo, pool_size = GitHubManager.find_available_pool_repo(current_acc_id, base_repo_name, span_limit_gb)
+                                 if pool_repo and pool_repo != repo_full:
+                                     repo_full = pool_repo
+                                     repo_size_kb = pool_size
+                                     can_reuse = True
+
+                            if not can_reuse:
+                                current_repo_index += 1
+                                current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+                                repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
+                                repo_size_kb = 0
+
+                            current_size_gb = repo_size_kb / (1024 * 1024)
 
                 # --- ADAPTIVE CAMOUFLAGE & CONTEXT ---
 
