@@ -428,8 +428,46 @@ const catalog = {
                 contentsHtml = `<div class="catalog-contents-section"><h3 style="color:var(--accent-color);">📝 Release Notes & Details</h3><div style="background:#16161e; padding:20px; border-radius:8px; border:1px solid var(--border-color); white-space:pre-wrap;">${restDesc.trim()}</div></div>`;
             }
 
+            // --- Spanning / Distribution Section ---
+            let spanningHtml = '';
+            if (item.spanning_info && item.spanning_info.length > 0) {
+                 let rows = item.spanning_info.map(s => `
+                    <tr style="border-bottom:1px solid #2f3549;">
+                        <td style="padding:12px; color:#bb9af7; font-weight:bold;">${s.account}</td>
+                        <td style="padding:12px;">${s.repo_name}</td>
+                        <td style="padding:12px; color:#9ece6a;">${s.size_human || '0 B'}</td>
+                        <td style="padding:12px; text-align:right;">
+                            <a href="${s.url}" target="_blank" class="secondary" style="padding:4px 10px; font-size:0.85em; text-decoration:none;">
+                                🌍 Open
+                            </a>
+                        </td>
+                    </tr>
+                `).join('');
+
+                spanningHtml = `
+                    <div class="catalog-contents-section">
+                        <h3 style="color:#7aa2f7; margin-bottom:15px;">🌐 Infrastructure & Distribution</h3>
+                        <div style="background:#16161e; border-radius:8px; border:1px solid #2f3549; overflow:hidden;">
+                            <table style="width:100%; border-collapse:collapse; font-size:0.95em;">
+                                <thead style="background:#1f2335; color:#a9b1d6;">
+                                    <tr>
+                                        <th style="padding:12px; text-align:left;">Identity</th>
+                                        <th style="padding:12px; text-align:left;">Repository</th>
+                                        <th style="padding:12px; text-align:left;">Size</th>
+                                        <th style="padding:12px; text-align:right;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rows}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
             // Combine
-            contentsHtml = treeHtml + contentsHtml;
+            contentsHtml = treeHtml + spanningHtml + contentsHtml;
 
             // --- Parse & Display Enriched Metadata (Reference URL) ---
             // We look for **Reference:** in the description and turn it into a clickable link
@@ -474,7 +512,6 @@ const catalog = {
                         </div>
 
                         <div class="catalog-actions">
-                            ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg" style="margin-right: 15px;">🌍 Open Release</a>` : ''}
                             ${restoreBtn}
                             ${extraActions}
                             <div style="flex: 1;"></div> <!-- Spacer -->

@@ -448,6 +448,8 @@ class WorkflowManager:
         cm = CatalogManager()
 
         gh_data = context.get('github_assets', {})
+        spanning_info = []
+
         # Handle backward compatibility or different structure
         if isinstance(gh_data, list):
             assets = gh_data
@@ -455,6 +457,7 @@ class WorkflowManager:
         else:
             assets = gh_data.get('assets', [])
             release_url = gh_data.get('release_url', f"https://github.com/{conf.get('repo')}")
+            spanning_info = gh_data.get('spanning_info', [])
 
         meta = context.get('meta', {})
 
@@ -521,7 +524,8 @@ class WorkflowManager:
             image=image_path,
             priority=int(conf.get('priority', 1)),
             description=final_desc,
-            restore_map=gh_data.get('restore_map', {})
+            restore_map=gh_data.get('restore_map', {}),
+            spanning_info=spanning_info
         )
 
         # Sync happens inside add_entry

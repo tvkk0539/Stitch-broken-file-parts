@@ -959,6 +959,23 @@ class GitHubManager:
         # Structure: { acc_id: { repo_name: upload_url } }
         scatter_cache = {}
 
+        # Spanning Tracking
+        spanning_map = {} # Key: "acc_id|repo_full", Value: { info_dict }
+
+        def track_spanning(acc_id, r_full, r_url, f_size):
+            key = f"{acc_id}|{r_full}"
+            if key not in spanning_map:
+                username = id_to_user.get(str(acc_id), 'Unknown')
+                spanning_map[key] = {
+                    'repo_name': r_full.split('/')[-1], # Short Name
+                    'account': username,
+                    'url': r_url,
+                    'file_count': 0,
+                    'size_bytes': 0
+                }
+            spanning_map[key]['file_count'] += 1
+            spanning_map[key]['size_bytes'] += f_size
+
         try:
             # Init state for Relay
             repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id)
@@ -993,30 +1010,21 @@ class GitHubManager:
             # Initial Release (First Repo)
             upload_url_template, first_release_url = get_release_data(repo_full, release_tag, current_acc_id)
             final_release_url = first_release_url # Keep track of primary link
+            current_release_url = first_release_url # For tracking
 
             total_files = len(active_files)
 
             for idx, file_path in enumerate(active_files):
                 if job_manager.is_cancelled(): break
 
-                file_size_gb = os.path.getsize(file_path) / (1024 * 1024 * 1024)
+                file_size_bytes = os.path.getsize(file_path)
+                file_size_gb = file_size_bytes / (1024 * 1024 * 1024)
 
                 # --- STRATEGY: SCATTER (Round Robin) ---
                 if strategy == 'scatter' and len(account_ids) > 1:
                     # Determine Account
                     current_acc_idx = idx % len(account_ids)
                     current_acc_id = account_ids[current_acc_idx]
-
-                    # Ensure repo exists for THIS account (we use same base name for all accounts in scatter usually)
-                    # or should we rotate repo names too?
-                    # Simplest Scatter: Use 'base-repo-name-01' on ALL accounts.
-                    # We assume 40GB limit is per repo per account.
-
-                    # NOTE: We are NOT tracking size limits strictly in Scatter mode for simplicity,
-                    # or we assume files are small enough.
-                    # BUT user asked for limits.
-                    # Implementing robust limit checking for 5 parallel accounts is complex.
-                    # We will do a lightweight check: Ensure repo exists.
 
                     tgt_repo = current_repo_name # e.g. archive-01
 
@@ -1027,12 +1035,12 @@ class GitHubManager:
                         # Init repo on this account
                         r_full, _ = ensure_repo(tgt_repo, current_acc_id)
                         u_url, r_url = get_release_data(r_full, release_tag, current_acc_id)
-                        scatter_cache[current_acc_id][tgt_repo] = (r_full, u_url)
+                        scatter_cache[current_acc_id][tgt_repo] = (r_full, u_url, r_url) # Added r_url to cache
 
                         # Use first scatter repo as final link if not set
                         if not final_release_url: final_release_url = r_url
 
-                    repo_full, upload_url_template = scatter_cache[current_acc_id][tgt_repo]
+                    repo_full, upload_url_template, current_release_url = scatter_cache[current_acc_id][tgt_repo]
 
                 # --- STRATEGY: RELAY (Sequential) ---
                 else:
@@ -1059,7 +1067,7 @@ class GitHubManager:
 
                         repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
                         current_size_gb = 0
-                        upload_url_template, _ = get_release_data(repo_full, release_tag, current_acc_id)
+                        upload_url_template, current_release_url = get_release_data(repo_full, release_tag, current_acc_id)
 
                 # Upload
                 fname = os.path.basename(file_path)
@@ -1076,10 +1084,13 @@ class GitHubManager:
                         log(f"Failed upload {fname}: {r.text}")
                         continue
 
+                    # Success - Track Metadata
+                    track_spanning(current_acc_id, repo_full, current_release_url, file_size_bytes)
+
                     adata = r.json()
                     uploaded_assets.append({
                         'name': fname,
-                        'size': os.path.getsize(file_path),
+                        'size': file_size_bytes,
                         'url': adata.get('browser_download_url', ''),
                         'repo': repo_full,
                         'account_id': str(current_acc_id),
@@ -1102,12 +1113,29 @@ class GitHubManager:
 
             log(f"Smart Publish Complete. {len(uploaded_assets)} assets across repos.")
 
+            # Convert map to list for storage
+            # Add human size string
+            spanning_info = list(spanning_map.values())
+            for item in spanning_info:
+                # Simple human size
+                s = item['size_bytes']
+                item['size_human'] = f"{s:.2f} B" # Default
+                for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                    if s < 1024:
+                        item['size_human'] = f"{s:.2f} {unit}"
+                        break
+                    s /= 1024
+                else:
+                    # If loop finishes (larger than TB)
+                    item['size_human'] = f"{s:.2f} PB"
+
             # Return data structure for Catalog
             return {
                 'assets': uploaded_assets,
                 'restore_map': restore_map,
                 'repo_base': base_repo_name,
-                'release_url': final_release_url
+                'release_url': final_release_url,
+                'spanning_info': spanning_info
             }
 
         except Exception as e:
