@@ -34,6 +34,12 @@ When you trigger a **Batch Download** or **Restore** job:
     *   For File 3, it swaps to **Token C**.
 4.  Result: A seamless, single-click restore process that "just works," regardless of how scattered your data is.
 
+### 3. Self-Healing Links (Resilience)
+What happens if you rename your GitHub account (e.g., `UserA` -> `UserNew`)?
+*   Normally, the stored download links (`github.com/UserA/...`) would eventually break.
+*   **ParFix Self-Healing:** The downloader checks your current configuration. If it detects that Account ID `123` is now `UserNew`, but the link says `UserA`, it **automatically repairs the URL** on the fly before downloading.
+*   **Result:** Your backup is resilient even against GitHub username changes.
+
 ## 🛠️ How to Use
 
 ### Setup

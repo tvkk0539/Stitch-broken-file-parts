@@ -1136,16 +1136,32 @@ class GitHubManager:
             default_headers['Authorization'] = f'token {default_token}'
             default_headers['Accept'] = 'application/octet-stream'
 
-        # Smart Identity: Pre-fetch tokens for all involved accounts
+        # Smart Identity: Pre-fetch tokens AND current usernames for all involved accounts
         identity_tokens = {}
+        identity_usernames = {}
+
+        # Load all accounts config once to map IDs to current Usernames
+        all_accounts = GitHubManager.list_accounts()
+        id_to_current_user = {str(a['id']): a['username'] for a in all_accounts}
+
         for asset in assets:
             aid = asset.get('account_id')
-            if aid and aid not in identity_tokens:
-                t = GitHubManager._get_token_for_account(aid)
-                if t: identity_tokens[aid] = t
+            if aid:
+                aid_str = str(aid)
+                if aid_str not in identity_tokens:
+                    t = GitHubManager._get_token_for_account(aid)
+                    if t:
+                        identity_tokens[aid_str] = t
+                        # Store current username for self-healing
+                        if aid_str in id_to_current_user:
+                            identity_usernames[aid_str] = id_to_current_user[aid_str]
 
         completed = 0
         errors = 0
+
+        # Regex for patching URL
+        import re
+        url_pattern = re.compile(r'^(https?://github\.com/)([^/]+)(/.*)$')
 
         def download_one(asset):
             url = asset['url']
@@ -1158,10 +1174,25 @@ class GitHubManager:
             # Determine Headers (Smart Switch)
             use_headers = default_headers.copy()
             aid = asset.get('account_id')
-            if aid and aid in identity_tokens:
-                use_headers['Authorization'] = f"token {identity_tokens[aid]}"
-                use_headers['Accept'] = 'application/octet-stream'
-                # log(f"Using Smart Identity for {name}: Account {aid}")
+
+            if aid:
+                aid_str = str(aid)
+                if aid_str in identity_tokens:
+                    use_headers['Authorization'] = f"token {identity_tokens[aid_str]}"
+                    use_headers['Accept'] = 'application/octet-stream'
+
+                    # --- Self-Healing Logic ---
+                    # If we have a current username map, check if URL matches it
+                    if aid_str in identity_usernames:
+                        current_user = identity_usernames[aid_str]
+                        match = url_pattern.match(url)
+                        if match:
+                            base, old_user, rest = match.groups()
+                            if old_user != current_user:
+                                # Patch the URL
+                                new_url = f"{base}{current_user}{rest}"
+                                log(f"🔧 Self-Healing URL: {old_user} -> {current_user}")
+                                url = new_url
 
             try:
                 # Basic download without progress tracking per file to simplify batch logic
