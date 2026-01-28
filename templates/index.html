@@ -226,11 +226,25 @@
 
             <!-- VIEW: AUTOMATION -->
             <div id="view-automation" class="view-section">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h2 style="margin:0; border:none;">Workflow Automation</h2>
-                    <button class="secondary" onclick="openWorkflowEditor()">+ Create Workflow</button>
+                <!-- Header with Tabs -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
+                    <div style="display:flex; gap:20px;">
+                        <h2 style="margin:0; border:none; cursor:pointer; opacity:1;" id="tab-auto-wf" onclick="switchAutoTab('wf')">Workflows</h2>
+                        <h2 style="margin:0; border:none; cursor:pointer; opacity:0.5; color:var(--text-muted);" id="tab-auto-prof" onclick="switchAutoTab('prof')">Strategies</h2>
+                    </div>
+                    <div>
+                        <button id="btn-new-wf" class="secondary" onclick="openWorkflowEditor()">+ New Workflow</button>
+                        <button id="btn-new-prof" class="secondary" onclick="openProfileEditor()" style="display:none;">+ New Strategy</button>
+                    </div>
                 </div>
-                <div id="workflow-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
+
+                <!-- Workflow List -->
+                <div id="auto-view-wf" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
+                    <!-- JS Injected -->
+                </div>
+
+                <!-- Profile List -->
+                <div id="auto-view-prof" style="display:none; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
                     <!-- JS Injected -->
                 </div>
             </div>
@@ -1083,6 +1097,100 @@
             <div class="modal-actions">
                 <button onclick="document.getElementById('catalog-add-modal').style.display='none'" class="danger">Cancel</button>
                 <button onclick="catalog.submitAdd()" class="secondary">Add Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Editor Modal -->
+    <div id="profile-editor-modal" class="modal">
+        <div class="modal-content" style="width: 700px; max-height:90vh; overflow-y:auto;">
+            <div class="modal-header">
+                <h3 id="prof-editor-title">Edit Strategy</h3>
+            </div>
+
+            <input type="hidden" id="prof-editor-id">
+
+            <div class="form-group">
+                <label>Strategy Name</label>
+                <input type="text" id="prof-editor-name" placeholder="e.g. Deep Cold Storage">
+            </div>
+
+            <div class="form-group">
+                <label>Upload Mode</label>
+                <select id="prof-editor-strat" onchange="toggleProfileFields(this.value)" style="width:100%; padding:10px; background:#13141c; border:1px solid var(--border-color); color:#fff;">
+                    <option value="relay">🔄 Relay (Sequential)</option>
+                    <option value="scatter">🔀 Scatter (Round Robin)</option>
+                    <option value="pool">🎲 Random Repo Pool (Stealth)</option>
+                </select>
+            </div>
+
+            <!-- Repo Config -->
+            <div id="prof-repo-std" class="form-group">
+                <label>Base Repository Name (Auto-Numbered)</label>
+                <input type="text" id="prof-editor-base" placeholder="backup-archive">
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">Creates <code>backup-archive-01</code>, <code>-02</code>...</div>
+            </div>
+
+            <div id="prof-repo-pool" class="form-group" style="display:none;">
+                <label>Repository Pool (One URL per line)</label>
+                <textarea id="prof-editor-pool" rows="6" style="width:100%; background:#1a1b26; border:1px solid var(--border-color); color:#c0caf5; padding:10px; font-family:monospace;" placeholder="https://github.com/user/repo1&#10;https://github.com/user/repo2..."></textarea>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">ParFix will randomly select one of these existing repositories for each file.</div>
+            </div>
+
+            <!-- Accounts -->
+            <div class="form-group">
+                <label>Accounts (Relay/Scatter Team)</label>
+                <div id="prof-editor-accs"></div>
+            </div>
+
+            <!-- Limits -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; background:#15161e; padding:15px; border-radius:8px; margin-bottom:15px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Repo Limit (GB)</label>
+                    <input type="number" id="prof-editor-lim-repo" value="40">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Account Limit (GB)</label>
+                    <input type="number" id="prof-editor-lim-acc" value="45">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Safety Sleep (s)</label>
+                    <input type="number" id="prof-editor-sleep" value="3600">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Rate Limit (s)</label>
+                    <input type="number" id="prof-editor-rate" value="15">
+                </div>
+            </div>
+
+            <!-- Camouflage -->
+            <div class="form-group">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                    <input type="checkbox" id="prof-editor-camo" onchange="document.getElementById('prof-camo-opts').style.display=this.checked?'block':'none'">
+                    🛡️ Enable Camouflage (Rename to System Logs)
+                </label>
+            </div>
+
+            <div id="prof-camo-opts" style="display:none; padding-left:25px; margin-bottom:15px;">
+                <div class="form-group">
+                    <label>Cover Story Template</label>
+                    <select id="prof-editor-template" style="width:100%; padding:8px; background:#1a1b26; border:1px solid var(--border-color); color:#fff;">
+                         <option value="log_rotation">Log Rotation</option>
+                         <option value="random">Random</option>
+                         <option value="crash_dump">Crash Dump</option>
+                         <option value="infrastructure">Infrastructure</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="prof-editor-obf-title" checked> Obfuscate Release Title
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button onclick="document.getElementById('profile-editor-modal').style.display='none'" class="danger">Cancel</button>
+                <button onclick="saveProfile()" class="secondary">Save Strategy</button>
             </div>
         </div>
     </div>

@@ -10,6 +10,7 @@ from app.managers.github_tool import GitHubManager
 from app.managers.catalog import CatalogManager
 from app.managers.sync import SyncManager
 from app.managers.workflow import WorkflowManager
+from app.managers.profile_manager import ProfileManager
 from app.managers.apple_music import AppleMusicManager
 from app.managers.am_wrapper import AppleMusicWrapperManager
 from app.managers.obfuscation import ObfuscationManager
@@ -310,6 +311,32 @@ def run_workflow(wf_id):
         args=(wf_id, abs_paths, wf_data)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
+
+# --- Profile API ---
+
+profile_manager = ProfileManager()
+
+@bp.route('/api/automation/profiles', methods=['GET'])
+def list_profiles():
+    return jsonify(profile_manager.get_all())
+
+@bp.route('/api/automation/profiles', methods=['POST'])
+def create_profile():
+    data = request.json
+    p = profile_manager.create_profile(data['name'], data['config'])
+    return jsonify(p)
+
+@bp.route('/api/automation/profiles/<pid>', methods=['PUT'])
+def update_profile(pid):
+    data = request.json
+    p = profile_manager.update_profile(pid, data['name'], data['config'])
+    if p: return jsonify(p)
+    return jsonify({'error': 'Profile not found'}), 404
+
+@bp.route('/api/automation/profiles/<pid>', methods=['DELETE'])
+def delete_profile(pid):
+    profile_manager.delete_profile(pid)
+    return jsonify({'status': 'deleted'})
 
 # --- Sync API ---
 

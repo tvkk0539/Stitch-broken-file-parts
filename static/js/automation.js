@@ -1,10 +1,13 @@
 // Automation Logic
 
 let workflows = [];
+let profiles = [];
 let currentEditingId = null;
+let currentProfileId = null;
 
 function initAutomation() {
     loadWorkflows();
+    loadProfiles();
 }
 
 async function loadWorkflows() {
@@ -354,113 +357,38 @@ function renderStepUI(stepDiv, type, config = {}) {
     } else if (type === 'github_publish') {
         contentDiv.innerHTML = `
             <div style="margin-bottom:15px;">
-                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Repository (Base Name)</label>
-                <input type="text" class="wf-gh-repo" placeholder="user/backup-repo" list="gh-repo-list" style="width:100%; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff;">
-            </div>
-
-            <div style="margin-bottom:15px;">
-                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Relay Accounts (Multi-Select)</label>
-                <div class="wf-gh-acc-container"></div>
-            </div>
-
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
-                <div>
-                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Upload Strategy</label>
-                     <select class="wf-gh-strat" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
-                        <option value="relay" selected>🔄 Relay (Sequential)</option>
-                        <option value="scatter">🔀 Scatter (Round Robin)</option>
-                     </select>
-                </div>
-                <div>
-                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Content</label>
-                     <select class="wf-gh-content" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
-                        <option value="tree_only" selected>Tree Only (Stealth)</option>
-                        <option value="standard">Standard</option>
-                        <option value="clean">Clean</option>
-                     </select>
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Publishing Strategy Profile</label>
+                <select class="wf-gh-profile" style="width:100%; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff; font-size:1.1em;">
+                    <option value="">-- Select a Strategy --</option>
+                </select>
+                <div style="font-size:0.8em; color:var(--text-muted); margin-top:5px;">
+                    Configure accounts, repos, and limits in the <a href="#" onclick="switchAutoTab('prof'); return false;" style="color:var(--accent-color);">Strategies Tab</a>.
                 </div>
             </div>
 
-            <div class="wf-opts-container" style="background:#15161e; border:1px solid #414868; border-radius:4px; padding:15px;">
-                <h4 style="margin:0 0 10px 0; color:#7dcfff; font-size:0.9em; display:flex; align-items:center; gap:5px;">
-                    ❄️ Cold Storage Protocol
-                </h4>
-
-                <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:10px; align-items:center;">
-                    <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Renames files to look like System Logs">
-                        <input type="checkbox" class="wf-opt-camo" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'block' : 'none'"> 🛡️ Camouflage Mode
-                    </label>
-
-                    <div style="display:none;" class="wf-camo-template-container">
-                        <select class="wf-opt-camo-template" style="padding:2px 5px; background:#1a1b26; border:1px solid #414868; color:#fff; font-size:0.8em; border-radius:4px;">
-                             <option value="log_rotation" selected>Log Rotation (Default)</option>
-                             <option value="random">🎲 Random Template</option>
-                             <option value="crash_dump">💥 Crash Dump</option>
-                             <option value="infrastructure">🏗️ Infrastructure</option>
-                             <option value="db_backup">🗄️ DB Backup</option>
-                             <option value="ai_weights">🧠 AI Weights</option>
-                             <option value="cdn_cache">⚡ CDN Cache</option>
-                             <option value="debug_symbols">🐛 Debug Symbols</option>
-                        </select>
-                    </div>
-
-                    <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Scrambles the Release Title (Base64)">
-                        <input type="checkbox" class="wf-gh-obf-title" checked> 🔒 Obfuscate Title
-                    </label>
-                </div>
-
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                    <div>
-                        <label style="font-size:0.75em; color:var(--text-muted);">Repo Limit (GB)</label>
-                        <input type="number" class="wf-gh-lim-repo" value="40" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.75em; color:var(--text-muted);">Account Limit (GB)</label>
-                        <input type="number" class="wf-gh-lim-acc" value="45" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.75em; color:var(--text-muted);">Safety Sleep (s)</label>
-                        <input type="number" class="wf-gh-sleep" value="3600" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.75em; color:var(--text-muted);">Rate Limit (s)</label>
-                        <input type="number" class="wf-gh-rate" value="15" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
-                    </div>
-                </div>
+            <div style="background:#15161e; padding:15px; border-radius:4px; border:1px solid var(--border-color);">
+                 <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Content Mode</label>
+                 <select class="wf-gh-content" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                    <option value="tree_only" selected>Tree Only (Stealth)</option>
+                    <option value="standard">Standard</option>
+                    <option value="clean">Clean</option>
+                 </select>
             </div>
         `;
 
-        // Populate
-        if(config.repo) contentDiv.querySelector('.wf-gh-repo').value = config.repo;
-        if(config.strategy) contentDiv.querySelector('.wf-gh-strat').value = config.strategy;
+        // Load profiles into dropdown
+        const sel = contentDiv.querySelector('.wf-gh-profile');
+        if (typeof profiles !== 'undefined') {
+            profiles.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                sel.appendChild(opt);
+            });
+        }
+        if(config.profile_id) sel.value = config.profile_id;
+
         if(config.release_content) contentDiv.querySelector('.wf-gh-content').value = config.release_content;
-        if(config.camouflage !== undefined) {
-             const cb = contentDiv.querySelector('.wf-opt-camo');
-             cb.checked = config.camouflage;
-             // Trigger visibility
-             contentDiv.querySelector('.wf-camo-template-container').style.display = config.camouflage ? 'block' : 'none';
-        }
-        if(config.camo_template) contentDiv.querySelector('.wf-opt-camo-template').value = config.camo_template;
-
-        if(config.obfuscate_title !== undefined) contentDiv.querySelector('.wf-gh-obf-title').checked = config.obfuscate_title;
-
-        if(config.span_limit) contentDiv.querySelector('.wf-gh-lim-repo').value = config.span_limit;
-        if(config.account_limit) contentDiv.querySelector('.wf-gh-lim-acc').value = config.account_limit;
-        if(config.safety_sleep_seconds) contentDiv.querySelector('.wf-gh-sleep').value = config.safety_sleep_seconds;
-        if(config.rate_limit_seconds) contentDiv.querySelector('.wf-gh-rate').value = config.rate_limit_seconds;
-
-        // Tokenizer for Accounts
-        const accContainer = contentDiv.querySelector('.wf-gh-acc-container');
-        const tokenizer = createTagInput(accContainer, 'gh-acc-list');
-        tokenizer.classList.add('wf-gh-acc-tokenizer'); // Add marker for save
-        const tokenInput = tokenizer.querySelector('.tag-input');
-        tokenInput.placeholder = "Add Account IDs...";
-
-        if(config.account_id) {
-            const ids = config.account_id.split(',').filter(x=>x.trim());
-            ids.forEach(id => addTagPill(tokenizer, tokenInput, id));
-            updateHiddenTagValue(tokenizer);
-        }
 
     } else if (type === 'catalog_add') {
          contentDiv.innerHTML = `
@@ -538,40 +466,17 @@ async function saveWorkflow() {
              };
 
         } else if (type === 'github_publish') {
-             const repo = contentDiv.querySelector('.wf-gh-repo').value;
-
-             // Account Tokenizer
-             const accContainer = contentDiv.querySelector('.wf-gh-acc-tokenizer');
-             const accIds = accContainer ? accContainer.querySelector('.tag-value').value : '';
-
-             const strat = contentDiv.querySelector('.wf-gh-strat').value;
+             const profileId = contentDiv.querySelector('.wf-gh-profile').value;
              const content = contentDiv.querySelector('.wf-gh-content').value;
 
-             // Get Options Container
-             const optsDiv = div.querySelector('.wf-opts-container');
-             const camo = optsDiv ? optsDiv.querySelector('.wf-opt-camo').checked : false;
-             const camoTemplate = optsDiv ? optsDiv.querySelector('.wf-opt-camo-template').value : 'log_rotation';
-             const obfTitle = optsDiv ? optsDiv.querySelector('.wf-gh-obf-title').checked : true;
-
-             const repoLim = parseInt(contentDiv.querySelector('.wf-gh-lim-repo').value) || 40;
-             const accLim = parseInt(contentDiv.querySelector('.wf-gh-lim-acc').value) || 45;
-             const sleep = parseInt(contentDiv.querySelector('.wf-gh-sleep').value) || 3600;
-             const rate = parseInt(contentDiv.querySelector('.wf-gh-rate').value) || 15;
+             if(!profileId) {
+                 alert("Please select a Strategy Profile for step 'GitHub Publish'.");
+                 throw new Error("Missing Profile");
+             }
 
              config = {
-                 repo: repo,
-                 account_id: accIds,
-                 strategy: strat,
-                 release_content: content,
-                 camouflage: camo,
-                 camo_template: camoTemplate,
-                 obfuscate_title: obfTitle,
-                 span_limit: repoLim,
-                 account_limit: accLim,
-                 safety_sleep_seconds: sleep,
-                 rate_limit_seconds: rate,
-                 span_repos: true, // Always active with limits
-                 tag_template: 'v{date}_{name}'
+                 profile_id: profileId,
+                 release_content: content
              };
 
         } else if (type === 'catalog_add') {
@@ -688,3 +593,187 @@ window.addWorkflowStepUI = addWorkflowStepUI;
 window.saveWorkflow = saveWorkflow;
 window.runWorkflow = runWorkflow;
 window.deleteWorkflow = deleteWorkflow;
+
+// --- Profiles Logic ---
+
+function switchAutoTab(tab) {
+    document.getElementById('auto-view-wf').style.display = tab === 'wf' ? 'grid' : 'none';
+    document.getElementById('auto-view-prof').style.display = tab === 'prof' ? 'grid' : 'none';
+
+    document.getElementById('tab-auto-wf').style.opacity = tab === 'wf' ? '1' : '0.5';
+    document.getElementById('tab-auto-prof').style.opacity = tab === 'prof' ? '1' : '0.5';
+    document.getElementById('tab-auto-wf').style.color = tab === 'wf' ? '#fff' : 'var(--text-muted)';
+    document.getElementById('tab-auto-prof').style.color = tab === 'prof' ? '#fff' : 'var(--text-muted)';
+
+    document.getElementById('btn-new-wf').style.display = tab === 'wf' ? 'block' : 'none';
+    document.getElementById('btn-new-prof').style.display = tab === 'prof' ? 'block' : 'none';
+}
+
+async function loadProfiles() {
+    try {
+        const res = await fetch('/api/automation/profiles');
+        profiles = await res.json();
+        renderProfiles();
+    } catch(e) { console.error("Load profiles failed", e); }
+}
+
+function renderProfiles() {
+    const container = document.getElementById('auto-view-prof');
+    if(!container) return;
+    container.innerHTML = '';
+
+    profiles.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'app-card';
+        card.style.height = 'auto';
+        // Describe config
+        let desc = "Standard";
+        if(p.config.strategy === 'pool') desc = `🎲 Pool (${(p.config.repo_pool || '').split('\n').length} Repos)`;
+        else if(p.config.strategy === 'scatter') desc = "🔀 Scatter";
+        else if(p.config.strategy === 'relay') desc = "🔄 Relay";
+
+        card.innerHTML = `
+            <div style="font-size:2em; margin-bottom:10px;">🛡️</div>
+            <div class="app-name">${p.name}</div>
+            <div class="app-desc">${desc}</div>
+            <div style="margin-top:15px; display:flex; gap:5px;">
+                <button class="secondary" onclick="openProfileEditor('${p.id}')" style="flex:1;">Edit Strategy</button>
+                <button class="danger" onclick="deleteProfile('${p.id}')" style="flex:0;">🗑️</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function openProfileEditor(id = null) {
+    currentProfileId = id;
+    const modal = document.getElementById('profile-editor-modal');
+    modal.style.display = 'block';
+
+    // Clear / Default
+    document.getElementById('prof-editor-name').value = '';
+    document.getElementById('prof-editor-strat').value = 'relay';
+    toggleProfileFields('relay');
+    document.getElementById('prof-editor-base').value = '';
+    document.getElementById('prof-editor-pool').value = '';
+
+    // Limits
+    document.getElementById('prof-editor-lim-repo').value = '40';
+    document.getElementById('prof-editor-lim-acc').value = '45';
+
+    // Accounts
+    const accContainer = document.getElementById('prof-editor-accs');
+    accContainer.innerHTML = ''; // Clear
+    createTagInput(accContainer, 'gh-acc-list'); // Re-init
+
+    if (id) {
+        const p = profiles.find(x => x.id === id);
+        if(p) {
+            document.getElementById('prof-editor-title').textContent = "Edit Strategy";
+            document.getElementById('prof-editor-name').value = p.name;
+            document.getElementById('prof-editor-strat').value = p.config.strategy || 'relay';
+            toggleProfileFields(p.config.strategy);
+
+            document.getElementById('prof-editor-base').value = p.config.repo || '';
+            document.getElementById('prof-editor-pool').value = p.config.repo_pool || '';
+
+            // Limits
+            if(p.config.span_limit) document.getElementById('prof-editor-lim-repo').value = p.config.span_limit;
+            if(p.config.account_limit) document.getElementById('prof-editor-lim-acc').value = p.config.account_limit;
+            if(p.config.safety_sleep_seconds) document.getElementById('prof-editor-sleep').value = p.config.safety_sleep_seconds;
+            if(p.config.rate_limit_seconds) document.getElementById('prof-editor-rate').value = p.config.rate_limit_seconds;
+
+            // Accounts
+            const tok = accContainer.querySelector('.tag-container');
+            const inp = tok.querySelector('.tag-input');
+            if(p.config.account_id) {
+                p.config.account_id.split(',').filter(x=>x).forEach(aid => addTagPill(tok, inp, aid));
+                updateHiddenTagValue(tok);
+            }
+
+            // Camo
+            document.getElementById('prof-editor-camo').checked = p.config.camouflage;
+            document.getElementById('prof-camo-opts').style.display = p.config.camouflage ? 'block' : 'none';
+            document.getElementById('prof-editor-template').value = p.config.camo_template || 'log_rotation';
+            document.getElementById('prof-editor-obf-title').checked = p.config.obfuscate_title;
+        }
+    } else {
+        document.getElementById('prof-editor-title').textContent = "New Strategy";
+    }
+}
+
+function toggleProfileFields(strat) {
+    if (strat === 'pool') {
+        document.getElementById('prof-repo-std').style.display = 'none';
+        document.getElementById('prof-repo-pool').style.display = 'block';
+    } else {
+        document.getElementById('prof-repo-std').style.display = 'block';
+        document.getElementById('prof-repo-pool').style.display = 'none';
+    }
+}
+
+async function saveProfile() {
+    const name = document.getElementById('prof-editor-name').value;
+    if(!name) { alert("Name required"); return; }
+
+    const strat = document.getElementById('prof-editor-strat').value;
+
+    // Accounts
+    const accContainer = document.getElementById('prof-editor-accs').querySelector('.tag-container');
+    const accIds = accContainer ? accContainer.querySelector('.tag-value').value : '';
+
+    const config = {
+        strategy: strat,
+        repo: document.getElementById('prof-editor-base').value,
+        repo_pool: document.getElementById('prof-editor-pool').value,
+        account_id: accIds,
+
+        span_limit: parseInt(document.getElementById('prof-editor-lim-repo').value),
+        account_limit: parseInt(document.getElementById('prof-editor-lim-acc').value),
+        safety_sleep_seconds: parseInt(document.getElementById('prof-editor-sleep').value),
+        rate_limit_seconds: parseInt(document.getElementById('prof-editor-rate').value),
+
+        camouflage: document.getElementById('prof-editor-camo').checked,
+        camo_template: document.getElementById('prof-editor-template').value,
+        obfuscate_title: document.getElementById('prof-editor-obf-title').checked,
+
+        span_repos: true // Always implied
+    };
+
+    try {
+        let res;
+        if (currentProfileId) {
+            res = await fetch(`/api/automation/profiles/${currentProfileId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, config})
+            });
+        } else {
+            res = await fetch('/api/automation/profiles', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, config})
+            });
+        }
+
+        if (res.ok) {
+            document.getElementById('profile-editor-modal').style.display = 'none';
+            loadProfiles();
+            showToast("Strategy Saved!");
+        } else {
+            alert("Save failed");
+        }
+    } catch(e) { alert("Error: " + e); }
+}
+
+async function deleteProfile(id) {
+    if(!confirm("Delete strategy?")) return;
+    await fetch(`/api/automation/profiles/${id}`, { method: 'DELETE' });
+    loadProfiles();
+}
+
+window.switchAutoTab = switchAutoTab;
+window.openProfileEditor = openProfileEditor;
+window.saveProfile = saveProfile;
+window.deleteProfile = deleteProfile;
+window.toggleProfileFields = toggleProfileFields;

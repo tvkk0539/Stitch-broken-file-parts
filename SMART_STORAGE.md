@@ -65,6 +65,17 @@ What happens if you rename your GitHub account (e.g., `UserA` -> `UserNew`)?
 3.  The system downloads all files to your server, switching tokens automatically.
 4.  **Auto-Restore:** Once the download completes, ParFix **automatically** triggers the Restore process to decrypt and rename the files back to their original names. No extra click required.
 
+## 🆕 Publishing Strategies (Profiles)
+ParFix now supports **Publishing Profiles** to manage complex cold storage setups cleanly.
+
+1.  **Create a Strategy:** Go to **Automation -> Strategies Tab**.
+2.  **Configure:** Set up your Repo Pool (50+ URLs), Accounts, and Camouflage.
+3.  **Use:** In your Workflow, simply select your strategy profile.
+
+**Repo Pool Strategy:**
+*   Paste a list of existing empty repositories.
+*   ParFix will randomly pick one for each file upload.
+
 ## ❓ FAQ
 
 ### Where do files download?

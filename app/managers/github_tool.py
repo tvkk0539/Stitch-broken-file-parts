@@ -871,7 +871,7 @@ class GitHubManager:
             return {'error': str(e)}
 
     @staticmethod
-    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay'):
+    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay', repo_pool=None):
         """
         Publishes files across multiple repositories and accounts if needed.
         Strategies: 'relay' (Sequential Fill), 'scatter' (Round Robin per File).
@@ -1001,8 +1001,37 @@ class GitHubManager:
 
                 file_size_gb = os.path.getsize(file_path) / (1024 * 1024 * 1024)
 
+                # --- STRATEGY: RANDOM POOL ---
+                if strategy == 'pool' and repo_pool:
+                    import random
+                    target_url = random.choice(repo_pool)
+
+                    # Extract Owner/Repo
+                    clean = target_url.replace('https://github.com/', '').strip('/')
+                    parts = clean.split('/')
+                    repo_full = f"{parts[0]}/{parts[1]}" if len(parts) >= 2 else clean
+
+                    # Determine Correct Account ID based on Owner
+                    owner = parts[0]
+                    user_to_id = {u: i for i, u in id_to_user.items()}
+
+                    if owner in user_to_id:
+                        current_acc_id = user_to_id[owner]
+                    else:
+                        # Fallback: Try to use current_acc_id, but log warning
+                        log(f"⚠️ Warning: Pool repo '{repo_full}' owner '{owner}' not found in local accounts. Upload might fail.")
+
+                    # Get Release (Assumes repo exists)
+                    try:
+                        upload_url_template, r_url = get_release_data(repo_full, release_tag, current_acc_id)
+                        if not final_release_url: final_release_url = r_url
+                    except Exception as pool_err:
+                        log(f"❌ Failed to access pool repo {repo_full}: {pool_err}")
+                        continue # Skip file? Or try another repo?
+                        # For now, skip file to avoid infinite loops.
+
                 # --- STRATEGY: SCATTER (Round Robin) ---
-                if strategy == 'scatter' and len(account_ids) > 1:
+                elif strategy == 'scatter' and len(account_ids) > 1:
                     # Determine Account
                     current_acc_idx = idx % len(account_ids)
                     current_acc_id = account_ids[current_acc_idx]
