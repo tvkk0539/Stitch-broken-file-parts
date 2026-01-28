@@ -391,6 +391,10 @@ function renderStepUI(stepDiv, type, config = {}) {
                         <input type="checkbox" class="wf-opt-camo" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'block' : 'none'"> 🛡️ Camouflage Mode
                     </label>
 
+                    <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Imports a random safe repository template">
+                        <input type="checkbox" class="wf-gh-stealth"> 🎭 Use Stealth Import
+                    </label>
+
                     <div style="display:none;" class="wf-camo-template-container">
                         <select class="wf-opt-camo-template" style="padding:2px 5px; background:#1a1b26; border:1px solid #414868; color:#fff; font-size:0.8em; border-radius:4px;">
                              <option value="log_rotation" selected>Log Rotation (Default)</option>
@@ -443,6 +447,7 @@ function renderStepUI(stepDiv, type, config = {}) {
         if(config.camo_template) contentDiv.querySelector('.wf-opt-camo-template').value = config.camo_template;
 
         if(config.obfuscate_title !== undefined) contentDiv.querySelector('.wf-gh-obf-title').checked = config.obfuscate_title;
+        if(config.use_stealth_import !== undefined) contentDiv.querySelector('.wf-gh-stealth').checked = config.use_stealth_import;
 
         if(config.span_limit) contentDiv.querySelector('.wf-gh-lim-repo').value = config.span_limit;
         if(config.account_limit) contentDiv.querySelector('.wf-gh-lim-acc').value = config.account_limit;
@@ -553,6 +558,10 @@ async function saveWorkflow() {
              const camoTemplate = optsDiv ? optsDiv.querySelector('.wf-opt-camo-template').value : 'log_rotation';
              const obfTitle = optsDiv ? optsDiv.querySelector('.wf-gh-obf-title').checked : true;
 
+             // Stealth Logic
+             const stealthCb = optsDiv ? optsDiv.querySelector('.wf-gh-stealth') : null;
+             const useStealth = stealthCb ? stealthCb.checked : false;
+
              const repoLim = parseInt(contentDiv.querySelector('.wf-gh-lim-repo').value) || 40;
              const accLim = parseInt(contentDiv.querySelector('.wf-gh-lim-acc').value) || 45;
              const sleep = parseInt(contentDiv.querySelector('.wf-gh-sleep').value) || 3600;
@@ -566,6 +575,7 @@ async function saveWorkflow() {
                  camouflage: camo,
                  camo_template: camoTemplate,
                  obfuscate_title: obfTitle,
+                 use_stealth_import: useStealth,
                  span_limit: repoLim,
                  account_limit: accLim,
                  safety_sleep_seconds: sleep,

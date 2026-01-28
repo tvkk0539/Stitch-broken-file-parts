@@ -32,6 +32,10 @@
             </div>
             <div class="nav-label">Apps</div>
         </div>
+        <div class="nav-item" data-view="stealth" onclick="switchView('stealth')">
+            <div class="nav-icon">🎭</div>
+            <div class="nav-label">Stealth</div>
+        </div>
         <div class="nav-item" data-view="logs" onclick="switchView('logs')">
             <div class="nav-icon">📜</div>
             <div class="nav-label">Logs</div>
@@ -781,6 +785,30 @@
                 </div>
             </div>
 
+            <!-- VIEW: STEALTH -->
+            <div id="view-stealth" class="view-section">
+                <div style="max-width:800px; margin:0 auto; display:flex; flex-direction:column; height:100%;">
+                    <div style="margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h2 style="margin:0; margin-bottom:5px;">Stealth Templates</h2>
+                            <span style="color:var(--text-muted);">Manage safe source repositories for camouflage import.</span>
+                        </div>
+                        <button class="purple-btn" onclick="stealth.saveTemplates()">💾 Save List</button>
+                    </div>
+
+                    <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+                        <textarea id="stealth-templates-input"
+                                  placeholder="Paste GitHub URLs here (one per line)...&#10;https://github.com/facebook/react&#10;https://github.com/vuejs/vue"
+                                  style="flex:1; background:#13141c; color:#c0caf5; border:1px solid var(--border-color); padding:15px; border-radius:8px; font-family:monospace; resize:none; font-size:1em;"></textarea>
+
+                        <div style="display:flex; justify-content:space-between; color:var(--text-muted); font-size:0.9em;">
+                            <span id="stealth-count">0 templates loaded</span>
+                            <span>These repositories will be cloned randomly when "Use Stealth Import" is enabled in automation.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- VIEW: LOGS -->
             <div id="view-logs" class="view-section">
                 <h2 style="margin-top:0; border:none; margin-bottom:10px;">System Logs</h2>
@@ -1286,5 +1314,6 @@
     <script src="/static/js/automation.js"></script>
     <script src="/static/js/apps/github.js"></script>
     <script src="/static/js/apps/apple_music.js"></script>
+    <script src="/static/js/stealth.js"></script>
 </body>
 </html>

@@ -203,4 +203,5 @@ document.addEventListener('DOMContentLoaded', () => {
     startStatsPoller();
     if(window.catalog) window.catalog.init();
     if(window.initAutomation) window.initAutomation();
+    if(window.stealth) window.stealth.init();
 });

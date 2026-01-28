@@ -878,6 +878,7 @@ class GitHubManager:
         """
         from app.managers.obfuscation import ObfuscationManager
         import time
+        import random
 
         # Normalize account_id to list
         account_ids = []
@@ -944,7 +945,25 @@ class GitHubManager:
             if 'error' not in details:
                 return full_name, details['size'] # size is in KB
 
-            # Create if missing
+            # --- Stealth Import Logic ---
+            use_stealth = False
+            if meta and meta.get('use_stealth_import'):
+                use_stealth = True
+
+            if use_stealth:
+                conf = config.load_config()
+                templates = conf.get('stealth_templates', [])
+                if templates:
+                    # Pick Random Template
+                    source_url = random.choice(templates).strip()
+                    if source_url:
+                        log(f"🕵️ Stealth Mode: Importing {source_url} -> {name}")
+                        GitHubManager.run_import_job(source_url, name, private, acc_id)
+                        # After import, return repo name and size (assume small init size)
+                        # We return name because run_import_job doesn't return the full name object directly, but it creates owner/name
+                        return full_name, 1000 # 1MB dummy size for the clone
+
+            # Standard Create if missing or no stealth
             log(f"Creating repository: {name} on account {acc_id}")
             res = GitHubManager.create_repository(name, private, description, acc_id)
             if 'error' in res:
