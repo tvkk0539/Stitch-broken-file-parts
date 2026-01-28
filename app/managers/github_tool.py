@@ -961,8 +961,8 @@ class GitHubManager:
             current_size_gb = repo_size_kb / (1024 * 1024)
             current_acc_uploaded_gb = 0
 
-            # Helper to create release return upload_url
-            def get_release_upload_url(r_name, t_name, acc_id):
+            # Helper to create release return (upload_url, html_url)
+            def get_release_data(r_name, t_name, acc_id):
                 token = GitHubManager._get_token_for_account(acc_id)
                 headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
                 create_url = f"https://api.github.com/repos/{r_name}/releases"
@@ -977,14 +977,18 @@ class GitHubManager:
                 get_url = f"https://api.github.com/repos/{r_name}/releases/tags/{t_name}"
                 gr = requests.get(get_url, headers=headers)
                 if gr.status_code == 200:
-                    return gr.json()['upload_url']
+                    d = gr.json()
+                    return d['upload_url'], d['html_url']
 
                 pr = requests.post(create_url, json=payload, headers=headers)
                 if pr.status_code in [200, 201]:
-                    return pr.json()['upload_url']
+                    d = pr.json()
+                    return d['upload_url'], d['html_url']
                 raise Exception(f"Failed to create release on {r_name}")
 
-            upload_url_template = get_release_upload_url(repo_full, release_tag, current_acc_id)
+            # Initial Release (First Repo)
+            upload_url_template, first_release_url = get_release_data(repo_full, release_tag, current_acc_id)
+            final_release_url = first_release_url # Keep track of primary link
 
             total_files = len(active_files)
 
@@ -1018,8 +1022,11 @@ class GitHubManager:
                     if tgt_repo not in scatter_cache[current_acc_id]:
                         # Init repo on this account
                         r_full, _ = ensure_repo(tgt_repo, current_acc_id)
-                        u_url = get_release_upload_url(r_full, release_tag, current_acc_id)
+                        u_url, r_url = get_release_data(r_full, release_tag, current_acc_id)
                         scatter_cache[current_acc_id][tgt_repo] = (r_full, u_url)
+
+                        # Use first scatter repo as final link if not set
+                        if not final_release_url: final_release_url = r_url
 
                     repo_full, upload_url_template = scatter_cache[current_acc_id][tgt_repo]
 
@@ -1048,7 +1055,7 @@ class GitHubManager:
 
                         repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
                         current_size_gb = 0
-                        upload_url_template = get_release_upload_url(repo_full, release_tag, current_acc_id)
+                        upload_url_template, _ = get_release_data(repo_full, release_tag, current_acc_id)
 
                 # Upload
                 fname = os.path.basename(file_path)
@@ -1093,7 +1100,8 @@ class GitHubManager:
             return {
                 'assets': uploaded_assets,
                 'restore_map': restore_map,
-                'repo_base': base_repo_name
+                'repo_base': base_repo_name,
+                'release_url': final_release_url
             }
 
         except Exception as e:
