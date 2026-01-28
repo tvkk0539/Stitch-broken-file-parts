@@ -372,13 +372,21 @@ function renderStepUI(stepDiv, type, config = {}) {
                      </select>
                 </div>
                 <div>
-                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Content</label>
-                     <select class="wf-gh-content" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
-                        <option value="tree_only" selected>Tree Only (Stealth)</option>
-                        <option value="standard">Standard</option>
-                        <option value="clean">Clean</option>
+                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Allocation Mode</label>
+                     <select class="wf-gh-alloc" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="new" selected>🆕 Create New (Fire & Forget)</option>
+                        <option value="fill">♻️ Fill Existing (Pool)</option>
                      </select>
                 </div>
+            </div>
+
+            <div style="margin-bottom:15px;">
+                 <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Content</label>
+                 <select class="wf-gh-content" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                    <option value="tree_only" selected>Tree Only (Stealth)</option>
+                    <option value="standard">Standard</option>
+                    <option value="clean">Clean</option>
+                 </select>
             </div>
 
             <div class="wf-opts-container" style="background:#15161e; border:1px solid #414868; border-radius:4px; padding:15px;">
@@ -437,6 +445,7 @@ function renderStepUI(stepDiv, type, config = {}) {
         // Populate
         if(config.repo) contentDiv.querySelector('.wf-gh-repo').value = config.repo;
         if(config.strategy) contentDiv.querySelector('.wf-gh-strat').value = config.strategy;
+        if(config.allocation_mode) contentDiv.querySelector('.wf-gh-alloc').value = config.allocation_mode;
         if(config.release_content) contentDiv.querySelector('.wf-gh-content').value = config.release_content;
         if(config.camouflage !== undefined) {
              const cb = contentDiv.querySelector('.wf-opt-camo');
@@ -550,6 +559,7 @@ async function saveWorkflow() {
              const accIds = accContainer ? accContainer.querySelector('.tag-value').value : '';
 
              const strat = contentDiv.querySelector('.wf-gh-strat').value;
+             const alloc = contentDiv.querySelector('.wf-gh-alloc').value;
              const content = contentDiv.querySelector('.wf-gh-content').value;
 
              // Get Options Container
@@ -571,6 +581,7 @@ async function saveWorkflow() {
                  repo: repo,
                  account_id: accIds,
                  strategy: strat,
+                 allocation_mode: alloc,
                  release_content: content,
                  camouflage: camo,
                  camo_template: camoTemplate,

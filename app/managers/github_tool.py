@@ -871,6 +871,51 @@ class GitHubManager:
             return {'error': str(e)}
 
     @staticmethod
+    def find_available_pool_repo(account_id, base_name, limit_gb):
+        """
+        Scans for existing repositories matching base_name that have free space.
+        Returns (full_repo_name, current_size_kb) or (None, 0).
+        """
+        try:
+            repos = GitHubManager.list_user_repos(account_id)
+            if isinstance(repos, dict) and 'error' in repos: return None, 0
+
+            # Filter matching Base Name
+            candidates = []
+            for r in repos:
+                # Check if name starts with base_name (e.g. "Movies-")
+                # Also handle direct match "Movies"
+                r_name = r['name'].split('/')[-1]
+                if r_name.startswith(base_name):
+                    # Check size
+                    # list_user_repos doesn't return size, we need to fetch details or assume
+                    # Actually, list_user_repos (API) usually DOES return 'size' in KB.
+                    # My implementation of list_user_repos filtered fields. Let's check.
+                    # It returns: name, private, stars, updated_at, html_url. SIZE MISSING.
+                    # We need to fetch details for candidates.
+                    pass
+                    candidates.append(r['name'])
+
+            # Sort by name (sequential)
+            candidates.sort()
+
+            limit_kb = limit_gb * 1024 * 1024
+
+            for cand in candidates:
+                details = GitHubManager.get_repo_details(cand, account_id)
+                if 'size' in details:
+                    current_kb = details['size']
+                    if current_kb < limit_kb:
+                        log(f"♻️ Pool: Found existing repo '{cand}' ({current_kb/1024:.2f}MB Used)")
+                        return cand, current_kb
+
+            return None, 0
+
+        except Exception as e:
+            log(f"Pool Scan Error: {e}")
+            return None, 0
+
+    @staticmethod
     def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay'):
         """
         Publishes files across multiple repositories and accounts if needed.
@@ -935,8 +980,15 @@ class GitHubManager:
         current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
 
         # Helper to get/create repo (Bound to current account)
-        def ensure_repo(name, acc_id):
-            # Check existence
+        def ensure_repo(name, acc_id, try_pool=False):
+            # --- Dynamic Pooling Logic ---
+            # If enabled, try to find an EXISTING bucket first
+            if try_pool:
+                pool_repo, pool_size = GitHubManager.find_available_pool_repo(acc_id, name, span_limit_gb)
+                if pool_repo:
+                    return pool_repo, pool_size
+
+            # Check existence (Standard)
             user_info = GitHubManager._fetch_user_profile(GitHubManager._get_token_for_account(acc_id))
             owner = user_info['username']
             full_name = f"{owner}/{name}"
@@ -997,8 +1049,24 @@ class GitHubManager:
             spanning_map[key]['size_bytes'] += f_size
 
         try:
+            # Determine Allocation Mode
+            allocation_mode = 'new'
+            if meta and meta.get('allocation_mode') == 'fill':
+                allocation_mode = 'fill'
+                log("♻️ Allocation Mode: Fill Existing (Dynamic Pooling)")
+
             # Init state for Relay
-            repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id)
+            # If Fill Mode: Try to find a pool repo matching the base name
+            if allocation_mode == 'fill':
+                # Use base name for pool search
+                repo_full, repo_size_kb = ensure_repo(base_repo_name, current_acc_id, try_pool=True)
+                # If pool returned a specific repo (e.g. base-04), update current name tracking?
+                # Actually, ensure_repo returns the full name found.
+                # But we maintain current_repo_name for naming NEW ones.
+                # If we reused one, we should probably stick to it until full.
+            else:
+                repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id)
+
             current_size_gb = repo_size_kb / (1024 * 1024)
             current_acc_uploaded_gb = 0
 
@@ -1053,7 +1121,16 @@ class GitHubManager:
 
                     if tgt_repo not in scatter_cache[current_acc_id]:
                         # Init repo on this account
-                        r_full, _ = ensure_repo(tgt_repo, current_acc_id)
+                        # Scatter + Fill: Search pool for EACH account?
+                        # Yes, if Fill is on, scatter should try to reuse existing on that account.
+                        use_pool = (allocation_mode == 'fill')
+
+                        # Special handling: ensure_repo uses 'try_pool' to scan base_repo_name
+                        # If we are in scatter, current_repo_name is usually static (base-01) or whatever.
+                        # If 'fill', we want ANY valid repo on that account.
+
+                        r_full, r_size = ensure_repo(base_repo_name if use_pool else tgt_repo, current_acc_id, try_pool=use_pool)
+
                         u_url, r_url = get_release_data(r_full, release_tag, current_acc_id)
                         scatter_cache[current_acc_id][tgt_repo] = (r_full, u_url, r_url) # Added r_url to cache
 
@@ -1082,11 +1159,30 @@ class GitHubManager:
                             log(f"Switched to Account: {current_acc_id}")
 
                         log(f"Switching Repository...")
-                        current_repo_index += 1
-                        current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
 
-                        repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
-                        current_size_gb = 0
+                        # Logic: If filling, search pool again (maybe we filled bucket A, is bucket B free?)
+                        # Or just create next in sequence.
+                        # Simple Logic: If Limit Reached -> Create New (Sequence).
+                        # Pool is mostly for Initial placement.
+                        # However, sophisticated pooling would re-scan.
+
+                        can_reuse = False
+                        if allocation_mode == 'fill':
+                             # Try to find another bucket
+                             pool_repo, pool_size = GitHubManager.find_available_pool_repo(current_acc_id, base_repo_name, span_limit_gb)
+                             # Ensure we don't pick the SAME one we just filled (check against repo_full)
+                             if pool_repo and pool_repo != repo_full:
+                                 repo_full = pool_repo
+                                 repo_size_kb = pool_size
+                                 can_reuse = True
+
+                        if not can_reuse:
+                            current_repo_index += 1
+                            current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+                            repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
+                            repo_size_kb = 0
+
+                        current_size_gb = repo_size_kb / (1024 * 1024)
                         upload_url_template, current_release_url = get_release_data(repo_full, release_tag, current_acc_id)
 
                 # Upload
