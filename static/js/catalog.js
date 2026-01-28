@@ -787,9 +787,12 @@ const catalog = {
         const item = catalog.state.items.find(x => x.id === id);
         if(!item) return;
 
+        // Safety Check 1: Explain Location
+        if (!confirm(`⚠️ Start Smart Download?\n\nThis will download ${item.assets ? item.assets.length : 0} files to your SERVER (VPS) storage.\n\nIt will NOT download to your phone/laptop.\n\nContinue?`)) return;
+
         // Clean title for default path
         const defPath = item.title.replace(/[^a-zA-Z0-9-_]/g, '_');
-        const path = prompt("Download to server path (relative to downloads):", defPath);
+        const path = prompt("Enter Server Destination Path (relative to downloads):", defPath);
         if (path === null) return; // Cancelled
 
         try {

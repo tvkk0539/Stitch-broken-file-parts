@@ -64,3 +64,20 @@ What happens if you rename your GitHub account (e.g., `UserA` -> `UserNew`)?
 2.  ParFix will ask for a destination folder (default: `Downloads/Title`).
 3.  The system downloads all files to your server, switching tokens automatically.
 4.  **Restore:** Once downloaded, click **"♻️ Restore Files"** (if Camouflage was used) to decrypt and rename them back to the original filenames.
+
+## ❓ FAQ
+
+### Where do files download?
+**Smart Download** saves files to your **Server / VPS** (the machine running ParFix), usually in `/data/downloads`.
+*   It acts like a remote download manager.
+*   It does **NOT** download to your local browser/laptop.
+*   To download to your laptop, use the "Direct Download Links" or JDownloader button.
+
+### How do I cancel a download?
+1.  Go to the **Job Queue** tab in ParFix.
+2.  Find the "Smart Download" job.
+3.  Click the **Cancel** button.
+4.  The system will stop downloading after the current file finishes.
+
+### How to avoid accidental clicks?
+The "Smart Download" button now includes a **Safety Confirmation Dialog** explaining exactly what will happen before starting.
