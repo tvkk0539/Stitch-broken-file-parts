@@ -6,6 +6,9 @@ import logging
 from datetime import datetime
 from app.managers.sync import SyncManager
 from app.managers.github_tool import GitHubManager
+from app.managers.obfuscation import ObfuscationManager
+from app.managers.notification import NotificationManager
+from app.core.job_manager import log, job_manager
 from werkzeug.utils import secure_filename
 from PIL import Image
 
@@ -593,3 +596,54 @@ class CatalogManager:
                 return f"{size:.{decimal_places}f} {unit}"
             size /= 1024.0
         return f"{size:.{decimal_places}f} PB"
+
+    @staticmethod
+    def run_smart_restore_job(item_id, target_path):
+        """
+        Job to Download AND Restore an item.
+        """
+        cm = CatalogManager()
+        item = cm.get_by_id(item_id)
+        if not item:
+            log("❌ Item not found for Smart Restore.")
+            return
+
+        title = item.get('title', 'Unknown')
+        assets = item.get('assets', [])
+
+        # 1. Download
+        log(f"⬇️ Starting Phase 1: Smart Download for '{title}'...")
+        job_manager.update_job_details({'action': 'Phase 1: Downloading Files...'})
+
+        # Note: We pass None as fallback account_id, handled by Smart Logic.
+        dl_stats = GitHubManager.run_batch_download_job(assets, target_path, None)
+
+        # dl_stats is {'success': int, 'errors': int} or None
+        success_count = dl_stats['success'] if dl_stats else 0
+        error_count = dl_stats['errors'] if dl_stats else 0
+
+        if error_count > 0:
+            log(f"⚠️ Download finished with errors (Success: {success_count}, Errors: {error_count}).")
+            if success_count == 0:
+                log("❌ Critical: No files downloaded. Aborting Restore.")
+                return
+            log("⚠️ Attempting Restore on partial download...")
+        else:
+            log("✅ Phase 1 Complete: All files downloaded.")
+
+        # 2. Restore
+        restore_map = item.get('restore_map')
+        if restore_map:
+            log(f"♻️ Starting Phase 2: Auto-Restore for '{title}'...")
+            job_manager.update_job_details({'action': 'Phase 2: Restoring Files...'})
+
+            success, msg = ObfuscationManager.restore_from_dict(restore_map, target_path)
+            if success:
+                log(f"✅ Smart Restore Complete! {msg}")
+                NotificationManager.send_notification(f"✅ ParFix: Download & Restore Complete for {title}")
+            else:
+                log(f"❌ Restore Failed: {msg}")
+                NotificationManager.send_notification(f"⚠️ ParFix: Download OK, Restore Failed for {title}")
+        else:
+            log("ℹ️ No Restore Map found. Skipping Phase 2 (Files are ready as-is).")
+            NotificationManager.send_notification(f"✅ ParFix: Download Complete for {title}")

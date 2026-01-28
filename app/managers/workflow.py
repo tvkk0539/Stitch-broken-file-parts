@@ -288,14 +288,29 @@ class WorkflowManager:
         """
         Publishes files to GitHub. Returns list of asset objects.
         Uses meta['tree_text'] for release body (Base64).
-        Now supports Smart Spanning & Camouflage.
+        Now supports Smart Spanning, Camouflage, and Profiles.
         """
-        repo = conf.get('repo')
+        # --- Apply Profile if selected ---
+        profile_id = conf.get('profile_id')
+        if profile_id:
+            from app.managers.profile_manager import ProfileManager
+            pm = ProfileManager()
+            profile = pm.get_by_id(profile_id)
+            if profile:
+                log(f"Using Publishing Profile: {profile['name']}")
+                # Merge profile config into conf (Profile overrides step defaults)
+                conf.update(profile['config'])
+
+        repo = conf.get('repo') or "pool-strategy"
         account_id = conf.get('account_id')
 
         # New Configs
         camouflage = conf.get('camouflage', False)
         span_repos = conf.get('span_repos', False)
+
+        # Parse Repo Pool (from Text Area)
+        repo_pool_raw = conf.get('repo_pool', '')
+        repo_pool = [line.strip() for line in repo_pool_raw.split('\n') if line.strip()]
 
         # Obfuscation Logic
         obfuscate_title = conf.get('obfuscate_title', False)
@@ -361,7 +376,8 @@ class WorkflowManager:
                 meta=meta,
                 rate_limit_sleep=int(conf.get('rate_limit_seconds', 15)),
                 safety_sleep=int(conf.get('safety_sleep_seconds', 3600)),
-                strategy=conf.get('strategy', 'relay')
+                strategy=conf.get('strategy', 'relay'),
+                repo_pool=repo_pool
             )
 
             # Inject private body into result for Catalog

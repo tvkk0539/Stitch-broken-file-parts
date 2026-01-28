@@ -329,6 +329,7 @@ const catalog = {
                             <span class="link-name" title="${a.name}">${a.name}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
+                            ${a.username ? `<span class="tag tag-secure" style="font-size:0.8em; padding:2px 6px;" title="Source Account">👤 ${a.username}</span>` : ''}
                             <span class="link-meta">${catalog._formatBytes(a.size)}</span>
                             <button onclick="catalog.copySingleLink('${a.url}')" class="icon-btn" style="padding:4px 8px; font-size:0.9em; background:#2f3549; border:1px solid #414868;" title="Copy Link">📋</button>
                         </div>
@@ -352,6 +353,9 @@ const catalog = {
 
                 extraActions = `
                     <div style="display:flex; flex-direction:column; gap:5px; margin-right:15px;">
+                        <button onclick="catalog.downloadItem('${item.id}')" class="btn-lg info-btn" style="background-color: #9ece6a; color: #15161e; font-weight: bold; border: 2px solid #73daca; padding: 10px 20px; font-size:1em;" title="Download to Server (Smart Identity)">
+                            🚀 Smart Download
+                        </button>
                         <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4; padding: 10px 20px; font-size:1em;" title="Copy all links for JDownloader">
                             📋 DL Links for JD
                         </button>
@@ -776,6 +780,35 @@ const catalog = {
             }
         } catch(e) {
             alert("Update Request Failed: " + e);
+        }
+    },
+
+    downloadItem: async (id) => {
+        const item = catalog.state.items.find(x => x.id === id);
+        if(!item) return;
+
+        // Safety Check 1: Explain Location & Auto-Restore
+        if (!confirm(`⚠️ Start Smart Download & Auto-Restore?\n\n1. Download ${item.assets ? item.assets.length : 0} files to SERVER (VPS).\n2. Automatically Restore (Rename/Decrypt) them.\n\n(This runs on the server, not your device)\n\nContinue?`)) return;
+
+        // Clean title for default path
+        const defPath = item.title.replace(/[^a-zA-Z0-9-_]/g, '_');
+        const path = prompt("Enter Server Destination Path (relative to downloads):", defPath);
+        if (path === null) return; // Cancelled
+
+        try {
+            const res = await fetch('/api/catalog/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ item_id: id, path: path })
+            });
+            const d = await res.json();
+            if (d.status === 'queued') {
+                showToast("Smart Download Started! 🚀", "success");
+            } else {
+                alert("Error: " + d.error);
+            }
+        } catch (e) {
+            alert("Request failed: " + e);
         }
     },
 

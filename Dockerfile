@@ -6,13 +6,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     git \
     zlib1g-dev \
-    ca-certificates
+    ca-certificates \
+    cmake
 
-WORKDIR /src
+WORKDIR /src/gpac
 RUN git clone --depth 1 https://github.com/gpac/gpac.git . && \
     ./configure --static-bin --use-zlib=no && \
     make -j$(nproc) && \
     strip bin/gcc/MP4Box
+
+WORKDIR /src/bento4
+RUN git clone --depth 1 https://github.com/axiomatic-systems/Bento4.git . && \
+    mkdir cmakebuild && \
+    cd cmakebuild && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local/bento4 .. && \
+    make -j$(nproc) && \
+    make install
 
 # Stage 2: Final Image
 FROM python:3.11-slim
@@ -49,16 +58,12 @@ RUN curl -L -o go.tar.gz https://go.dev/dl/go1.25.6.linux-amd64.tar.gz && \
     rm go.tar.gz
 ENV PATH=$PATH:/usr/local/go/bin
 
-# Install Bento4
-RUN curl -L -o bento4.zip https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-641.x86_64-unknown-linux.zip && \
-    mkdir -p /usr/local/bento4 && \
-    unzip bento4.zip -d /usr/local/bento4 && \
-    mv /usr/local/bento4/Bento4-SDK-1-6-0-641.x86_64-unknown-linux/* /usr/local/bento4/ && \
-    rm -rf /usr/local/bento4/Bento4-SDK-1-6-0-641.x86_64-unknown-linux bento4.zip
+# Install Bento4 from builder
+COPY --from=gpac-builder /usr/local/bento4 /usr/local/bento4
 ENV PATH=$PATH:/usr/local/bento4/bin
 
 # Install MP4Box from builder
-COPY --from=gpac-builder /src/bin/gcc/MP4Box /usr/local/bin/MP4Box
+COPY --from=gpac-builder /src/gpac/bin/gcc/MP4Box /usr/local/bin/MP4Box
 
 # Set work directory
 WORKDIR /app

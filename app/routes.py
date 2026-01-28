@@ -10,10 +10,12 @@ from app.managers.github_tool import GitHubManager
 from app.managers.catalog import CatalogManager
 from app.managers.sync import SyncManager
 from app.managers.workflow import WorkflowManager
+from app.managers.profile_manager import ProfileManager
 from app.managers.apple_music import AppleMusicManager
 from app.managers.am_wrapper import AppleMusicWrapperManager
 from app.managers.obfuscation import ObfuscationManager
 from app.core.config import save_config, load_config
+from werkzeug.utils import secure_filename
 import os
 import shutil
 import subprocess
@@ -131,6 +133,39 @@ def add_catalog_item():
         return jsonify({'status': 'success', 'entry': entry})
     else:
         return jsonify({'status': 'error', 'message': 'Failed to save'}), 500
+
+@bp.route('/api/catalog/download', methods=['POST'])
+def catalog_download_item():
+    """Smart Download for Catalog Items."""
+    data = request.json
+    item_id = data.get('item_id')
+    path = data.get('path') # Optional: Relative path override
+
+    if not item_id: return jsonify({'error': 'Item ID required'}), 400
+
+    item = catalog_manager.get_by_id(item_id)
+    if not item: return jsonify({'error': 'Item not found'}), 404
+
+    assets = item.get('assets', [])
+    if not assets: return jsonify({'error': 'No assets in item'}), 400
+
+    # Determine destination
+    # Default: DOWNLOAD_ROOT/Title
+    title_slug = secure_filename(item['title']) or "download"
+
+    if path:
+        target_dir = os.path.join(DOWNLOAD_ROOT, path)
+    else:
+        target_dir = os.path.join(DOWNLOAD_ROOT, title_slug)
+
+    # Trigger Job: Download + Auto-Restore
+    job_id = job_manager.add_job(
+        f"Smart Download: {item['title']}",
+        CatalogManager.run_smart_restore_job,
+        args=(item_id, target_dir)
+    )
+
+    return jsonify({'status': 'queued', 'job_id': job_id})
 
 @bp.route('/api/catalog/fetch-metadata', methods=['POST'])
 def catalog_fetch_metadata():
@@ -276,6 +311,32 @@ def run_workflow(wf_id):
         args=(wf_id, abs_paths, wf_data)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
+
+# --- Profile API ---
+
+profile_manager = ProfileManager()
+
+@bp.route('/api/automation/profiles', methods=['GET'])
+def list_profiles():
+    return jsonify(profile_manager.get_all())
+
+@bp.route('/api/automation/profiles', methods=['POST'])
+def create_profile():
+    data = request.json
+    p = profile_manager.create_profile(data['name'], data['config'])
+    return jsonify(p)
+
+@bp.route('/api/automation/profiles/<pid>', methods=['PUT'])
+def update_profile(pid):
+    data = request.json
+    p = profile_manager.update_profile(pid, data['name'], data['config'])
+    if p: return jsonify(p)
+    return jsonify({'error': 'Profile not found'}), 404
+
+@bp.route('/api/automation/profiles/<pid>', methods=['DELETE'])
+def delete_profile(pid):
+    profile_manager.delete_profile(pid)
+    return jsonify({'status': 'deleted'})
 
 # --- Sync API ---
 
