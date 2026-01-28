@@ -334,6 +334,10 @@ function renderStepUI(stepDiv, type, config = {}) {
                      </select>
                 </div>
             </div>
+            <div style="margin-bottom:15px;">
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Archive Password</label>
+                <input type="text" class="wf-pack-pass" value="tvkk13579" placeholder="Enter password (Optional)" style="width:100%; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff; font-family:monospace;">
+            </div>
             <div style="background:#1a1b26; padding:10px; border-radius:4px;">
                 <label style="display:block; color:var(--accent-color); font-size:0.8em; margin-bottom:10px;">Security & Protection</label>
                 <div style="display:flex; gap:15px; flex-wrap:wrap;">
@@ -346,6 +350,7 @@ function renderStepUI(stepDiv, type, config = {}) {
         `;
         // Populate
         if(config.split) contentDiv.querySelector('.wf-pack-split').value = config.split;
+        if(config.password) contentDiv.querySelector('.wf-pack-pass').value = config.password;
         if(config.encrypt_filenames !== undefined) contentDiv.querySelector('.wf-pack-enc').checked = config.encrypt_filenames;
         if(config.recovery !== undefined) contentDiv.querySelector('.wf-pack-rr').checked = config.recovery;
         if(config.create_par2 !== undefined) contentDiv.querySelector('.wf-pack-par2').checked = config.create_par2;
@@ -545,6 +550,7 @@ async function saveWorkflow() {
         } else if (type === 'pack') {
              const split = contentDiv.querySelector('.wf-pack-split').value;
              const fmt = contentDiv.querySelector('.wf-pack-fmt').value;
+             const pass = contentDiv.querySelector('.wf-pack-pass').value;
              const encName = contentDiv.querySelector('.wf-pack-enc').checked;
              const rr = contentDiv.querySelector('.wf-pack-rr').checked;
              const par2 = contentDiv.querySelector('.wf-pack-par2').checked;
@@ -553,6 +559,7 @@ async function saveWorkflow() {
              config = {
                  split: split,
                  format: fmt,
+                 password: pass,
                  encrypt_filenames: encName,
                  recovery: rr,
                  create_par2: par2,
