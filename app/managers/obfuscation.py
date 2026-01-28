@@ -149,6 +149,65 @@ Required for gdb/lldb analysis of production binaries."""
             return f"sys_log_{date_str}_shard_{unique_id}.dat"
 
     @staticmethod
+    def get_next_sequence_name(current_assets, original_name, template='log_rotation'):
+        """
+        Analyzes existing asset names to determine the next logical sequence number.
+        Returns a new filename that continues the pattern.
+        """
+        import re
+
+        # Define regex patterns per template to find sequence numbers
+        patterns = {
+            'ai_weights': r'model_layer_(\d+)\.bin', # e.g. model_layer_01.bin
+            'db_backup': r'pg_wal_.*?\.(\d+)', # e.g. pg_wal_....00000001
+            'debug_symbols': r'lib_symbol_.*?_(\d+)\.so\.debug', # hypothetical
+            'crash_dump': r'core\.dump\..*?\.(\d+)\.dmp' # hypothetical
+        }
+
+        # If template not in patterns, fallback to random but consistent style
+        if template not in patterns and template != 'log_rotation':
+             return ObfuscationManager.get_camouflaged_filename(original_name, template)
+
+        # Special Case: Log Rotation usually just has dates, not strict seq.
+        if template == 'log_rotation':
+             return ObfuscationManager.get_camouflaged_filename(original_name, template)
+
+        regex = patterns.get(template)
+        if not regex:
+             return ObfuscationManager.get_camouflaged_filename(original_name, template)
+
+        max_seq = 0
+        matched = False
+
+        for asset in current_assets:
+            m = re.search(regex, asset)
+            if m:
+                matched = True
+                try:
+                    seq = int(m.group(1))
+                    if seq > max_seq: max_seq = seq
+                except: pass
+
+        # If we found a pattern, increment
+        if matched:
+            next_seq = max_seq + 1
+            # Generate new name preserving the style
+            unique_id = str(uuid.uuid4())[:8]
+
+            if template == 'ai_weights':
+                return f"model_layer_{next_seq:02d}.bin"
+            elif template == 'db_backup':
+                return f"pg_wal_{unique_id}.{next_seq:08d}"
+            # Add other cases as needed, or fallback
+
+        # If no match found or pattern too complex, start at 01 or use random
+        # For 'ai_weights' specifically, we want to enforce structure if possible
+        if template == 'ai_weights':
+            return f"model_layer_01.bin" # Start of sequence
+
+        return ObfuscationManager.get_camouflaged_filename(original_name, template)
+
+    @staticmethod
     def detect_template(text):
         """
         Guesses the template from a string (Release Title or Tag).

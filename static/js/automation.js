@@ -380,13 +380,22 @@ function renderStepUI(stepDiv, type, config = {}) {
                 </div>
             </div>
 
-            <div style="margin-bottom:15px;">
-                 <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Content</label>
-                 <select class="wf-gh-content" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
-                    <option value="tree_only" selected>Tree Only (Stealth)</option>
-                    <option value="standard">Standard</option>
-                    <option value="clean">Clean</option>
-                 </select>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                 <div>
+                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Content</label>
+                     <select class="wf-gh-content" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="tree_only" selected>Tree Only (Stealth)</option>
+                        <option value="standard">Standard</option>
+                        <option value="clean">Clean</option>
+                     </select>
+                 </div>
+                 <div>
+                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Mode (Smart)</label>
+                     <select class="wf-gh-release-mode" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="create" selected>✨ Create New Tag</option>
+                        <option value="append">📎 Append to Latest (Smart)</option>
+                     </select>
+                 </div>
             </div>
 
             <div class="wf-opts-container" style="background:#15161e; border:1px solid #414868; border-radius:4px; padding:15px;">
@@ -561,6 +570,7 @@ async function saveWorkflow() {
              const strat = contentDiv.querySelector('.wf-gh-strat').value;
              const alloc = contentDiv.querySelector('.wf-gh-alloc').value;
              const content = contentDiv.querySelector('.wf-gh-content').value;
+             const relMode = contentDiv.querySelector('.wf-gh-release-mode').value;
 
              // Get Options Container
              const optsDiv = div.querySelector('.wf-opts-container');
@@ -583,6 +593,7 @@ async function saveWorkflow() {
                  strategy: strat,
                  allocation_mode: alloc,
                  release_content: content,
+                 release_mode: relMode,
                  camouflage: camo,
                  camo_template: camoTemplate,
                  obfuscate_title: obfTitle,

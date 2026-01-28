@@ -916,10 +916,11 @@ class GitHubManager:
             return None, 0
 
     @staticmethod
-    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay'):
+    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay', release_mode='create'):
         """
         Publishes files across multiple repositories and accounts if needed.
         Strategies: 'relay' (Sequential Fill), 'scatter' (Round Robin per File).
+        Release Mode: 'create' (New Tag) or 'append' (Add to latest).
         """
         from app.managers.obfuscation import ObfuscationManager
         import time
@@ -1177,31 +1178,50 @@ class GitHubManager:
                         # User preference or Random
                         base_pref = meta.get('camo_template', 'random') if meta else 'random'
                         # If base_pref is fixed (e.g. 'log_rotation'), we use it.
-                        # If 'random', ObfuscationManager picks one.
-                        # BUT we want 'random' to be consistent per repo?
-                        # ObfuscationManager.generate_boring_metadata(random) returns a specific one.
                         detected_template = base_pref
 
                     # Generate Metadata
                     boring = ObfuscationManager.generate_boring_metadata(detected_template)
 
+                    # --- SMART APPEND LOGIC ---
+                    target_tag = boring['tag']
+                    target_title = boring['title']
+                    target_body = boring['body']
+                    is_append = False
+
+                    if release_mode == 'append':
+                        # Try to find LATEST release to append to
+                        releases = GitHubManager.get_releases(r_full, acc_id)
+                        if releases and len(releases) > 0:
+                            latest = releases[0]
+                            log(f"📎 Smart Append: Found existing release '{latest['tag']}' on {r_full}")
+                            target_tag = latest['tag']
+                            target_title = latest['name']
+                            is_append = True
+
+                            # Update Template Context from Latest Release
+                            # This is crucial so ObfuscationManager knows which pattern to use (e.g. ai_weights vs log_rotation)
+                            detected_template_from_release = ObfuscationManager.detect_template(latest.get('name', ''))
+                            if detected_template_from_release:
+                                detected_template = detected_template_from_release # Update detected for boring gen if we re-gen
+                                boring['template'] = detected_template_from_release # Force update boring
+                                log(f"📎 Smart Append: Adopted template '{detected_template}' from existing release.")
+
+                            # We keep the detected template (from context) or boring template
+                        else:
+                            log(f"⚠️ Smart Append: No release found on {r_full}, falling back to CREATE.")
+
                     # Create/Get Release
                     # We use the generated tag/title/body
-                    # Note: If existing repo had a different tag format, we might clash or look weird?
-                    # But we are adding a NEW release.
-                    u_url, r_url = get_release_data(r_full, boring['tag'], acc_id)
+                    u_url, r_url = get_release_data(r_full, target_tag, acc_id)
 
-                    # We must modify get_release_data to use passed title/body,
-                    # OR we just redefine it locally?
-                    # Actually get_release_data used closure 'release_title'.
-                    # We need to call API directly here or make get_release_data accept args.
-                    # Redefining logic here is safer for the context switch.
-
+                    # Ensure ctx gets the potentially updated template from 'Smart Append' block
                     ctx = {
                         'template': boring['template'],
                         'upload_url': u_url,
                         'html_url': r_url,
-                        'tag': boring['tag']
+                        'tag': target_tag,
+                        'is_append': is_append
                     }
                     repo_context_cache[r_full] = ctx
                     log(f"🎭 Context for {r_full}: {boring['title']} ({boring['template']})")
@@ -1213,11 +1233,23 @@ class GitHubManager:
                 # We need to make it dynamic.
                 # Let's override the logic here:
 
+                # The loop relies on repo_context_cache[repo_full].
+                # If it's NOT in cache, we need to initialize it.
+                # BUT wait, the block above ('if repo_full not in repo_context_cache:') is structured wrong.
+                # It seems I have duplicate logic or misplaced blocks.
+                # The big block above (ensure_release_context replacement) handles INIT.
+                # Let's verify if the logic flows correctly.
+
+                # Logic Flow:
+                # 1. Check if repo_full in cache.
+                # 2. If NOT, init context (detect template, check append mode, create/get release).
+                # 3. Use context.
+
                 if repo_full not in repo_context_cache:
                     # Resolve Template
                     base_pref = meta.get('camo_template', 'random') if meta else 'random'
 
-                    # Detect existing
+                    # Detect existing for FILL mode
                     if allocation_mode == 'fill':
                          rels = GitHubManager.get_releases(repo_full, current_acc_id)
                          if rels and len(rels) > 0:
@@ -1226,24 +1258,52 @@ class GitHubManager:
 
                     boring = ObfuscationManager.generate_boring_metadata(base_pref)
 
+                    # --- SMART APPEND LOGIC (Duplicate for Loop safety) ---
+                    target_tag = boring['tag']
+                    target_title = boring['title']
+                    is_append = False
+
+                    if release_mode == 'append':
+                        releases = GitHubManager.get_releases(repo_full, current_acc_id)
+                        if releases and len(releases) > 0:
+                            latest = releases[0]
+                            target_tag = latest['tag']
+                            target_title = latest['name']
+                            is_append = True
+
+                            det = ObfuscationManager.detect_template(latest.get('name', ''))
+                            if det:
+                                boring['template'] = det
+                                log(f"📎 Smart Append: Adopted template '{det}'")
+
                     # Create Release
                     token = GitHubManager._get_token_for_account(current_acc_id)
                     headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
 
+                    # If Appending, we skip POST and go straight to GET usually,
+                    # unless it's missing (fallback handled by get_release_data equivalent logic below).
+
                     # Check if tag exists (Collision check)
-                    # Use boring['tag']
+                    # Use target_tag (which might be boring['tag'] or existing tag)
 
                     create_url = f"https://api.github.com/repos/{repo_full}/releases"
                     payload = {
-                        "tag_name": boring['tag'],
-                        "name": boring['title'],
+                        "tag_name": target_tag,
+                        "name": target_title,
                         "body": boring['body'],
                         "draft": False,
                         "prerelease": False
                     }
 
-                    # Try Create
-                    r = requests.post(create_url, json=payload, headers=headers)
+                    # Try Create (Only if not append mode, OR if we want to try anyway)
+                    # Ideally if is_append, we shouldn't create.
+
+                    if is_append:
+                        # Skip create attempt, force get
+                        r = requests.Response()
+                        r.status_code = 422 # Already exists simulation
+                    else:
+                        r = requests.post(create_url, json=payload, headers=headers)
                     if r.status_code in [200, 201]:
                         d = r.json()
                         u_url = d['upload_url']
@@ -1253,22 +1313,23 @@ class GitHubManager:
                         # Or if we want to APPEND to existing release?
                         # Spanning usually means unique releases.
                         # If failed, maybe try GET
-                        get_url = f"https://api.github.com/repos/{repo_full}/releases/tags/{boring['tag']}"
+                        get_url = f"https://api.github.com/repos/{repo_full}/releases/tags/{target_tag}"
                         gr = requests.get(get_url, headers=headers)
                         if gr.status_code == 200:
                             d = gr.json()
                             u_url = d['upload_url']
                             h_url = d['html_url']
                         else:
-                            raise Exception(f"Failed to create release {boring['tag']} on {repo_full}: {r.text}")
+                            raise Exception(f"Failed to create/find release {target_tag} on {repo_full}: {r.text}")
 
                     repo_context_cache[repo_full] = {
                         'template': boring['template'],
                         'upload_url': u_url,
                         'html_url': h_url,
-                        'tag': boring['tag']
+                        'tag': target_tag,
+                        'is_append': is_append
                     }
-                    log(f"🎭 Context for {repo_full}: {boring['title']} ({boring['template']})")
+                    log(f"🎭 Context for {repo_full}: {target_title} ({boring['template']})")
 
                 ctx = repo_context_cache[repo_full]
                 upload_url_template = ctx['upload_url']
@@ -1283,7 +1344,28 @@ class GitHubManager:
                 clean_up_needed = False
 
                 if camouflage:
-                    fake_name = ObfuscationManager.get_camouflaged_filename(original_name, current_template_name)
+                    # Smart Sequence Naming if Appending
+                    if ctx.get('is_append', False):
+                        # Fetch existing assets to determine next sequence
+                        # We need to query the release assets.
+                        # Optimization: We can't query API for every file.
+                        # But we are in a loop. We should cache the 'existing_assets' list in context.
+                        if 'assets' not in ctx:
+                             # Fetch assets
+                             rels = GitHubManager.get_releases(repo_full, current_acc_id)
+                             # Find the matching tag
+                             ctx['assets'] = []
+                             for r in rels:
+                                 if r['tag'] == ctx['tag']:
+                                     ctx['assets'] = [a['name'] for a in r['assets']]
+                                     break
+
+                        fake_name = ObfuscationManager.get_next_sequence_name(ctx['assets'], original_name, current_template_name)
+                        # Add this new name to local cache so next file increments properly
+                        ctx['assets'].append(fake_name)
+                    else:
+                        fake_name = ObfuscationManager.get_camouflaged_filename(original_name, current_template_name)
+
                     # We need to copy/rename to a temp location to avoid modifying the original list if reused?
                     # But files are consumed.
                     # Using same dir
