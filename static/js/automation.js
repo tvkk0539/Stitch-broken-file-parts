@@ -405,7 +405,7 @@ function renderStepUI(stepDiv, type, config = {}) {
 
                 <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:10px; align-items:center;">
                     <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Renames files to look like System Logs">
-                        <input type="checkbox" class="wf-opt-camo" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'block' : 'none'"> 🛡️ Camouflage Mode
+                        <input type="checkbox" class="wf-opt-camo" onchange="this.closest('.wf-opts-container').querySelector('.wf-camo-template-container').style.display = this.checked ? 'block' : 'none'"> 🛡️ Camouflage Mode
                     </label>
 
                     <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Imports a random safe repository template">
