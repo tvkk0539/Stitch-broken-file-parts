@@ -787,8 +787,8 @@ const catalog = {
         const item = catalog.state.items.find(x => x.id === id);
         if(!item) return;
 
-        // Safety Check 1: Explain Location
-        if (!confirm(`⚠️ Start Smart Download?\n\nThis will download ${item.assets ? item.assets.length : 0} files to your SERVER (VPS) storage.\n\nIt will NOT download to your phone/laptop.\n\nContinue?`)) return;
+        // Safety Check 1: Explain Location & Auto-Restore
+        if (!confirm(`⚠️ Start Smart Download & Auto-Restore?\n\n1. Download ${item.assets ? item.assets.length : 0} files to SERVER (VPS).\n2. Automatically Restore (Rename/Decrypt) them.\n\n(This runs on the server, not your device)\n\nContinue?`)) return;
 
         // Clean title for default path
         const defPath = item.title.replace(/[^a-zA-Z0-9-_]/g, '_');

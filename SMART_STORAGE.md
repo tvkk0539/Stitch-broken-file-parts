@@ -63,7 +63,7 @@ What happens if you rename your GitHub account (e.g., `UserA` -> `UserNew`)?
 1.  **Smart Download:** Click the **"🚀 Smart Download"** button in the Catalog Item details.
 2.  ParFix will ask for a destination folder (default: `Downloads/Title`).
 3.  The system downloads all files to your server, switching tokens automatically.
-4.  **Restore:** Once downloaded, click **"♻️ Restore Files"** (if Camouflage was used) to decrypt and rename them back to the original filenames.
+4.  **Auto-Restore:** Once the download completes, ParFix **automatically** triggers the Restore process to decrypt and rename the files back to their original names. No extra click required.
 
 ## ❓ FAQ
 

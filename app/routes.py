@@ -157,12 +157,11 @@ def catalog_download_item():
     else:
         target_dir = os.path.join(DOWNLOAD_ROOT, title_slug)
 
-    # Trigger Job
-    # We pass None as fallback account_id. The Smart Downloader handles 'account_id' in assets.
+    # Trigger Job: Download + Auto-Restore
     job_id = job_manager.add_job(
         f"Smart Download: {item['title']}",
-        GitHubManager.run_batch_download_job,
-        args=(assets, target_dir, None)
+        CatalogManager.run_smart_restore_job,
+        args=(item_id, target_dir)
     )
 
     return jsonify({'status': 'queued', 'job_id': job_id})

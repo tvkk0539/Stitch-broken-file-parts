@@ -1233,3 +1233,4 @@ class GitHubManager:
 
         log(f"Batch Download Finished. Success: {completed}, Errors: {errors}")
         NotificationManager.send_notification(f"✅ ParFix: Batch Downloaded {completed} files")
+        return {'success': completed, 'errors': errors}
