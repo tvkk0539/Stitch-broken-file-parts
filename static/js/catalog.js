@@ -433,7 +433,10 @@ const catalog = {
             if (item.spanning_info && item.spanning_info.length > 0) {
                  let rows = item.spanning_info.map(s => `
                     <tr style="border-bottom:1px solid #2f3549;">
-                        <td style="padding:12px; color:#bb9af7; font-weight:bold;">${s.account}</td>
+                        <td style="padding:12px;">
+                            <div style="color:#bb9af7; font-weight:bold;">${s.account}</div>
+                            ${s.account_id ? `<div style="font-size:0.75em; color:#565f89; margin-top:2px;">ID: ${s.account_id}</div>` : ''}
+                        </td>
                         <td style="padding:12px;">${s.repo_name}</td>
                         <td style="padding:12px; color:#9ece6a;">${s.size_human || '0 B'}</td>
                         <td style="padding:12px; text-align:right;">

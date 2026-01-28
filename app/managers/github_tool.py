@@ -969,6 +969,7 @@ class GitHubManager:
                 spanning_map[key] = {
                     'repo_name': r_full.split('/')[-1], # Short Name
                     'account': username,
+                    'account_id': str(acc_id),
                     'url': r_url,
                     'file_count': 0,
                     'size_bytes': 0
