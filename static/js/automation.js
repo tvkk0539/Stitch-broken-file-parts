@@ -303,6 +303,23 @@ window.fetchReposForAccount = function(input) {
 
 // --- New Form Rendering System ---
 
+function addRoutingRow(tbody, accId='', repoName='') {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td style="padding:5px;">
+            <input type="text" class="route-acc" value="${accId}" placeholder="Account ID" list="gh-acc-list" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
+        </td>
+        <td style="padding:5px;">
+            <input type="text" class="route-repo" value="${repoName}" placeholder="username/repo" list="gh-repo-list" style="width:100%; background:#1a1b26; border:1px solid #414868; color:#fff; padding:5px;">
+        </td>
+        <td style="padding:5px; text-align:center;">
+            <span style="cursor:pointer; color:#f7768e;" onclick="this.closest('tr').remove()">×</span>
+        </td>
+    `;
+    tbody.appendChild(tr);
+}
+window.addRoutingRow = addRoutingRow;
+
 function renderStepUI(stepDiv, type, config = {}) {
     const contentDiv = stepDiv.querySelector('.wf-step-content');
     contentDiv.innerHTML = ''; // Clear old
@@ -334,6 +351,10 @@ function renderStepUI(stepDiv, type, config = {}) {
                      </select>
                 </div>
             </div>
+            <div style="margin-bottom:15px;">
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Archive Password</label>
+                <input type="text" class="wf-pack-pass" value="tvkk13579" placeholder="Enter password (Optional)" style="width:100%; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff; font-family:monospace;">
+            </div>
             <div style="background:#1a1b26; padding:10px; border-radius:4px;">
                 <label style="display:block; color:var(--accent-color); font-size:0.8em; margin-bottom:10px;">Security & Protection</label>
                 <div style="display:flex; gap:15px; flex-wrap:wrap;">
@@ -346,6 +367,7 @@ function renderStepUI(stepDiv, type, config = {}) {
         `;
         // Populate
         if(config.split) contentDiv.querySelector('.wf-pack-split').value = config.split;
+        if(config.password) contentDiv.querySelector('.wf-pack-pass').value = config.password;
         if(config.encrypt_filenames !== undefined) contentDiv.querySelector('.wf-pack-enc').checked = config.encrypt_filenames;
         if(config.recovery !== undefined) contentDiv.querySelector('.wf-pack-rr').checked = config.recovery;
         if(config.create_par2 !== undefined) contentDiv.querySelector('.wf-pack-par2').checked = config.create_par2;
@@ -354,13 +376,20 @@ function renderStepUI(stepDiv, type, config = {}) {
     } else if (type === 'github_publish') {
         contentDiv.innerHTML = `
             <div style="margin-bottom:15px;">
-                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Repository (Base Name)</label>
-                <input type="text" class="wf-gh-repo" placeholder="user/backup-repo" list="gh-repo-list" style="width:100%; padding:10px; background:#1a1b26; border:1px solid #414868; color:#fff;">
-            </div>
-
-            <div style="margin-bottom:15px;">
-                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Relay Accounts (Multi-Select)</label>
-                <div class="wf-gh-acc-container"></div>
+                <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Distribution Routing (Account → Repo)</label>
+                <div class="wf-gh-routing-container" style="background:#15161e; padding:10px; border-radius:4px; border:1px solid #414868;">
+                    <table class="wf-gh-routing-table" style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="text-align:left; color:#7dcfff; font-size:0.8em;">
+                                <th style="padding:5px;">Account</th>
+                                <th style="padding:5px;">Repository</th>
+                                <th style="width:30px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody><!-- Rows --></tbody>
+                    </table>
+                    <button class="secondary" onclick="addRoutingRow(this.closest('.wf-gh-routing-container').querySelector('tbody'))" style="width:100%; margin-top:10px; font-size:0.8em;">+ Add Route</button>
+                </div>
             </div>
 
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
@@ -372,13 +401,30 @@ function renderStepUI(stepDiv, type, config = {}) {
                      </select>
                 </div>
                 <div>
+                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Allocation Mode</label>
+                     <select class="wf-gh-alloc" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="new" selected>🆕 Create New (Fire & Forget)</option>
+                        <option value="fill">♻️ Fill Existing (Pool)</option>
+                     </select>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                 <div>
                      <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Content</label>
                      <select class="wf-gh-content" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
                         <option value="tree_only" selected>Tree Only (Stealth)</option>
                         <option value="standard">Standard</option>
                         <option value="clean">Clean</option>
                      </select>
-                </div>
+                 </div>
+                 <div>
+                     <label style="display:block; color:var(--text-muted); font-size:0.8em; margin-bottom:5px;">Release Mode (Smart)</label>
+                     <select class="wf-gh-release-mode" style="width:100%; padding:8px; background:#1a1b26; border:1px solid #414868; color:#fff;">
+                        <option value="create" selected>✨ Create New Tag</option>
+                        <option value="append">📎 Append to Latest (Smart)</option>
+                     </select>
+                 </div>
             </div>
 
             <div class="wf-opts-container" style="background:#15161e; border:1px solid #414868; border-radius:4px; padding:15px;">
@@ -388,7 +434,11 @@ function renderStepUI(stepDiv, type, config = {}) {
 
                 <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:10px; align-items:center;">
                     <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Renames files to look like System Logs">
-                        <input type="checkbox" class="wf-opt-camo" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'block' : 'none'"> 🛡️ Camouflage Mode
+                        <input type="checkbox" class="wf-opt-camo" onchange="this.closest('.wf-opts-container').querySelector('.wf-camo-template-container').style.display = this.checked ? 'block' : 'none'"> 🛡️ Camouflage Mode
+                    </label>
+
+                    <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Imports a random safe repository template">
+                        <input type="checkbox" class="wf-gh-stealth"> 🎭 Use Stealth Import
                     </label>
 
                     <div style="display:none;" class="wf-camo-template-container">
@@ -406,6 +456,12 @@ function renderStepUI(stepDiv, type, config = {}) {
 
                     <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#c0caf5;" title="Scrambles the Release Title (Base64)">
                         <input type="checkbox" class="wf-gh-obf-title" checked> 🔒 Obfuscate Title
+                    </label>
+                </div>
+
+                <div style="margin-bottom:10px;">
+                    <label style="display:flex; align-items:center; gap:5px; font-size:0.8em; color:#ff9e64;" title="Enforces 1 Repo per Account (Max 45GB). Switches account immediately if full.">
+                        <input type="checkbox" class="wf-gh-strict" onchange="const el=this.closest('.wf-opts-container').querySelector('.wf-gh-lim-repo'); el.disabled = this.checked; el.style.opacity = this.checked ? 0.5 : 1;"> 🔒 Strict Mode (1 Account = 1 Repo)
                     </label>
                 </div>
 
@@ -430,37 +486,54 @@ function renderStepUI(stepDiv, type, config = {}) {
             </div>
         `;
 
-        // Populate
-        if(config.repo) contentDiv.querySelector('.wf-gh-repo').value = config.repo;
+        // Populate Routing Table
+        const tbody = contentDiv.querySelector('.wf-gh-routing-table tbody');
+
+        if (config.distribution_map && Array.isArray(config.distribution_map)) {
+            // New Format
+            config.distribution_map.forEach(route => {
+                addRoutingRow(tbody, route.account_id, route.repo);
+            });
+        } else if (config.account_id) {
+            // Legacy Format Migration
+            const ids = config.account_id.split(',').filter(x=>x.trim());
+            const baseRepo = config.repo || '';
+            ids.forEach(id => {
+                addRoutingRow(tbody, id, baseRepo);
+            });
+        } else {
+            // Default Empty Row
+            addRoutingRow(tbody);
+        }
+
+        // Populate Standard Configs
         if(config.strategy) contentDiv.querySelector('.wf-gh-strat').value = config.strategy;
+        if(config.allocation_mode) contentDiv.querySelector('.wf-gh-alloc').value = config.allocation_mode;
         if(config.release_content) contentDiv.querySelector('.wf-gh-content').value = config.release_content;
+        if(config.release_mode) contentDiv.querySelector('.wf-gh-release-mode').value = config.release_mode;
+
         if(config.camouflage !== undefined) {
              const cb = contentDiv.querySelector('.wf-opt-camo');
              cb.checked = config.camouflage;
-             // Trigger visibility
              contentDiv.querySelector('.wf-camo-template-container').style.display = config.camouflage ? 'block' : 'none';
         }
         if(config.camo_template) contentDiv.querySelector('.wf-opt-camo-template').value = config.camo_template;
 
         if(config.obfuscate_title !== undefined) contentDiv.querySelector('.wf-gh-obf-title').checked = config.obfuscate_title;
+        if(config.use_stealth_import !== undefined) contentDiv.querySelector('.wf-gh-stealth').checked = config.use_stealth_import;
+
+        // Strict Mode Population
+        if(config.strict_mode !== undefined) {
+             const strictCb = contentDiv.querySelector('.wf-gh-strict');
+             strictCb.checked = config.strict_mode;
+             // Trigger change to update UI state
+             strictCb.dispatchEvent(new Event('change'));
+        }
 
         if(config.span_limit) contentDiv.querySelector('.wf-gh-lim-repo').value = config.span_limit;
         if(config.account_limit) contentDiv.querySelector('.wf-gh-lim-acc').value = config.account_limit;
         if(config.safety_sleep_seconds) contentDiv.querySelector('.wf-gh-sleep').value = config.safety_sleep_seconds;
         if(config.rate_limit_seconds) contentDiv.querySelector('.wf-gh-rate').value = config.rate_limit_seconds;
-
-        // Tokenizer for Accounts
-        const accContainer = contentDiv.querySelector('.wf-gh-acc-container');
-        const tokenizer = createTagInput(accContainer, 'gh-acc-list');
-        tokenizer.classList.add('wf-gh-acc-tokenizer'); // Add marker for save
-        const tokenInput = tokenizer.querySelector('.tag-input');
-        tokenInput.placeholder = "Add Account IDs...";
-
-        if(config.account_id) {
-            const ids = config.account_id.split(',').filter(x=>x.trim());
-            ids.forEach(id => addTagPill(tokenizer, tokenInput, id));
-            updateHiddenTagValue(tokenizer);
-        }
 
     } else if (type === 'catalog_add') {
          contentDiv.innerHTML = `
@@ -512,7 +585,7 @@ async function saveWorkflow() {
     const stepDivs = document.querySelectorAll('.wf-step');
     const steps = [];
 
-    stepDivs.forEach(div => {
+    for (let div of stepDivs) {
         const type = div.querySelector('.wf-step-type').value;
         const contentDiv = div.querySelector('.wf-step-content');
         let config = {};
@@ -522,6 +595,7 @@ async function saveWorkflow() {
         } else if (type === 'pack') {
              const split = contentDiv.querySelector('.wf-pack-split').value;
              const fmt = contentDiv.querySelector('.wf-pack-fmt').value;
+             const pass = contentDiv.querySelector('.wf-pack-pass').value;
              const encName = contentDiv.querySelector('.wf-pack-enc').checked;
              const rr = contentDiv.querySelector('.wf-pack-rr').checked;
              const par2 = contentDiv.querySelector('.wf-pack-par2').checked;
@@ -530,6 +604,7 @@ async function saveWorkflow() {
              config = {
                  split: split,
                  format: fmt,
+                 password: pass,
                  encrypt_filenames: encName,
                  recovery: rr,
                  create_par2: par2,
@@ -538,14 +613,22 @@ async function saveWorkflow() {
              };
 
         } else if (type === 'github_publish') {
-             const repo = contentDiv.querySelector('.wf-gh-repo').value;
+             // Gather Routing Data
+             const routingRows = contentDiv.querySelectorAll('.wf-gh-routing-table tbody tr');
+             const distMap = [];
 
-             // Account Tokenizer
-             const accContainer = contentDiv.querySelector('.wf-gh-acc-tokenizer');
-             const accIds = accContainer ? accContainer.querySelector('.tag-value').value : '';
+             routingRows.forEach(tr => {
+                 const acc = tr.querySelector('.route-acc').value.trim();
+                 const rp = tr.querySelector('.route-repo').value.trim();
+                 if(acc && rp) {
+                     distMap.push({ account_id: acc, repo: rp });
+                 }
+             });
 
              const strat = contentDiv.querySelector('.wf-gh-strat').value;
+             const alloc = contentDiv.querySelector('.wf-gh-alloc').value;
              const content = contentDiv.querySelector('.wf-gh-content').value;
+             const relMode = contentDiv.querySelector('.wf-gh-release-mode').value;
 
              // Get Options Container
              const optsDiv = div.querySelector('.wf-opts-container');
@@ -553,19 +636,36 @@ async function saveWorkflow() {
              const camoTemplate = optsDiv ? optsDiv.querySelector('.wf-opt-camo-template').value : 'log_rotation';
              const obfTitle = optsDiv ? optsDiv.querySelector('.wf-gh-obf-title').checked : true;
 
+             // Strict Mode
+             const strictCb = optsDiv ? optsDiv.querySelector('.wf-gh-strict') : null;
+             const useStrict = strictCb ? strictCb.checked : false;
+
+             // Safety Net: Strict Mode requires >= 2 Accounts
+             if (useStrict && distMap.length < 2) {
+                 alert("⚠️ Strict Mode Violation:\n\nYou must configure at least 2 Account Routes (Account → Repo) to use Strict Mode. This ensures a safety net when the first account fills up.");
+                 return; // Stop saving
+             }
+
+             // Stealth Logic
+             const stealthCb = optsDiv ? optsDiv.querySelector('.wf-gh-stealth') : null;
+             const useStealth = stealthCb ? stealthCb.checked : false;
+
              const repoLim = parseInt(contentDiv.querySelector('.wf-gh-lim-repo').value) || 40;
              const accLim = parseInt(contentDiv.querySelector('.wf-gh-lim-acc').value) || 45;
              const sleep = parseInt(contentDiv.querySelector('.wf-gh-sleep').value) || 3600;
              const rate = parseInt(contentDiv.querySelector('.wf-gh-rate').value) || 15;
 
              config = {
-                 repo: repo,
-                 account_id: accIds,
+                 distribution_map: distMap,
                  strategy: strat,
+                 allocation_mode: alloc,
                  release_content: content,
+                 release_mode: relMode,
                  camouflage: camo,
                  camo_template: camoTemplate,
                  obfuscate_title: obfTitle,
+                 use_stealth_import: useStealth,
+                 strict_mode: useStrict,
                  span_limit: repoLim,
                  account_limit: accLim,
                  safety_sleep_seconds: sleep,
@@ -597,7 +697,7 @@ async function saveWorkflow() {
         }
 
         steps.push({ type: type, config: config });
-    });
+    }
 
     if(!name || steps.length === 0) {
         alert("Name and at least one step required.");

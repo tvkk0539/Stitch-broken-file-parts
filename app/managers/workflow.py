@@ -290,8 +290,19 @@ class WorkflowManager:
         Uses meta['tree_text'] for release body (Base64).
         Now supports Smart Spanning & Camouflage.
         """
+        # Data Normalization for Routing
+        distribution_map = conf.get('distribution_map', [])
+
+        # Legacy Fallback
         repo = conf.get('repo')
         account_id = conf.get('account_id')
+
+        if not distribution_map and repo and account_id:
+            # Convert legacy single input to map
+            # Support comma-separated accounts
+            acc_list = [a.strip() for a in str(account_id).split(',') if a.strip()]
+            for acc in acc_list:
+                distribution_map.append({'account_id': acc, 'repo': repo})
 
         # New Configs
         camouflage = conf.get('camouflage', False)
@@ -331,28 +342,20 @@ class WorkflowManager:
 
         # Check for Smart Publish Requirement
         # We now assume smart publish if span_limit is present or span_repos is true
-        if span_repos or conf.get('span_limit'):
-            # Repo is assumed to be base name "user/repo-base" or just "repo-base"
-            # We strip 'https://github.com/'
-            clean_repo = repo.replace('https://github.com/', '').strip('/')
-            # If user provided user/repo, we split
-            if '/' in clean_repo:
-                # We assume user owns it, so we extract just the repo name part for creating suffix
-                # But actually, create_repository takes just 'name'.
-                # So we need 'base_name'.
-                base_repo_name = clean_repo.split('/')[-1]
-            else:
-                base_repo_name = clean_repo
+        if span_repos or conf.get('span_limit') or distribution_map:
+            # Note: We pass distribution_map instead of base_repo_name/account_id list
 
             # Inject camo_template into meta
             if conf.get('camo_template'):
                 meta['camo_template'] = conf.get('camo_template')
 
             result = GitHubManager.smart_publish_job(
-                files,
-                base_repo_name,
-                tag_name,
-                account_id,
+                files=files,
+                # base_repo_name/account_id are deprecated in favor of map, but passed for compat if map empty
+                base_repo_name=repo.split('/')[-1] if repo else 'backup',
+                tag=tag_name,
+                account_id=account_id, # Deprecated
+                distribution_map=distribution_map, # NEW
                 body=public_body,
                 private=True, # Enforce private for cold storage
                 span_limit_gb=int(conf.get('span_limit', 40)),
@@ -361,7 +364,9 @@ class WorkflowManager:
                 meta=meta,
                 rate_limit_sleep=int(conf.get('rate_limit_seconds', 15)),
                 safety_sleep=int(conf.get('safety_sleep_seconds', 3600)),
-                strategy=conf.get('strategy', 'relay')
+                strategy=conf.get('strategy', 'relay'),
+                release_mode=conf.get('release_mode', 'create'),
+                strict_mode=conf.get('strict_mode', False)
             )
 
             # Inject private body into result for Catalog
@@ -448,6 +453,8 @@ class WorkflowManager:
         cm = CatalogManager()
 
         gh_data = context.get('github_assets', {})
+        spanning_info = []
+
         # Handle backward compatibility or different structure
         if isinstance(gh_data, list):
             assets = gh_data
@@ -455,6 +462,7 @@ class WorkflowManager:
         else:
             assets = gh_data.get('assets', [])
             release_url = gh_data.get('release_url', f"https://github.com/{conf.get('repo')}")
+            spanning_info = gh_data.get('spanning_info', [])
 
         meta = context.get('meta', {})
 
@@ -521,7 +529,8 @@ class WorkflowManager:
             image=image_path,
             priority=int(conf.get('priority', 1)),
             description=final_desc,
-            restore_map=gh_data.get('restore_map', {})
+            restore_map=gh_data.get('restore_map', {}),
+            spanning_info=spanning_info
         )
 
         # Sync happens inside add_entry

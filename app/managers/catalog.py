@@ -69,7 +69,8 @@ class CatalogManager:
                         assets TEXT,     -- JSON list of dicts
                         priority INTEGER DEFAULT 1, -- 2=High, 1=Normal, 0=Low
                         description TEXT,
-                        restore_map TEXT -- JSON dict for Cold Storage
+                        restore_map TEXT, -- JSON dict for Cold Storage
+                        spanning_info TEXT -- JSON list for Multi-Repo Distribution
                     )
                 """)
                 conn.commit()
@@ -78,6 +79,7 @@ class CatalogManager:
             self._migrate_priority_column()
             self._migrate_description_column()
             self._migrate_restore_map_column()
+            self._migrate_spanning_info_column()
 
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
@@ -120,6 +122,19 @@ class CatalogManager:
                     conn.commit()
         except Exception as e:
             logger.error(f"Restore Map Migration Error: {e}")
+
+    def _migrate_spanning_info_column(self):
+        """Adds spanning_info column if missing."""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("PRAGMA table_info(items)")
+                columns = [info[1] for info in cursor.fetchall()]
+                if 'spanning_info' not in columns:
+                    logger.info("Migrating DB: Adding spanning_info column...")
+                    conn.execute("ALTER TABLE items ADD COLUMN spanning_info TEXT")
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Spanning Info Migration Error: {e}")
 
     def _migrate_json_to_sqlite(self):
         """Imports legacy catalog.json into catalog.db if db is empty."""
@@ -250,6 +265,11 @@ class CatalogManager:
             except: d['restore_map'] = {}
         else: d['restore_map'] = {}
 
+        if d.get('spanning_info'):
+            try: d['spanning_info'] = json.loads(d['spanning_info'])
+            except: d['spanning_info'] = []
+        else: d['spanning_info'] = []
+
         d['is_encrypted'] = bool(d['is_encrypted'])
         return d
 
@@ -263,10 +283,11 @@ class CatalogManager:
             logger.error(f"Get ID Error: {e}")
         return None
 
-    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None, priority=1, description=None, restore_map=None):
+    def create_entry(self, title, file_name, file_size, url, category="General", tags=None, is_encrypted=True, assets=None, image=None, priority=1, description=None, restore_map=None, spanning_info=None):
         if tags is None: tags = []
         if assets is None: assets = []
         if restore_map is None: restore_map = {}
+        if spanning_info is None: spanning_info = []
 
         return {
             "id": str(uuid.uuid4()),
@@ -283,7 +304,8 @@ class CatalogManager:
             "image": image,
             "priority": priority,
             "description": description,
-            "restore_map": restore_map
+            "restore_map": restore_map,
+            "spanning_info": spanning_info
         }
 
     def add_entry(self, entry):
@@ -292,8 +314,8 @@ class CatalogManager:
             with self._get_conn() as conn:
                 conn.execute("""
                     INSERT INTO items (id, title, category, file_name, size_bytes, size_human,
-                                       release_url, created_at, tags, is_encrypted, image, assets, priority, description, restore_map)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       release_url, created_at, tags, is_encrypted, image, assets, priority, description, restore_map, spanning_info)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     entry['id'],
                     entry['title'],
@@ -309,7 +331,8 @@ class CatalogManager:
                     json.dumps(entry['assets']),
                     entry.get('priority', 1),
                     entry.get('description', ''),
-                    json.dumps(entry.get('restore_map', {}))
+                    json.dumps(entry.get('restore_map', {})),
+                    json.dumps(entry.get('spanning_info', []))
                 ))
                 conn.commit()
 

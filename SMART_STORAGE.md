@@ -40,6 +40,32 @@ What happens if you rename your GitHub account (e.g., `UserA` -> `UserNew`)?
 *   **ParFix Self-Healing:** The downloader checks your current configuration. If it detects that Account ID `123` is now `UserNew`, but the link says `UserA`, it **automatically repairs the URL** on the fly before downloading.
 *   **Result:** Your backup is resilient even against GitHub username changes.
 
+## 🕵️ Adaptive Camouflage & Stealth Import
+
+To further secure your backups against detection or takedowns, ParFix implements **Adaptive Camouflage**.
+
+### 1. Stealth Import
+Instead of creating empty repositories, ParFix can **clone legitimate open-source repositories** (Stealth Templates) before uploading your data.
+*   Your backup repository looks like a fork of "Linux Kernel", "React", or "TensorFlow".
+*   This establishes a "Cover Story" for the repository.
+
+### 2. Context-Aware File Renaming
+When creating a multi-repository archive (Spanning), ParFix adapts the camouflage to **match the specific repository context**:
+*   If Repo A is a "Linux" fork -> Files are renamed to `sys_log_...` or `debug_symbols...`.
+*   If Repo B is an "AI" fork -> Files are renamed to `model_weights_...` or `checkpoint...`.
+*   This prevents "Context Mismatch" (e.g., uploading valid-looking AI weights to a React repo).
+
+### 3. Dynamic Pooling
+If you use **Allocation Mode: Fill**, ParFix will scan your existing repositories for free space.
+*   It detects the *existing theme* of the repository (e.g., "Oh, this is a Log Rotation repo").
+*   It automatically matches the filenames of new uploads to that existing theme.
+*   This allows you to "top up" old backups without breaking their cover.
+
+### Configuration
+*   **Stealth Templates:** Manage the list of source URLs in the **Stealth** tab.
+*   **Camouflage:** Enable in the Automation Workflow -> GitHub Publish step.
+*   **Allocation Mode:** Select "Fill Existing" to enable Dynamic Pooling.
+
 ## 🛠️ How to Use
 
 ### Setup

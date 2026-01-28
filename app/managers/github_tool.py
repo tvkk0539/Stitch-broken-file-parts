@@ -871,25 +871,98 @@ class GitHubManager:
             return {'error': str(e)}
 
     @staticmethod
-    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay'):
+    def find_available_pool_repo(account_id, base_name, limit_gb):
+        """
+        Scans for existing repositories matching base_name that have free space.
+        Returns (full_repo_name, current_size_kb) or (None, 0).
+        """
+        try:
+            repos = GitHubManager.list_user_repos(account_id)
+            if isinstance(repos, dict) and 'error' in repos: return None, 0
+
+            # Filter matching Base Name
+            candidates = []
+            for r in repos:
+                # Check if name starts with base_name (e.g. "Movies-")
+                # Also handle direct match "Movies"
+                r_name = r['name'].split('/')[-1]
+                if r_name.startswith(base_name):
+                    # Check size
+                    # list_user_repos doesn't return size, we need to fetch details or assume
+                    # Actually, list_user_repos (API) usually DOES return 'size' in KB.
+                    # My implementation of list_user_repos filtered fields. Let's check.
+                    # It returns: name, private, stars, updated_at, html_url. SIZE MISSING.
+                    # We need to fetch details for candidates.
+                    pass
+                    candidates.append(r['name'])
+
+            # Sort by name (sequential)
+            candidates.sort()
+
+            limit_kb = limit_gb * 1024 * 1024
+
+            for cand in candidates:
+                details = GitHubManager.get_repo_details(cand, account_id)
+                if 'size' in details:
+                    current_kb = details['size']
+                    if current_kb < limit_kb:
+                        log(f"♻️ Pool: Found existing repo '{cand}' ({current_kb/1024:.2f}MB Used)")
+                        return cand, current_kb
+
+            return None, 0
+
+        except Exception as e:
+            log(f"Pool Scan Error: {e}")
+            return None, 0
+
+    @staticmethod
+    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay', release_mode='create', strict_mode=False, distribution_map=None):
         """
         Publishes files across multiple repositories and accounts if needed.
         Strategies: 'relay' (Sequential Fill), 'scatter' (Round Robin per File).
+        Release Mode: 'create' (New Tag) or 'append' (Add to latest).
+        Strict Mode: If True, enforces 1 Repo per Account (Max 45GB) and switches account immediately if full.
+        Distribution Map: List of dicts [{'account_id': '1', 'repo': 'user/repo'}] defining explicit routing.
         """
         from app.managers.obfuscation import ObfuscationManager
         import time
+        import random
 
-        # Normalize account_id to list
-        account_ids = []
-        if isinstance(account_id, list):
-            account_ids = account_id
-        elif isinstance(account_id, str) and ',' in account_id:
-            account_ids = [aid.strip() for aid in account_id.split(',') if aid.strip()]
+        # Normalize Routing Logic
+        # Case 1: Use distribution_map if provided (Professional Mode)
+        # Case 2: Use account_ids list + base_repo_name (Legacy/Simple Mode)
+
+        routing_mode = 'map' if distribution_map and len(distribution_map) > 0 else 'legacy'
+
+        # Build unified accessors
+        if routing_mode == 'map':
+            account_ids = [str(item['account_id']) for item in distribution_map]
+            # Helper to get repo for an account index
+            def get_repo_target(idx):
+                if idx < len(distribution_map):
+                    return distribution_map[idx]['repo']
+                return base_repo_name # Fallback
         else:
-            account_ids = [str(account_id)]
+            # Legacy logic normalization
+            account_ids = []
+            if isinstance(account_id, list):
+                account_ids = account_id
+            elif isinstance(account_id, str) and ',' in account_id:
+                account_ids = [aid.strip() for aid in account_id.split(',') if aid.strip()]
+            else:
+                account_ids = [str(account_id)]
+
+            def get_repo_target(idx):
+                return base_repo_name
 
         current_acc_idx = 0
         current_acc_id = account_ids[0]
+        # Initial Repo Name Selection
+        current_repo_name = get_repo_target(current_acc_idx)
+        # If strict mode, we use full name. If not strict, we might append -01
+        # But 'ensure_repo' logic below handles suffixing for non-strict.
+        # Wait, ensure_repo takes 'name'. Ideally distribution_map provides FULL name 'user/repo'.
+        # We need to adapt ensure_repo logic.
 
         # Build Username Map for Smart Identity
         accounts_list = GitHubManager.list_accounts()
@@ -900,51 +973,82 @@ class GitHubManager:
         restore_map = {}
         active_files = files
 
-        # 1. Camouflage Logic
+        # 1. Camouflage Logic (Adaptive)
+        # We now handle camouflage per-file inside the loop to support adaptive contexts.
         release_tag = tag
         release_title = f"Archive {tag}"
         release_body = body
 
+        # Context Cache: repo_full -> {template, tag, title, body}
+        repo_context_cache = {}
+
         if camouflage:
-            log("🛡️ Camouflage Mode: ON")
-            job_manager.update_job_details({'action': 'Obfuscating file names...'})
-
-            # Rename files
-            camouflaged_paths, mapping = ObfuscationManager.camouflage_files(files)
-            active_files = camouflaged_paths
-            restore_map = mapping
-
-            # Save local map for backup
-            ObfuscationManager.save_map_file(mapping, base_repo_name)
-
-            # Generate Boring Metadata
-            # Check for passed template in meta
-            camo_template = 'log_rotation'
-            if meta and 'camo_template' in meta:
-                camo_template = meta['camo_template']
-
-            boring = ObfuscationManager.generate_boring_metadata(camo_template)
-            release_tag = boring['tag']
-            release_title = boring['title']
-            release_body = boring['body']
-            log(f"🎭 Using Cover Story: {release_title} ({camo_template})")
+            log("🛡️ Adaptive Camouflage Mode: ON")
 
         # 2. Repo Spanning Logic
         current_repo_index = 1
-        current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+
+        # If routing_mode is map, current_repo_name IS the target (no suffix).
+        # If legacy, we suffix '-01' unless strict mode or single repo.
+
+        if routing_mode == 'map':
+             # Use explicit name from map.
+             # If strict mode is OFF, do we still suffix?
+             # Professional mode usually implies explicit control.
+             # Let's assume Map = Exact Name unless strict mode is OFF and it fills up?
+             # For strict mode, Map = Exact Name.
+             # For non-strict, we can stick to Exact Name first, then suffix if needed.
+             pass
+        else:
+             if not strict_mode:
+                 current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+             else:
+                 current_repo_name = base_repo_name
 
         # Helper to get/create repo (Bound to current account)
-        def ensure_repo(name, acc_id):
-            # Check existence
+        def ensure_repo(name, acc_id, try_pool=False):
+            # --- Dynamic Pooling Logic ---
+            # Only relevant for 'legacy' naming. If 'map' is used, user specified exact target.
+            if try_pool and routing_mode == 'legacy':
+                pool_repo, pool_size = GitHubManager.find_available_pool_repo(acc_id, name, span_limit_gb)
+                if pool_repo:
+                    return pool_repo, pool_size
+
+            # Check existence (Standard)
             user_info = GitHubManager._fetch_user_profile(GitHubManager._get_token_for_account(acc_id))
             owner = user_info['username']
+
+            # Handle Name Normalization (Strip owner if present in map)
+            if '/' in name:
+                supplied_owner, short_name = name.split('/', 1)
+                if supplied_owner.lower() == owner.lower():
+                    name = short_name
+
             full_name = f"{owner}/{name}"
 
             details = GitHubManager.get_repo_details(full_name, acc_id)
             if 'error' not in details:
                 return full_name, details['size'] # size is in KB
 
-            # Create if missing
+            # --- Stealth Import Logic ---
+            use_stealth = False
+            if meta and meta.get('use_stealth_import'):
+                use_stealth = True
+
+            if use_stealth:
+                conf = config.load_config()
+                templates = conf.get('stealth_templates', [])
+                if templates:
+                    # Pick Random Template
+                    source_url = random.choice(templates).strip()
+                    if source_url:
+                        log(f"🕵️ Stealth Mode: Importing {source_url} -> {name}")
+                        GitHubManager.run_import_job(source_url, name, private, acc_id)
+                        # After import, return repo name and size (assume small init size)
+                        # We return name because run_import_job doesn't return the full name object directly, but it creates owner/name
+                        return full_name, 1000 # 1MB dummy size for the clone
+
+            # Standard Create if missing or no stealth
             log(f"Creating repository: {name} on account {acc_id}")
             res = GitHubManager.create_repository(name, private, description, acc_id)
             if 'error' in res:
@@ -959,9 +1063,46 @@ class GitHubManager:
         # Structure: { acc_id: { repo_name: upload_url } }
         scatter_cache = {}
 
+        # Spanning Tracking
+        spanning_map = {} # Key: "acc_id|repo_full", Value: { info_dict }
+
+        def track_spanning(acc_id, r_full, r_url, f_size):
+            key = f"{acc_id}|{r_full}"
+            if key not in spanning_map:
+                username = id_to_user.get(str(acc_id), 'Unknown')
+                spanning_map[key] = {
+                    'repo_name': r_full.split('/')[-1], # Short Name
+                    'account': username,
+                    'account_id': str(acc_id),
+                    'url': r_url,
+                    'file_count': 0,
+                    'size_bytes': 0
+                }
+            spanning_map[key]['file_count'] += 1
+            spanning_map[key]['size_bytes'] += f_size
+
         try:
+            # Determine Allocation Mode
+            allocation_mode = 'new'
+            if meta and meta.get('allocation_mode') == 'fill':
+                allocation_mode = 'fill'
+                log("♻️ Allocation Mode: Fill Existing (Dynamic Pooling)")
+
+            # IMPORTANT: In Strict Mode, we treat 'fill' as default if not specified?
+            # Or assume we want to fill the target repo.
+            # But the key is that current_size_gb MUST be accurate from start.
+
             # Init state for Relay
-            repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id)
+            use_pool = (allocation_mode == 'fill')
+
+            # Determine initial target based on strategy
+            initial_target_name = current_repo_name
+            if use_pool and routing_mode == 'legacy':
+                 initial_target_name = base_repo_name # Pool scans base
+
+            repo_full, repo_size_kb = ensure_repo(initial_target_name, current_acc_id, try_pool=use_pool)
+
+            # Update loop state
             current_size_gb = repo_size_kb / (1024 * 1024)
             current_acc_uploaded_gb = 0
 
@@ -991,15 +1132,33 @@ class GitHubManager:
                 raise Exception(f"Failed to create release on {r_name}")
 
             # Initial Release (First Repo)
-            upload_url_template, first_release_url = get_release_data(repo_full, release_tag, current_acc_id)
-            final_release_url = first_release_url # Keep track of primary link
+            # We delay release creation until inside the loop for Adaptive Camouflage
+
+            final_release_url = None # Keep track of primary link
+            current_release_url = None
 
             total_files = len(active_files)
 
             for idx, file_path in enumerate(active_files):
                 if job_manager.is_cancelled(): break
 
-                file_size_gb = os.path.getsize(file_path) / (1024 * 1024 * 1024)
+                file_size_bytes = os.path.getsize(file_path)
+                file_size_gb = file_size_bytes / (1024 * 1024 * 1024)
+
+                # Check for Account Switch Requirement (Strict Mode Immediate Check)
+                # If Strict Mode is on, we check if the CURRENT repo + NEW file > 45GB.
+                # If so, we MUST switch account before even trying to upload.
+
+                strict_limit_kb = 45 * 1024 * 1024 # 45GB in KB
+                current_kb = current_size_gb * 1024 * 1024
+                file_kb = file_size_bytes / 1024
+
+                # We do this logic inside the loop, but BEFORE Scatter/Relay branch?
+                # Actually Scatter branch handles its own selection.
+                # Relay branch handles limit checks.
+                # But Strict Mode is a global override essentially.
+
+                # Let's rely on the Relay branch logic below, but verify 'current_size_gb' is fresh.
 
                 # --- STRATEGY: SCATTER (Round Robin) ---
                 if strategy == 'scatter' and len(account_ids) > 1:
@@ -1007,62 +1166,360 @@ class GitHubManager:
                     current_acc_idx = idx % len(account_ids)
                     current_acc_id = account_ids[current_acc_idx]
 
-                    # Ensure repo exists for THIS account (we use same base name for all accounts in scatter usually)
-                    # or should we rotate repo names too?
-                    # Simplest Scatter: Use 'base-repo-name-01' on ALL accounts.
-                    # We assume 40GB limit is per repo per account.
-
-                    # NOTE: We are NOT tracking size limits strictly in Scatter mode for simplicity,
-                    # or we assume files are small enough.
-                    # BUT user asked for limits.
-                    # Implementing robust limit checking for 5 parallel accounts is complex.
-                    # We will do a lightweight check: Ensure repo exists.
-
                     tgt_repo = current_repo_name # e.g. archive-01
 
-                    # Check cache
+                    # Check cache for REPO existence (not context yet)
                     if current_acc_id not in scatter_cache: scatter_cache[current_acc_id] = {}
 
                     if tgt_repo not in scatter_cache[current_acc_id]:
                         # Init repo on this account
-                        r_full, _ = ensure_repo(tgt_repo, current_acc_id)
-                        u_url, r_url = get_release_data(r_full, release_tag, current_acc_id)
-                        scatter_cache[current_acc_id][tgt_repo] = (r_full, u_url)
+                        use_pool = (allocation_mode == 'fill')
+                        r_full, r_size = ensure_repo(base_repo_name if use_pool else tgt_repo, current_acc_id, try_pool=use_pool)
+                        # We don't create release here anymore, just cache the repo info
+                        scatter_cache[current_acc_id][tgt_repo] = {'repo': r_full, 'size': r_size}
 
-                        # Use first scatter repo as final link if not set
-                        if not final_release_url: final_release_url = r_url
-
-                    repo_full, upload_url_template = scatter_cache[current_acc_id][tgt_repo]
+                    repo_full = scatter_cache[current_acc_id][tgt_repo]['repo']
+                    # Repo Size tracking is harder in scatter mode without re-querying,
+                    # but we only use it for limits which scatter ignores (Round Robin implies infinite/balanced).
+                    # Actually scatter limits are per-account.
 
                 # --- STRATEGY: RELAY (Sequential) ---
                 else:
                     # Check Repo Limit OR Account Switch Requirement
-                    repo_limit_reached = (current_size_gb + file_size_gb > span_limit_gb)
-                    account_limit_reached = (current_acc_uploaded_gb + file_size_gb > account_limit_gb)
+                    # Strict Mode: Hard 45GB limit on Repo (which equals Account limit)
+                    effective_repo_limit = 45 if strict_mode else span_limit_gb
+                    effective_acc_limit = 45 if strict_mode else account_limit_gb
+
+                    repo_limit_reached = (current_size_gb + file_size_gb > effective_repo_limit)
+                    account_limit_reached = (current_acc_uploaded_gb + file_size_gb > effective_acc_limit)
+
+                    # Strict Mode Override:
+                    # If Repo Limit is reached in Strict Mode, it implies Account Limit is also reached
+                    # because we enforced 1 Repo = 1 Account.
+                    if strict_mode and repo_limit_reached:
+                        account_limit_reached = True
 
                     if repo_limit_reached or account_limit_reached:
-                        if account_limit_reached and len(account_ids) > 1:
-                            log(f"Account {current_acc_id} limit reached ({current_acc_uploaded_gb:.2f}GB > {account_limit_gb}GB). Switching...")
-                            if safety_sleep > 0:
-                                log(f"💤 Safety Sleep for {safety_sleep}s...")
-                                job_manager.update_job_details({'action': f"Cooling down ({safety_sleep}s)..."})
-                                time.sleep(safety_sleep)
+                        # Switch Account Logic
+                        # If strict mode, even repo_limit triggers account switch
+                        should_switch_account = account_limit_reached or (strict_mode and repo_limit_reached)
 
-                            current_acc_idx = (current_acc_idx + 1) % len(account_ids)
-                            current_acc_id = account_ids[current_acc_idx]
-                            current_acc_uploaded_gb = 0
-                            log(f"Switched to Account: {current_acc_id}")
+                        if should_switch_account:
+                            if len(account_ids) > 1:
+                                log(f"Account {current_acc_id} limit reached ({current_acc_uploaded_gb:.2f}GB / Repo {current_size_gb:.2f}GB). Switching...")
+                                if safety_sleep > 0:
+                                    log(f"💤 Safety Sleep for {safety_sleep}s...")
+                                    job_manager.update_job_details({'action': f"Cooling down ({safety_sleep}s)..."})
+                                    time.sleep(safety_sleep)
 
-                        log(f"Switching Repository...")
-                        current_repo_index += 1
-                        current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+                                current_acc_idx = (current_acc_idx + 1) % len(account_ids)
+                                current_acc_id = account_ids[current_acc_idx]
+                                current_acc_uploaded_gb = 0
 
-                        repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
-                        current_size_gb = 0
-                        upload_url_template, _ = get_release_data(repo_full, release_tag, current_acc_id)
+                                # Reset Repo Index for new account?
+                                # Strict Mode: Use base name again (try 'repo', then 'repo-02' if 'repo' full?
+                                # No, strictly 1 repo means we check THE repo.)
+                                # If strict mode, we should check 'base_repo_name' on new account.
+                                # Strict Mode / Map Logic: Update Repo Name for new account
+                                if strict_mode or routing_mode == 'map':
+                                    # Get the specific repo for this new account index
+                                    current_repo_name = get_repo_target(current_acc_idx)
+
+                                    # Ensure we get the actual size
+                                    repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id, try_pool=False)
+                                    current_size_gb = repo_size_kb / (1024 * 1024)
+                                    # Reset uploaded count
+                                    current_acc_uploaded_gb = 0
+
+                                    # Update context cache for new repo
+                                    # We need to force a context refresh because 'repo_full' changed!
+                                    # Clear previous context from cache to force regeneration in loop logic
+                                    if repo_full in repo_context_cache:
+                                        del repo_context_cache[repo_full]
+
+                                    # Force RE-INIT logic below to run by ensuring it's not in cache or manually setting it
+                                    # Ideally we should let the 'if repo_full not in repo_context_cache:' block handle it.
+                                    # But we are inside the loop. The variable 'upload_url_template' needs to be updated for THIS file.
+
+                                    # We can't rely on the loop flow falling through because we are in the 'else' (Relay) block.
+                                    # The 'Adaptive Context' block comes AFTER this.
+                                    # So if we reset 'repo_context_cache', the next block 'ensure_release_context' (or equivalent) will run.
+                                    # Wait, the code structure is:
+                                    # Loop -> Strategy (Relay/Scatter) -> Context Logic -> Upload.
+
+                                    # Correct! So we just need to update 'repo_full' and 'current_acc_id' here.
+                                    # The context block below uses 'repo_full' and 'current_acc_id'.
+                                    # So we DON'T need to manually call get_release_data here IF we clear the cache/ensure logic runs.
+
+                                    # Let's rely on the downstream block.
+
+                                    # Force context cache update for next iteration logic
+                                    if repo_full in repo_context_cache:
+                                        del repo_context_cache[repo_full]
+
+                                log(f"Switched to Account: {current_acc_id} -> {current_repo_name}")
+                            else:
+                                log("⚠️ Limit reached but no more accounts available!")
+                                # If strict mode, we might just stop or error?
+                                # Proceeding will overfill.
+                                pass
+
+                        # Switch Repo Logic (Within same account)
+                        # Only if NOT Strict Mode OR if Account Switch didn't happen (e.g. single account config)
+                        # The 'elif' ensures we don't double-switch if we just switched accounts.
+                        # BUT: If strict mode is on, we NEVER want to switch repos locally.
+                        # So 'elif not strict_mode' handles that.
+                        elif not strict_mode:
+                            log(f"Switching Repository...")
+
+                            can_reuse = False
+                            if allocation_mode == 'fill':
+                                 # Try to find another bucket
+                                 pool_repo, pool_size = GitHubManager.find_available_pool_repo(current_acc_id, base_repo_name, span_limit_gb)
+                                 if pool_repo and pool_repo != repo_full:
+                                     repo_full = pool_repo
+                                     repo_size_kb = pool_size
+                                     can_reuse = True
+
+                            if not can_reuse:
+                                current_repo_index += 1
+                                current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+                                repo_full, _ = ensure_repo(current_repo_name, current_acc_id)
+                                repo_size_kb = 0
+
+                            current_size_gb = repo_size_kb / (1024 * 1024)
+
+                # --- ADAPTIVE CAMOUFLAGE & CONTEXT ---
+
+                # Helper to update Release Data based on context
+                def ensure_release_context(r_full, acc_id):
+                    if r_full in repo_context_cache:
+                        return repo_context_cache[r_full]
+
+                    # Detect Context
+                    detected_template = None
+                    # If using Fill mode, we might have history
+                    if allocation_mode == 'fill':
+                        releases = GitHubManager.get_releases(r_full, acc_id)
+                        if releases and isinstance(releases, list) and len(releases) > 0:
+                            # Heuristic: Check latest release title
+                            latest = releases[0]
+                            detected_template = ObfuscationManager.detect_template(latest.get('name', ''))
+                            if detected_template:
+                                log(f"🕵️ Detected existing theme for {r_full}: {detected_template}")
+
+                    # Fallback or New
+                    if not detected_template:
+                        # User preference or Random
+                        base_pref = meta.get('camo_template', 'random') if meta else 'random'
+                        # If base_pref is fixed (e.g. 'log_rotation'), we use it.
+                        detected_template = base_pref
+
+                    # Generate Metadata
+                    boring = ObfuscationManager.generate_boring_metadata(detected_template)
+
+                    # --- SMART APPEND LOGIC ---
+                    target_tag = boring['tag']
+                    target_title = boring['title']
+                    target_body = boring['body']
+                    is_append = False
+
+                    if release_mode == 'append':
+                        # Try to find LATEST release to append to
+                        releases = GitHubManager.get_releases(r_full, acc_id)
+                        if releases and len(releases) > 0:
+                            latest = releases[0]
+                            log(f"📎 Smart Append: Found existing release '{latest['tag']}' on {r_full}")
+                            target_tag = latest['tag']
+                            target_title = latest['name']
+                            is_append = True
+
+                            # Update Template Context from Latest Release
+                            # This is crucial so ObfuscationManager knows which pattern to use (e.g. ai_weights vs log_rotation)
+                            detected_template_from_release = ObfuscationManager.detect_template(latest.get('name', ''))
+                            if detected_template_from_release:
+                                detected_template = detected_template_from_release # Update detected for boring gen if we re-gen
+                                boring['template'] = detected_template_from_release # Force update boring
+                                log(f"📎 Smart Append: Adopted template '{detected_template}' from existing release.")
+
+                            # We keep the detected template (from context) or boring template
+                        else:
+                            log(f"⚠️ Smart Append: No release found on {r_full}, falling back to CREATE.")
+
+                    # Create/Get Release
+                    # We use the generated tag/title/body
+                    u_url, r_url = get_release_data(r_full, target_tag, acc_id)
+
+                    # Ensure ctx gets the potentially updated template from 'Smart Append' block
+                    ctx = {
+                        'template': boring['template'],
+                        'upload_url': u_url,
+                        'html_url': r_url,
+                        'tag': target_tag,
+                        'is_append': is_append
+                    }
+                    repo_context_cache[r_full] = ctx
+                    log(f"🎭 Context for {r_full}: {boring['title']} ({boring['template']})")
+                    return ctx
+
+                # Redefine get_release_data inside loop to use specific metadata?
+                # No, let's just copy the logic or update the helper.
+                # The helper 'get_release_data' above (in previous block) used 'release_title' (global to func).
+                # We need to make it dynamic.
+                # Let's override the logic here:
+
+                # The loop relies on repo_context_cache[repo_full].
+                # If it's NOT in cache, we need to initialize it.
+                # BUT wait, the block above ('if repo_full not in repo_context_cache:') is structured wrong.
+                # It seems I have duplicate logic or misplaced blocks.
+                # The big block above (ensure_release_context replacement) handles INIT.
+                # Let's verify if the logic flows correctly.
+
+                # Logic Flow:
+                # 1. Check if repo_full in cache.
+                # 2. If NOT, init context (detect template, check append mode, create/get release).
+                # 3. Use context.
+
+                if repo_full not in repo_context_cache:
+                    # Resolve Template
+                    base_pref = meta.get('camo_template', 'random') if meta else 'random'
+
+                    # Detect existing for FILL mode
+                    if allocation_mode == 'fill':
+                         rels = GitHubManager.get_releases(repo_full, current_acc_id)
+                         if rels and len(rels) > 0:
+                             det = ObfuscationManager.detect_template(rels[0].get('name', ''))
+                             if det: base_pref = det
+
+                    boring = ObfuscationManager.generate_boring_metadata(base_pref)
+
+                    # --- SMART APPEND LOGIC (Duplicate for Loop safety) ---
+                    target_tag = boring['tag']
+                    target_title = boring['title']
+                    is_append = False
+
+                    if release_mode == 'append':
+                        releases = GitHubManager.get_releases(repo_full, current_acc_id)
+                        if releases and len(releases) > 0:
+                            latest = releases[0]
+                            target_tag = latest['tag']
+                            target_title = latest['name']
+                            is_append = True
+
+                            det = ObfuscationManager.detect_template(latest.get('name', ''))
+                            if det:
+                                boring['template'] = det
+                                log(f"📎 Smart Append: Adopted template '{det}'")
+
+                    # Create Release
+                    token = GitHubManager._get_token_for_account(current_acc_id)
+                    headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+                    # If Appending, we skip POST and go straight to GET usually,
+                    # unless it's missing (fallback handled by get_release_data equivalent logic below).
+
+                    # Check if tag exists (Collision check)
+                    # Use target_tag (which might be boring['tag'] or existing tag)
+
+                    create_url = f"https://api.github.com/repos/{repo_full}/releases"
+                    payload = {
+                        "tag_name": target_tag,
+                        "name": target_title,
+                        "body": boring['body'],
+                        "draft": False,
+                        "prerelease": False
+                    }
+
+                    # Try Create (Only if not append mode, OR if we want to try anyway)
+                    # Ideally if is_append, we shouldn't create.
+
+                    if is_append:
+                        # Skip create attempt, force get
+                        r = requests.Response()
+                        r.status_code = 422 # Already exists simulation
+                    else:
+                        r = requests.post(create_url, json=payload, headers=headers)
+                    if r.status_code in [200, 201]:
+                        d = r.json()
+                        u_url = d['upload_url']
+                        h_url = d['html_url']
+                    else:
+                        # Fallback: Get existing (if we guessed tag correctly or collision)
+                        # Or if we want to APPEND to existing release?
+                        # Spanning usually means unique releases.
+                        # If failed, maybe try GET
+                        get_url = f"https://api.github.com/repos/{repo_full}/releases/tags/{target_tag}"
+                        gr = requests.get(get_url, headers=headers)
+                        if gr.status_code == 200:
+                            d = gr.json()
+                            u_url = d['upload_url']
+                            h_url = d['html_url']
+                        else:
+                            raise Exception(f"Failed to create/find release {target_tag} on {repo_full}: {r.text}")
+
+                    repo_context_cache[repo_full] = {
+                        'template': boring['template'],
+                        'upload_url': u_url,
+                        'html_url': h_url,
+                        'tag': target_tag,
+                        'is_append': is_append
+                    }
+                    log(f"🎭 Context for {repo_full}: {target_title} ({boring['template']})")
+
+                ctx = repo_context_cache[repo_full]
+                upload_url_template = ctx['upload_url']
+                current_release_url = ctx['html_url']
+                current_template_name = ctx['template']
+
+                if not final_release_url: final_release_url = current_release_url
+
+                # Rename File (Just-In-Time)
+                original_name = os.path.basename(file_path)
+                final_path_to_upload = file_path
+                clean_up_needed = False
+
+                if camouflage:
+                    # Smart Sequence Naming if Appending
+                    if ctx.get('is_append', False):
+                        # Fetch existing assets to determine next sequence
+                        # We need to query the release assets.
+                        # Optimization: We can't query API for every file.
+                        # But we are in a loop. We should cache the 'existing_assets' list in context.
+                        if 'assets' not in ctx:
+                             # Fetch assets
+                             rels = GitHubManager.get_releases(repo_full, current_acc_id)
+                             # Find the matching tag
+                             ctx['assets'] = []
+                             for r in rels:
+                                 if r['tag'] == ctx['tag']:
+                                     ctx['assets'] = [a['name'] for a in r['assets']]
+                                     break
+
+                        fake_name = ObfuscationManager.get_next_sequence_name(ctx['assets'], original_name, current_template_name)
+                        # Add this new name to local cache so next file increments properly
+                        ctx['assets'].append(fake_name)
+                    else:
+                        fake_name = ObfuscationManager.get_camouflaged_filename(original_name, current_template_name)
+
+                    # We need to copy/rename to a temp location to avoid modifying the original list if reused?
+                    # But files are consumed.
+                    # Using same dir
+                    fake_path = os.path.join(os.path.dirname(file_path), fake_name)
+                    try:
+                        os.rename(file_path, fake_path)
+                        final_path_to_upload = fake_path
+                        restore_map[fake_name] = original_name
+                        clean_up_needed = True # Actually we just renamed it, so original path is gone.
+                        # We don't need to delete 'fake_path' if it replaced 'file_path'.
+                        # But wait, JobManager deletes the FOLDER.
+                        # If we renamed, we are fine.
+                    except Exception as e:
+                        log(f"Renaming failed: {e}")
+                        # Fallback to original
+                        final_path_to_upload = file_path
 
                 # Upload
-                fname = os.path.basename(file_path)
+                fname = os.path.basename(final_path_to_upload)
                 job_manager.update_job_details({'action': f"Uploading {idx+1}/{total_files}: {fname} to {current_repo_name} ({current_acc_id})"})
 
                 token = GitHubManager._get_token_for_account(current_acc_id)
@@ -1070,16 +1527,19 @@ class GitHubManager:
 
                 real_upload_url = upload_url_template.split('{')[0] + f"?name={fname}"
 
-                with open(file_path, 'rb') as f:
+                with open(final_path_to_upload, 'rb') as f:
                     r = requests.post(real_upload_url, data=f, headers=headers)
                     if r.status_code not in [200, 201]:
                         log(f"Failed upload {fname}: {r.text}")
                         continue
 
+                    # Success - Track Metadata
+                    track_spanning(current_acc_id, repo_full, current_release_url, file_size_bytes)
+
                     adata = r.json()
                     uploaded_assets.append({
                         'name': fname,
-                        'size': os.path.getsize(file_path),
+                        'size': file_size_bytes,
                         'url': adata.get('browser_download_url', ''),
                         'repo': repo_full,
                         'account_id': str(current_acc_id),
@@ -1092,22 +1552,35 @@ class GitHubManager:
                     if rate_limit_sleep > 0:
                         time.sleep(rate_limit_sleep)
 
-            # Cleanup Camouflaged files
-            if camouflage:
-                log("Cleaning up camouflaged files...")
-                for p in active_files:
-                    try:
-                        os.remove(p)
-                    except: pass
+            # Save Map Logic
+            if camouflage and restore_map:
+                 ObfuscationManager.save_map_file(restore_map, base_repo_name)
 
             log(f"Smart Publish Complete. {len(uploaded_assets)} assets across repos.")
+
+            # Convert map to list for storage
+            # Add human size string
+            spanning_info = list(spanning_map.values())
+            for item in spanning_info:
+                # Simple human size
+                s = item['size_bytes']
+                item['size_human'] = f"{s:.2f} B" # Default
+                for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                    if s < 1024:
+                        item['size_human'] = f"{s:.2f} {unit}"
+                        break
+                    s /= 1024
+                else:
+                    # If loop finishes (larger than TB)
+                    item['size_human'] = f"{s:.2f} PB"
 
             # Return data structure for Catalog
             return {
                 'assets': uploaded_assets,
                 'restore_map': restore_map,
                 'repo_base': base_repo_name,
-                'release_url': final_release_url
+                'release_url': final_release_url,
+                'spanning_info': spanning_info
             }
 
         except Exception as e:
