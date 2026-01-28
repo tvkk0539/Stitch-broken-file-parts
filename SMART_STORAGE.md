@@ -25,7 +25,7 @@ When `GitHubManager.smart_publish_job` runs (via Automation):
 3.  It tags the asset in the Catalog DB with `{ "account_id": "123", "username": "UserA" }`.
 
 ### 2. Identity-Aware Restoration
-When you trigger a **Batch Download** or **Restore** job:
+When you trigger a **Smart Download**:
 1.  The Downloader scans the list of files.
 2.  It detects the `account_id` tag on each file.
 3.  **Dynamic Token Switching:**
@@ -48,9 +48,10 @@ What happens if you rename your GitHub account (e.g., `UserA` -> `UserNew`)?
 
 ### Automation
 1.  Create a Workflow with **GitHub Publish**.
-2.  Enable **Smart Repo Spanning** and choose **Scatter** (Round Robin) or **Relay**.
-3.  Select *multiple* accounts in the account picker.
-4.  Run the workflow.
+2.  **Smart Repo Spanning:** This is enabled automatically when you set a **Repo Limit (GB)** (default 40GB).
+3.  Choose Strategy: **Scatter** (Round Robin) or **Relay**.
+4.  Select *multiple* accounts in the account picker.
+5.  Run the workflow.
 
 ### Verification
 1.  Go to the **Catalog**.
@@ -59,5 +60,7 @@ What happens if you rename your GitHub account (e.g., `UserA` -> `UserNew`)?
 4.  You will see a tag `👤 Username` next to each file, confirming its source identity.
 
 ### Restoration
-1.  Simply click **Download All** or **Restore Files**.
-2.  ParFix handles the rest.
+1.  **Smart Download:** Click the **"🚀 Smart Download"** button in the Catalog Item details.
+2.  ParFix will ask for a destination folder (default: `Downloads/Title`).
+3.  The system downloads all files to your server, switching tokens automatically.
+4.  **Restore:** Once downloaded, click **"♻️ Restore Files"** (if Camouflage was used) to decrypt and rename them back to the original filenames.

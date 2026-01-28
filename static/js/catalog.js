@@ -353,6 +353,9 @@ const catalog = {
 
                 extraActions = `
                     <div style="display:flex; flex-direction:column; gap:5px; margin-right:15px;">
+                        <button onclick="catalog.downloadItem('${item.id}')" class="btn-lg info-btn" style="background-color: #9ece6a; color: #15161e; font-weight: bold; border: 2px solid #73daca; padding: 10px 20px; font-size:1em;" title="Download to Server (Smart Identity)">
+                            🚀 Smart Download
+                        </button>
                         <button onclick="catalog.copyLinks('${item.id}')" class="btn-lg info-btn" style="background-color: #00d9ff; color: #15161e; font-weight: bold; border: 2px solid #00b3d4; padding: 10px 20px; font-size:1em;" title="Copy all links for JDownloader">
                             📋 DL Links for JD
                         </button>
@@ -777,6 +780,32 @@ const catalog = {
             }
         } catch(e) {
             alert("Update Request Failed: " + e);
+        }
+    },
+
+    downloadItem: async (id) => {
+        const item = catalog.state.items.find(x => x.id === id);
+        if(!item) return;
+
+        // Clean title for default path
+        const defPath = item.title.replace(/[^a-zA-Z0-9-_]/g, '_');
+        const path = prompt("Download to server path (relative to downloads):", defPath);
+        if (path === null) return; // Cancelled
+
+        try {
+            const res = await fetch('/api/catalog/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ item_id: id, path: path })
+            });
+            const d = await res.json();
+            if (d.status === 'queued') {
+                showToast("Smart Download Started! 🚀", "success");
+            } else {
+                alert("Error: " + d.error);
+            }
+        } catch (e) {
+            alert("Request failed: " + e);
         }
     },
 

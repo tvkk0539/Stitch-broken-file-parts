@@ -14,6 +14,7 @@ from app.managers.apple_music import AppleMusicManager
 from app.managers.am_wrapper import AppleMusicWrapperManager
 from app.managers.obfuscation import ObfuscationManager
 from app.core.config import save_config, load_config
+from werkzeug.utils import secure_filename
 import os
 import shutil
 import subprocess
@@ -131,6 +132,40 @@ def add_catalog_item():
         return jsonify({'status': 'success', 'entry': entry})
     else:
         return jsonify({'status': 'error', 'message': 'Failed to save'}), 500
+
+@bp.route('/api/catalog/download', methods=['POST'])
+def catalog_download_item():
+    """Smart Download for Catalog Items."""
+    data = request.json
+    item_id = data.get('item_id')
+    path = data.get('path') # Optional: Relative path override
+
+    if not item_id: return jsonify({'error': 'Item ID required'}), 400
+
+    item = catalog_manager.get_by_id(item_id)
+    if not item: return jsonify({'error': 'Item not found'}), 404
+
+    assets = item.get('assets', [])
+    if not assets: return jsonify({'error': 'No assets in item'}), 400
+
+    # Determine destination
+    # Default: DOWNLOAD_ROOT/Title
+    title_slug = secure_filename(item['title']) or "download"
+
+    if path:
+        target_dir = os.path.join(DOWNLOAD_ROOT, path)
+    else:
+        target_dir = os.path.join(DOWNLOAD_ROOT, title_slug)
+
+    # Trigger Job
+    # We pass None as fallback account_id. The Smart Downloader handles 'account_id' in assets.
+    job_id = job_manager.add_job(
+        f"Smart Download: {item['title']}",
+        GitHubManager.run_batch_download_job,
+        args=(assets, target_dir, None)
+    )
+
+    return jsonify({'status': 'queued', 'job_id': job_id})
 
 @bp.route('/api/catalog/fetch-metadata', methods=['POST'])
 def catalog_fetch_metadata():
