@@ -916,28 +916,53 @@ class GitHubManager:
             return None, 0
 
     @staticmethod
-    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay', release_mode='create', strict_mode=False):
+    def smart_publish_job(files, base_repo_name, tag, account_id, body=None, private=True, description="Archive Spanning", span_limit_gb=40, account_limit_gb=45, camouflage=False, meta=None, rate_limit_sleep=0, safety_sleep=0, strategy='relay', release_mode='create', strict_mode=False, distribution_map=None):
         """
         Publishes files across multiple repositories and accounts if needed.
         Strategies: 'relay' (Sequential Fill), 'scatter' (Round Robin per File).
         Release Mode: 'create' (New Tag) or 'append' (Add to latest).
         Strict Mode: If True, enforces 1 Repo per Account (Max 45GB) and switches account immediately if full.
+        Distribution Map: List of dicts [{'account_id': '1', 'repo': 'user/repo'}] defining explicit routing.
         """
         from app.managers.obfuscation import ObfuscationManager
         import time
         import random
 
-        # Normalize account_id to list
-        account_ids = []
-        if isinstance(account_id, list):
-            account_ids = account_id
-        elif isinstance(account_id, str) and ',' in account_id:
-            account_ids = [aid.strip() for aid in account_id.split(',') if aid.strip()]
+        # Normalize Routing Logic
+        # Case 1: Use distribution_map if provided (Professional Mode)
+        # Case 2: Use account_ids list + base_repo_name (Legacy/Simple Mode)
+
+        routing_mode = 'map' if distribution_map and len(distribution_map) > 0 else 'legacy'
+
+        # Build unified accessors
+        if routing_mode == 'map':
+            account_ids = [str(item['account_id']) for item in distribution_map]
+            # Helper to get repo for an account index
+            def get_repo_target(idx):
+                if idx < len(distribution_map):
+                    return distribution_map[idx]['repo']
+                return base_repo_name # Fallback
         else:
-            account_ids = [str(account_id)]
+            # Legacy logic normalization
+            account_ids = []
+            if isinstance(account_id, list):
+                account_ids = account_id
+            elif isinstance(account_id, str) and ',' in account_id:
+                account_ids = [aid.strip() for aid in account_id.split(',') if aid.strip()]
+            else:
+                account_ids = [str(account_id)]
+
+            def get_repo_target(idx):
+                return base_repo_name
 
         current_acc_idx = 0
         current_acc_id = account_ids[0]
+        # Initial Repo Name Selection
+        current_repo_name = get_repo_target(current_acc_idx)
+        # If strict mode, we use full name. If not strict, we might append -01
+        # But 'ensure_repo' logic below handles suffixing for non-strict.
+        # Wait, ensure_repo takes 'name'. Ideally distribution_map provides FULL name 'user/repo'.
+        # We need to adapt ensure_repo logic.
 
         # Build Username Map for Smart Identity
         accounts_list = GitHubManager.list_accounts()
@@ -962,13 +987,29 @@ class GitHubManager:
 
         # 2. Repo Spanning Logic
         current_repo_index = 1
-        current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+
+        # If routing_mode is map, current_repo_name IS the target (no suffix).
+        # If legacy, we suffix '-01' unless strict mode or single repo.
+
+        if routing_mode == 'map':
+             # Use explicit name from map.
+             # If strict mode is OFF, do we still suffix?
+             # Professional mode usually implies explicit control.
+             # Let's assume Map = Exact Name unless strict mode is OFF and it fills up?
+             # For strict mode, Map = Exact Name.
+             # For non-strict, we can stick to Exact Name first, then suffix if needed.
+             pass
+        else:
+             if not strict_mode:
+                 current_repo_name = f"{base_repo_name}-{current_repo_index:02d}"
+             else:
+                 current_repo_name = base_repo_name
 
         # Helper to get/create repo (Bound to current account)
         def ensure_repo(name, acc_id, try_pool=False):
             # --- Dynamic Pooling Logic ---
-            # If enabled, try to find an EXISTING bucket first
-            if try_pool:
+            # Only relevant for 'legacy' naming. If 'map' is used, user specified exact target.
+            if try_pool and routing_mode == 'legacy':
                 pool_repo, pool_size = GitHubManager.find_available_pool_repo(acc_id, name, span_limit_gb)
                 if pool_repo:
                     return pool_repo, pool_size
@@ -976,6 +1017,13 @@ class GitHubManager:
             # Check existence (Standard)
             user_info = GitHubManager._fetch_user_profile(GitHubManager._get_token_for_account(acc_id))
             owner = user_info['username']
+
+            # Handle Name Normalization (Strip owner if present in map)
+            if '/' in name:
+                supplied_owner, short_name = name.split('/', 1)
+                if supplied_owner.lower() == owner.lower():
+                    name = short_name
+
             full_name = f"{owner}/{name}"
 
             details = GitHubManager.get_repo_details(full_name, acc_id)
@@ -1045,25 +1093,18 @@ class GitHubManager:
             # But the key is that current_size_gb MUST be accurate from start.
 
             # Init state for Relay
-            # If Fill Mode: Try to find a pool repo matching the base name
-            if allocation_mode == 'fill':
-                # Use base name for pool search
-                repo_full, repo_size_kb = ensure_repo(base_repo_name, current_acc_id, try_pool=True)
-                # If pool returned a specific repo (e.g. base-04), update current name tracking?
-                # Actually, ensure_repo returns the full name found.
-                # But we maintain current_repo_name for naming NEW ones.
-                # If we reused one, we should probably stick to it until full.
-            else:
-                repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id)
+            use_pool = (allocation_mode == 'fill')
 
-            # STRICT MODE INIT:
-            # If strict mode is ON, we must respect the existing size of the repo immediately.
-            # ensure_repo returns size.
+            # Determine initial target based on strategy
+            initial_target_name = current_repo_name
+            if use_pool and routing_mode == 'legacy':
+                 initial_target_name = base_repo_name # Pool scans base
+
+            repo_full, repo_size_kb = ensure_repo(initial_target_name, current_acc_id, try_pool=use_pool)
+
+            # Update loop state
             current_size_gb = repo_size_kb / (1024 * 1024)
             current_acc_uploaded_gb = 0
-
-            # If strict mode, we might need to trigger switch BEFORE the first file if full?
-            # The loop handles it.
 
             # Helper to create release return (upload_url, html_url)
             def get_release_data(r_name, t_name, acc_id):
@@ -1179,12 +1220,15 @@ class GitHubManager:
                                 # Strict Mode: Use base name again (try 'repo', then 'repo-02' if 'repo' full?
                                 # No, strictly 1 repo means we check THE repo.)
                                 # If strict mode, we should check 'base_repo_name' on new account.
-                                if strict_mode:
-                                    current_repo_name = base_repo_name
-                                    # Ensure we get the actual size of this repo on the new account
+                                # Strict Mode / Map Logic: Update Repo Name for new account
+                                if strict_mode or routing_mode == 'map':
+                                    # Get the specific repo for this new account index
+                                    current_repo_name = get_repo_target(current_acc_idx)
+
+                                    # Ensure we get the actual size
                                     repo_full, repo_size_kb = ensure_repo(current_repo_name, current_acc_id, try_pool=False)
                                     current_size_gb = repo_size_kb / (1024 * 1024)
-                                    # Reset uploaded count for new account
+                                    # Reset uploaded count
                                     current_acc_uploaded_gb = 0
 
                                     # Update context cache for new repo
