@@ -946,34 +946,17 @@ class GitHubManager:
         restore_map = {}
         active_files = files
 
-        # 1. Camouflage Logic
+        # 1. Camouflage Logic (Adaptive)
+        # We now handle camouflage per-file inside the loop to support adaptive contexts.
         release_tag = tag
         release_title = f"Archive {tag}"
         release_body = body
 
+        # Context Cache: repo_full -> {template, tag, title, body}
+        repo_context_cache = {}
+
         if camouflage:
-            log("🛡️ Camouflage Mode: ON")
-            job_manager.update_job_details({'action': 'Obfuscating file names...'})
-
-            # Rename files
-            camouflaged_paths, mapping = ObfuscationManager.camouflage_files(files)
-            active_files = camouflaged_paths
-            restore_map = mapping
-
-            # Save local map for backup
-            ObfuscationManager.save_map_file(mapping, base_repo_name)
-
-            # Generate Boring Metadata
-            # Check for passed template in meta
-            camo_template = 'log_rotation'
-            if meta and 'camo_template' in meta:
-                camo_template = meta['camo_template']
-
-            boring = ObfuscationManager.generate_boring_metadata(camo_template)
-            release_tag = boring['tag']
-            release_title = boring['title']
-            release_body = boring['body']
-            log(f"🎭 Using Cover Story: {release_title} ({camo_template})")
+            log("🛡️ Adaptive Camouflage Mode: ON")
 
         # 2. Repo Spanning Logic
         current_repo_index = 1
@@ -1096,9 +1079,10 @@ class GitHubManager:
                 raise Exception(f"Failed to create release on {r_name}")
 
             # Initial Release (First Repo)
-            upload_url_template, first_release_url = get_release_data(repo_full, release_tag, current_acc_id)
-            final_release_url = first_release_url # Keep track of primary link
-            current_release_url = first_release_url # For tracking
+            # We delay release creation until inside the loop for Adaptive Camouflage
+
+            final_release_url = None # Keep track of primary link
+            current_release_url = None
 
             total_files = len(active_files)
 
@@ -1116,28 +1100,20 @@ class GitHubManager:
 
                     tgt_repo = current_repo_name # e.g. archive-01
 
-                    # Check cache
+                    # Check cache for REPO existence (not context yet)
                     if current_acc_id not in scatter_cache: scatter_cache[current_acc_id] = {}
 
                     if tgt_repo not in scatter_cache[current_acc_id]:
                         # Init repo on this account
-                        # Scatter + Fill: Search pool for EACH account?
-                        # Yes, if Fill is on, scatter should try to reuse existing on that account.
                         use_pool = (allocation_mode == 'fill')
-
-                        # Special handling: ensure_repo uses 'try_pool' to scan base_repo_name
-                        # If we are in scatter, current_repo_name is usually static (base-01) or whatever.
-                        # If 'fill', we want ANY valid repo on that account.
-
                         r_full, r_size = ensure_repo(base_repo_name if use_pool else tgt_repo, current_acc_id, try_pool=use_pool)
+                        # We don't create release here anymore, just cache the repo info
+                        scatter_cache[current_acc_id][tgt_repo] = {'repo': r_full, 'size': r_size}
 
-                        u_url, r_url = get_release_data(r_full, release_tag, current_acc_id)
-                        scatter_cache[current_acc_id][tgt_repo] = (r_full, u_url, r_url) # Added r_url to cache
-
-                        # Use first scatter repo as final link if not set
-                        if not final_release_url: final_release_url = r_url
-
-                    repo_full, upload_url_template, current_release_url = scatter_cache[current_acc_id][tgt_repo]
+                    repo_full = scatter_cache[current_acc_id][tgt_repo]['repo']
+                    # Repo Size tracking is harder in scatter mode without re-querying,
+                    # but we only use it for limits which scatter ignores (Round Robin implies infinite/balanced).
+                    # Actually scatter limits are per-account.
 
                 # --- STRATEGY: RELAY (Sequential) ---
                 else:
@@ -1160,17 +1136,10 @@ class GitHubManager:
 
                         log(f"Switching Repository...")
 
-                        # Logic: If filling, search pool again (maybe we filled bucket A, is bucket B free?)
-                        # Or just create next in sequence.
-                        # Simple Logic: If Limit Reached -> Create New (Sequence).
-                        # Pool is mostly for Initial placement.
-                        # However, sophisticated pooling would re-scan.
-
                         can_reuse = False
                         if allocation_mode == 'fill':
                              # Try to find another bucket
                              pool_repo, pool_size = GitHubManager.find_available_pool_repo(current_acc_id, base_repo_name, span_limit_gb)
-                             # Ensure we don't pick the SAME one we just filled (check against repo_full)
                              if pool_repo and pool_repo != repo_full:
                                  repo_full = pool_repo
                                  repo_size_kb = pool_size
@@ -1183,10 +1152,157 @@ class GitHubManager:
                             repo_size_kb = 0
 
                         current_size_gb = repo_size_kb / (1024 * 1024)
-                        upload_url_template, current_release_url = get_release_data(repo_full, release_tag, current_acc_id)
+
+                # --- ADAPTIVE CAMOUFLAGE & CONTEXT ---
+
+                # Helper to update Release Data based on context
+                def ensure_release_context(r_full, acc_id):
+                    if r_full in repo_context_cache:
+                        return repo_context_cache[r_full]
+
+                    # Detect Context
+                    detected_template = None
+                    # If using Fill mode, we might have history
+                    if allocation_mode == 'fill':
+                        releases = GitHubManager.get_releases(r_full, acc_id)
+                        if releases and isinstance(releases, list) and len(releases) > 0:
+                            # Heuristic: Check latest release title
+                            latest = releases[0]
+                            detected_template = ObfuscationManager.detect_template(latest.get('name', ''))
+                            if detected_template:
+                                log(f"🕵️ Detected existing theme for {r_full}: {detected_template}")
+
+                    # Fallback or New
+                    if not detected_template:
+                        # User preference or Random
+                        base_pref = meta.get('camo_template', 'random') if meta else 'random'
+                        # If base_pref is fixed (e.g. 'log_rotation'), we use it.
+                        # If 'random', ObfuscationManager picks one.
+                        # BUT we want 'random' to be consistent per repo?
+                        # ObfuscationManager.generate_boring_metadata(random) returns a specific one.
+                        detected_template = base_pref
+
+                    # Generate Metadata
+                    boring = ObfuscationManager.generate_boring_metadata(detected_template)
+
+                    # Create/Get Release
+                    # We use the generated tag/title/body
+                    # Note: If existing repo had a different tag format, we might clash or look weird?
+                    # But we are adding a NEW release.
+                    u_url, r_url = get_release_data(r_full, boring['tag'], acc_id)
+
+                    # We must modify get_release_data to use passed title/body,
+                    # OR we just redefine it locally?
+                    # Actually get_release_data used closure 'release_title'.
+                    # We need to call API directly here or make get_release_data accept args.
+                    # Redefining logic here is safer for the context switch.
+
+                    ctx = {
+                        'template': boring['template'],
+                        'upload_url': u_url,
+                        'html_url': r_url,
+                        'tag': boring['tag']
+                    }
+                    repo_context_cache[r_full] = ctx
+                    log(f"🎭 Context for {r_full}: {boring['title']} ({boring['template']})")
+                    return ctx
+
+                # Redefine get_release_data inside loop to use specific metadata?
+                # No, let's just copy the logic or update the helper.
+                # The helper 'get_release_data' above (in previous block) used 'release_title' (global to func).
+                # We need to make it dynamic.
+                # Let's override the logic here:
+
+                if repo_full not in repo_context_cache:
+                    # Resolve Template
+                    base_pref = meta.get('camo_template', 'random') if meta else 'random'
+
+                    # Detect existing
+                    if allocation_mode == 'fill':
+                         rels = GitHubManager.get_releases(repo_full, current_acc_id)
+                         if rels and len(rels) > 0:
+                             det = ObfuscationManager.detect_template(rels[0].get('name', ''))
+                             if det: base_pref = det
+
+                    boring = ObfuscationManager.generate_boring_metadata(base_pref)
+
+                    # Create Release
+                    token = GitHubManager._get_token_for_account(current_acc_id)
+                    headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+
+                    # Check if tag exists (Collision check)
+                    # Use boring['tag']
+
+                    create_url = f"https://api.github.com/repos/{repo_full}/releases"
+                    payload = {
+                        "tag_name": boring['tag'],
+                        "name": boring['title'],
+                        "body": boring['body'],
+                        "draft": False,
+                        "prerelease": False
+                    }
+
+                    # Try Create
+                    r = requests.post(create_url, json=payload, headers=headers)
+                    if r.status_code in [200, 201]:
+                        d = r.json()
+                        u_url = d['upload_url']
+                        h_url = d['html_url']
+                    else:
+                        # Fallback: Get existing (if we guessed tag correctly or collision)
+                        # Or if we want to APPEND to existing release?
+                        # Spanning usually means unique releases.
+                        # If failed, maybe try GET
+                        get_url = f"https://api.github.com/repos/{repo_full}/releases/tags/{boring['tag']}"
+                        gr = requests.get(get_url, headers=headers)
+                        if gr.status_code == 200:
+                            d = gr.json()
+                            u_url = d['upload_url']
+                            h_url = d['html_url']
+                        else:
+                            raise Exception(f"Failed to create release {boring['tag']} on {repo_full}: {r.text}")
+
+                    repo_context_cache[repo_full] = {
+                        'template': boring['template'],
+                        'upload_url': u_url,
+                        'html_url': h_url,
+                        'tag': boring['tag']
+                    }
+                    log(f"🎭 Context for {repo_full}: {boring['title']} ({boring['template']})")
+
+                ctx = repo_context_cache[repo_full]
+                upload_url_template = ctx['upload_url']
+                current_release_url = ctx['html_url']
+                current_template_name = ctx['template']
+
+                if not final_release_url: final_release_url = current_release_url
+
+                # Rename File (Just-In-Time)
+                original_name = os.path.basename(file_path)
+                final_path_to_upload = file_path
+                clean_up_needed = False
+
+                if camouflage:
+                    fake_name = ObfuscationManager.get_camouflaged_filename(original_name, current_template_name)
+                    # We need to copy/rename to a temp location to avoid modifying the original list if reused?
+                    # But files are consumed.
+                    # Using same dir
+                    fake_path = os.path.join(os.path.dirname(file_path), fake_name)
+                    try:
+                        os.rename(file_path, fake_path)
+                        final_path_to_upload = fake_path
+                        restore_map[fake_name] = original_name
+                        clean_up_needed = True # Actually we just renamed it, so original path is gone.
+                        # We don't need to delete 'fake_path' if it replaced 'file_path'.
+                        # But wait, JobManager deletes the FOLDER.
+                        # If we renamed, we are fine.
+                    except Exception as e:
+                        log(f"Renaming failed: {e}")
+                        # Fallback to original
+                        final_path_to_upload = file_path
 
                 # Upload
-                fname = os.path.basename(file_path)
+                fname = os.path.basename(final_path_to_upload)
                 job_manager.update_job_details({'action': f"Uploading {idx+1}/{total_files}: {fname} to {current_repo_name} ({current_acc_id})"})
 
                 token = GitHubManager._get_token_for_account(current_acc_id)
@@ -1194,7 +1310,7 @@ class GitHubManager:
 
                 real_upload_url = upload_url_template.split('{')[0] + f"?name={fname}"
 
-                with open(file_path, 'rb') as f:
+                with open(final_path_to_upload, 'rb') as f:
                     r = requests.post(real_upload_url, data=f, headers=headers)
                     if r.status_code not in [200, 201]:
                         log(f"Failed upload {fname}: {r.text}")
@@ -1219,13 +1335,9 @@ class GitHubManager:
                     if rate_limit_sleep > 0:
                         time.sleep(rate_limit_sleep)
 
-            # Cleanup Camouflaged files
-            if camouflage:
-                log("Cleaning up camouflaged files...")
-                for p in active_files:
-                    try:
-                        os.remove(p)
-                    except: pass
+            # Save Map Logic
+            if camouflage and restore_map:
+                 ObfuscationManager.save_map_file(restore_map, base_repo_name)
 
             log(f"Smart Publish Complete. {len(uploaded_assets)} assets across repos.")
 

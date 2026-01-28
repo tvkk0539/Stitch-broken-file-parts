@@ -14,6 +14,12 @@ class ObfuscationManager:
 
     MAPS_DIR = os.path.join(os.environ.get('DOWNLOAD_ROOT', '/data/downloads'), 'maps')
 
+    # Template Definitions
+    TEMPLATES = [
+        'log_rotation', 'crash_dump', 'infrastructure', 'db_backup',
+        'ai_weights', 'cdn_cache', 'debug_symbols'
+    ]
+
     @staticmethod
     def generate_boring_metadata(template='log_rotation'):
         """
@@ -21,16 +27,11 @@ class ObfuscationManager:
         Templates: 'log_rotation', 'crash_dump', 'infrastructure', 'db_backup', 'ai_weights', 'cdn_cache', 'debug_symbols'
         If 'random' is passed, selects one randomly.
         """
-        templates = [
-            'log_rotation', 'crash_dump', 'infrastructure', 'db_backup',
-            'ai_weights', 'cdn_cache', 'debug_symbols'
-        ]
-
         if template == 'random':
-            template = random.choice(templates)
+            template = random.choice(ObfuscationManager.TEMPLATES)
 
         # Default fallback
-        if template not in templates:
+        if template not in ObfuscationManager.TEMPLATES:
             template = 'log_rotation'
 
         date_str = datetime.now().strftime('%Y-%m-%d')
@@ -120,23 +121,63 @@ Compiler: GCC 11.2
 
 Required for gdb/lldb analysis of production binaries."""
 
-        return {'tag': tag, 'title': title, 'body': body}
+        return {'tag': tag, 'title': title, 'body': body, 'template': template}
+
+    @staticmethod
+    def get_camouflaged_filename(original_name, template='log_rotation'):
+        """
+        Generates a camouflaged filename based on the template theme.
+        """
+        date_str = datetime.now().strftime("%Y%m%d")
+        unique_id = str(uuid.uuid4())[:8]
+
+        if template == 'crash_dump':
+            return f"core.dump.{unique_id}.dmp"
+        elif template == 'infrastructure':
+            return f"backup_vol_{unique_id}.tar.enc"
+        elif template == 'db_backup':
+            # Postgres WAL style
+            return f"pg_wal_{unique_id}.00000001"
+        elif template == 'ai_weights':
+            return f"model_layer_{unique_id}.bin"
+        elif template == 'cdn_cache':
+            return f"cache_{unique_id}.bin"
+        elif template == 'debug_symbols':
+            return f"lib_symbol_{unique_id}.so.debug"
+        else:
+            # Default: Log Rotation
+            return f"sys_log_{date_str}_shard_{unique_id}.dat"
+
+    @staticmethod
+    def detect_template(text):
+        """
+        Guesses the template from a string (Release Title or Tag).
+        Returns the template key or None.
+        """
+        if not text: return None
+        text = text.lower()
+
+        if "log rotation" in text or "-logs-" in text: return 'log_rotation'
+        if "core dump" in text or "dump-build" in text: return 'crash_dump'
+        if "infrastructure snapshot" in text: return 'infrastructure'
+        if "postgres wal" in text or "wal-arch" in text: return 'db_backup'
+        if "model checkpoints" in text or "ckpt-epoch" in text: return 'ai_weights'
+        if "static assets" in text or "assets-v" in text: return 'cdn_cache'
+        if "debug symbols" in text or "sym-v" in text: return 'debug_symbols'
+
+        return None
 
     @staticmethod
     def camouflage_files(file_paths):
         """
-        Renames files to `sys_log_[DATE]_shard_[UUID].dat`.
-        Returns:
-            new_paths (list): List of absolute paths to the renamed files.
-            mapping (dict): { 'fake_name.dat': 'original_name.rar' }
+        Legacy wrapper: Renames files using the default 'log_rotation' template.
+        Kept for backward compatibility if called directly.
         """
         if not os.path.exists(ObfuscationManager.MAPS_DIR):
             os.makedirs(ObfuscationManager.MAPS_DIR, exist_ok=True)
 
         new_paths = []
         mapping = {}
-
-        date_str = datetime.now().strftime("%Y%m%d")
 
         log(f"🛡️ Starting Camouflage for {len(file_paths)} files...")
 
@@ -147,10 +188,7 @@ Required for gdb/lldb analysis of production binaries."""
             directory = os.path.dirname(original_path)
             original_name = os.path.basename(original_path)
 
-            # Generate Camouflage Name
-            # Pattern: sys_log_20240101_shard_a1b2c3d4.dat
-            unique_id = str(uuid.uuid4())[:8]
-            fake_name = f"sys_log_{date_str}_shard_{unique_id}.dat"
+            fake_name = ObfuscationManager.get_camouflaged_filename(original_name, 'log_rotation')
             fake_path = os.path.join(directory, fake_name)
 
             try:
@@ -160,7 +198,6 @@ Required for gdb/lldb analysis of production binaries."""
                 log(f"   🎭 Masked: {original_name} -> {fake_name}")
             except Exception as e:
                 log(f"   ❌ Failed to mask {original_name}: {e}")
-                # Keep original if failed
                 new_paths.append(original_path)
 
         return new_paths, mapping
@@ -173,6 +210,9 @@ Required for gdb/lldb analysis of production binaries."""
         """
         if not mapping:
             return None
+
+        if not os.path.exists(ObfuscationManager.MAPS_DIR):
+            os.makedirs(ObfuscationManager.MAPS_DIR, exist_ok=True)
 
         filename = f"restore_map_{job_name}_{datetime.now().strftime('%H%M%S')}.txt"
         path = os.path.join(ObfuscationManager.MAPS_DIR, filename)
