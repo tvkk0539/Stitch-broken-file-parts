@@ -303,6 +303,16 @@ const catalog = {
                 posterHtml = `<span>${initial}</span>`;
             }
 
+            // Check for Restore Map
+            let restoreBtn = '';
+            if (item.restore_map && Object.keys(item.restore_map).length > 0) {
+                 restoreBtn = `
+                    <button onclick="catalog.restoreItem('${item.id}')" class="btn-lg info-btn" style="background-color: #7aa2f7; color: #15161e; font-weight: bold; border: 2px solid #3d59a1; padding: 10px 20px; font-size:1em; margin-right: 15px;">
+                        ♻️ Restore Files
+                    </button>
+                 `;
+            }
+
             // Check for assets
             let extraActions = '';
             let linksContainerHtml = '';
@@ -461,6 +471,7 @@ const catalog = {
 
                         <div class="catalog-actions">
                             ${item.release_url ? `<a href="${item.release_url}" target="_blank" class="secondary btn-lg" style="margin-right: 15px;">🌍 Open Release</a>` : ''}
+                            ${restoreBtn}
                             ${extraActions}
                             <div style="flex: 1;"></div> <!-- Spacer -->
                             <button onclick="catalog.openEditModal('${item.id}')" class="warning-btn btn-lg" style="color:#1a1b26; margin-right: 15px;">
@@ -777,6 +788,28 @@ const catalog = {
             catalog.reload(); // Refresh
         } catch (e) {
             alert("Failed to delete: " + e);
+        }
+    },
+
+    restoreItem: async (id) => {
+        const path = prompt("Enter the path where the obfuscated files are located (relative to Download Root):", "Downloads/");
+        if (!path) return;
+
+        try {
+            const res = await fetch('/api/obfuscation/restore', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ item_id: id, path: path })
+            });
+            const data = await res.json();
+
+            if (data.status === 'queued') {
+                showToast(`Restoration Started! Job ID: ${data.job_id}`, 'success');
+            } else {
+                alert("Error: " + (data.error || "Unknown error"));
+            }
+        } catch (e) {
+            alert("Request failed: " + e);
         }
     },
 

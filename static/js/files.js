@@ -250,10 +250,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('arc-fmt').onchange = (e) => {
         const isRar = e.target.value === 'rar';
+        const is7z = e.target.value === '7z';
         const nameGrp = document.getElementById('arc-naming-group');
         const rrGrp = document.getElementById('arc-rr-group');
-        if(nameGrp) nameGrp.style.display = isRar ? 'block' : 'none';
+
+        // Hide Naming Scheme for RAR (it defaults to standard part1.rar)
+        // Show Naming Scheme for 7z (if supported/requested)
+        if(nameGrp) nameGrp.style.display = is7z ? 'block' : 'none';
+
+        // Recovery Record only for RAR
         if(rrGrp) rrGrp.style.display = isRar ? 'block' : 'none';
+    };
+
+    // Show/Hide Encrypt Filenames based on Password input
+    document.getElementById('arc-pass').oninput = (e) => {
+        const hasPass = e.target.value.length > 0;
+        document.getElementById('arc-enc-name-group').style.display = hasPass ? 'block' : 'none';
+        if (!hasPass) document.getElementById('arc-enc-name').checked = false;
     };
 
     document.getElementById('start-arc').onclick = async () => {
@@ -272,6 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  format: document.getElementById('arc-fmt').value,
                  naming_scheme: naming,
                  rar_recovery_record: document.getElementById('arc-rr').checked,
+                 encrypt_filenames: document.getElementById('arc-enc-name').checked,
                  create_par2: document.getElementById('arc-par2').checked,
                  upload: document.getElementById('arc-upload').checked,
                  remote: document.getElementById('arc-remote').value,

@@ -8,7 +8,7 @@ import re
 
 class ArchiveManager:
     @staticmethod
-    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path='', naming_scheme='part1', rar_recovery_record=True):
+    def run_archive_job(source_path, archive_name, split_size, password, fmt='rar', create_par2=True, upload=False, remote=None, upload_path='', naming_scheme='part1', rar_recovery_record=True, encrypt_filenames=False):
         parent_dir = os.path.dirname(source_path)
         base_name = os.path.basename(source_path)
 
@@ -18,13 +18,10 @@ class ArchiveManager:
         elif clean_name.lower().endswith('.7z'): clean_name = clean_name[:-3]
 
         # 2. Construct Output Name based on Scheme
+        # For RAR, we rely on the archiver's auto-naming for parts.
+        # Manually appending .part001.rar causes double extensions (e.g. .part001.part1.rar).
         if fmt == 'rar':
-            if naming_scheme == 'part001':
-                archive_name = f"{clean_name}.part001.rar"
-            elif naming_scheme == 'part01':
-                archive_name = f"{clean_name}.part01.rar"
-            else:
-                archive_name = f"{clean_name}.rar"
+            archive_name = f"{clean_name}.rar"
         else:
             archive_name = f"{clean_name}.7z"
 
@@ -42,7 +39,12 @@ class ArchiveManager:
             if rar_recovery_record:
                 cmd.append('-rr5p')
             if password:
-                cmd.append(f'-hp{password}')
+                # -hp: Encrypt both file data and headers (filenames)
+                # -p: Encrypt files only
+                if encrypt_filenames:
+                    cmd.append(f'-hp{password}')
+                else:
+                    cmd.append(f'-p{password}')
             cmd.append(archive_name)
             cmd.append(source_path)
         else:
@@ -51,7 +53,10 @@ class ArchiveManager:
             cmd = ['7z', 'a', f'-v{size_arg}', '-mx0', '-y']
             if password:
                 cmd.append(f'-p{password}')
-                cmd.append('-mhe=on')
+                if encrypt_filenames:
+                    cmd.append('-mhe=on')
+                else:
+                    cmd.append('-mhe=off')
             cmd.append(archive_name)
             cmd.append(source_path)
 

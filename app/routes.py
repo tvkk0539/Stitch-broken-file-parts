@@ -12,6 +12,7 @@ from app.managers.sync import SyncManager
 from app.managers.workflow import WorkflowManager
 from app.managers.apple_music import AppleMusicManager
 from app.managers.am_wrapper import AppleMusicWrapperManager
+from app.managers.obfuscation import ObfuscationManager
 from app.core.config import save_config, load_config
 import os
 import shutil
@@ -196,6 +197,35 @@ def delete_catalog_item(item_id):
         return jsonify({'status': 'success'})
     else:
         return jsonify({'status': 'error', 'message': 'Item not found'}), 404
+
+@bp.route('/api/obfuscation/restore', methods=['POST'])
+def restore_obfuscated_files():
+    data = request.json
+    item_id = data.get('item_id')
+    target_path = data.get('path') # Relative to DOWNLOAD_ROOT
+
+    if not item_id or not target_path:
+        return jsonify({'error': 'Item ID and Path required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, target_path)
+    if not os.path.exists(abs_path):
+        return jsonify({'error': 'Target path not found'}), 404
+
+    item = catalog_manager.get_by_id(item_id)
+    if not item:
+        return jsonify({'error': 'Catalog item not found'}), 404
+
+    restore_map = item.get('restore_map')
+    if not restore_map:
+        return jsonify({'error': 'No restore map found for this item'}), 400
+
+    job_id = job_manager.add_job(
+        f"Restore Files: {item['title']}",
+        ObfuscationManager.restore_from_dict,
+        args=(restore_map, abs_path)
+    )
+
+    return jsonify({'status': 'queued', 'job_id': job_id})
 
 # --- Automation API ---
 
@@ -413,7 +443,8 @@ def trigger_archive():
         args=(abs_path, name, data.get('split_size', '1024M'), data.get('password'),
               data.get('format', 'rar'), data.get('create_par2', True),
               data.get('upload', False), data.get('remote'), data.get('upload_path', ''),
-              data.get('naming_scheme', 'part1'), data.get('rar_recovery_record', True))
+              data.get('naming_scheme', 'part1'), data.get('rar_recovery_record', True),
+              data.get('encrypt_filenames', False))
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 

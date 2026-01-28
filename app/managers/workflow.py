@@ -260,11 +260,12 @@ class WorkflowManager:
             split,
             conf.get('password'),
             conf.get('format', 'rar'),
-            True, # Create Par2
+            conf.get('create_par2', True),
             False,
             None, "",
             conf.get('naming', 'part1'),
-            conf.get('recovery', True)
+            conf.get('recovery', True),
+            conf.get('encrypt_filenames', False)
         )
 
         # Scan for output files (RAR/PAR2) in the parent dir
@@ -287,28 +288,27 @@ class WorkflowManager:
         """
         Publishes files to GitHub. Returns list of asset objects.
         Uses meta['tree_text'] for release body (Base64).
+        Now supports Smart Spanning & Camouflage.
         """
         repo = conf.get('repo')
-        tag_template = conf.get('tag_template', 'v{date}_{name}')
+        account_id = conf.get('account_id')
+
+        # New Configs
+        camouflage = conf.get('camouflage', False)
+        span_repos = conf.get('span_repos', False)
 
         # Obfuscation Logic
         obfuscate_title = conf.get('obfuscate_title', False)
-
-        # Body Content Mode (Standard, Tree Only, Clean)
         content_mode = conf.get('release_content', 'standard')
+        tag_template = conf.get('tag_template', 'v{date}_{name}')
 
-        # Generate Tag
         date_str = datetime.now().strftime("%Y%m%d")
-
         raw_title = meta.get('title', 'upload')
         title_slug = raw_title.replace(' ', '_')
 
         if obfuscate_title:
-            # Base64 Encode Title
             title_b64 = base64.urlsafe_b64encode(raw_title.encode('utf-8')).decode('utf-8').rstrip('=')
             display_title = title_b64
-            # Keep tag simple or obfuscated? Tag is public URL.
-            # Usually safer to obfuscate tag too if title is hidden.
             tag_slug = title_b64
         else:
             display_title = raw_title
@@ -316,89 +316,127 @@ class WorkflowManager:
 
         tag_name = tag_template.replace('{date}', date_str).replace('{name}', tag_slug)
 
-        # Build Body
+        # Body Generation
         tree_b64 = base64.b64encode(meta.get('tree_text', '').encode('utf-8')).decode('utf-8')
-
-        # Default Full Body (used for internal Catalog reference)
         stats_block = f"\n\n**Stats:**\nSize: {WorkflowManager._human_size(meta.get('total_size', 0))}\nFiles: {meta.get('file_count', 0)}"
         private_body = f"Auto-Upload via ParFix.\n\n**Original Structure (Base64):**\n`{tree_b64}`{stats_block}"
 
+        public_body = private_body
         if content_mode == 'clean':
-            body = ""
-            log("📝 Release Content: Clean (Empty Body)")
+            public_body = ""
         elif content_mode == 'tree_only':
-            # ENTIRE CONTENT IS BASE64 (Tree + Stats)
-            # 1. Decode the tree back to text (or just use meta['tree_text'])
             raw_tree = meta.get('tree_text', '')
-            # 2. Combine Tree + Stats
-            full_raw_content = f"{raw_tree}{stats_block}"
-            # 3. Encode everything
-            full_b64 = base64.b64encode(full_raw_content.encode('utf-8')).decode('utf-8')
+            full_raw = f"{raw_tree}{stats_block}"
+            public_body = base64.b64encode(full_raw.encode('utf-8')).decode('utf-8')
 
-            body = full_b64
-            log("📝 Release Content: Tree Only (Full Base64)")
+        # Check for Smart Publish Requirement
+        # We now assume smart publish if span_limit is present or span_repos is true
+        if span_repos or conf.get('span_limit'):
+            # Repo is assumed to be base name "user/repo-base" or just "repo-base"
+            # We strip 'https://github.com/'
+            clean_repo = repo.replace('https://github.com/', '').strip('/')
+            # If user provided user/repo, we split
+            if '/' in clean_repo:
+                # We assume user owns it, so we extract just the repo name part for creating suffix
+                # But actually, create_repository takes just 'name'.
+                # So we need 'base_name'.
+                base_repo_name = clean_repo.split('/')[-1]
+            else:
+                base_repo_name = clean_repo
+
+            # Inject camo_template into meta
+            if conf.get('camo_template'):
+                meta['camo_template'] = conf.get('camo_template')
+
+            result = GitHubManager.smart_publish_job(
+                files,
+                base_repo_name,
+                tag_name,
+                account_id,
+                body=public_body,
+                private=True, # Enforce private for cold storage
+                span_limit_gb=int(conf.get('span_limit', 40)),
+                account_limit_gb=int(conf.get('account_limit', 45)),
+                camouflage=camouflage,
+                meta=meta,
+                rate_limit_sleep=int(conf.get('rate_limit_seconds', 15)),
+                safety_sleep=int(conf.get('safety_sleep_seconds', 3600)),
+                strategy=conf.get('strategy', 'relay')
+            )
+
+            # Inject private body into result for Catalog
+            result['body'] = private_body
+            result['public_body_mode'] = content_mode
+            return result
+
         else:
-            # Standard
-            body = private_body
-            log("📝 Release Content: Standard (Full Detail)")
+            # STANDARD PUBLISH (Legacy Logic)
+            # Create Release
+            token = GitHubManager._get_token_for_account(account_id)
+            if not token: raise Exception("No GitHub Account")
 
-        # Use GitHubManager to publish (We need a method that returns assets!)
-        # Existing run_publish_job is void. We need to call internal methods.
+            clean_repo = repo.replace('https://github.com/', '').strip('/')
+            create_url = f"https://api.github.com/repos/{clean_repo}/releases"
+            headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+            payload = {"tag_name": tag_name, "name": display_title, "body": public_body}
 
-        acc_id = "1" # TODO: Pass from config or context
-        # For now, let's use the first available account or require one in config
-        # Assuming GitHubManager has logic.
+            import requests
+            r = requests.post(create_url, json=payload, headers=headers)
+            if r.status_code not in [200, 201]:
+                 # Try finding existing tag to upload to?
+                 # Simplified: Fail
+                 raise Exception(f"Release Create Failed: {r.text}")
 
-        # Create Release
-        # NOTE: We need to import GitHubManager static methods.
-        # Assuming user provided account_id in config
-        account_id = conf.get('account_id')
+            release_data = r.json()
+            upload_url_template = release_data['upload_url']
 
-        # 1. Create Release
-        token = GitHubManager._get_token_for_account(account_id)
-        if not token: raise Exception("No GitHub Account selected for Publish")
+            assets_out = []
 
-        # Create Release API call (simplified reuse)
-        clean_repo = repo.replace('https://github.com/', '').strip('/')
-        create_url = f"https://api.github.com/repos/{clean_repo}/releases"
-        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
-        payload = {"tag_name": tag_name, "name": display_title, "body": body}
+            # Camouflage Handling for Single Repo?
+            # User asked for Camouflage. If Span is OFF but Camouflage is ON, we should still rename.
+            active_files = files
+            restore_map = {}
 
-        import requests
-        r = requests.post(create_url, json=payload, headers=headers)
-        if r.status_code not in [200, 201]:
-             raise Exception(f"Release Create Failed: {r.text}")
+            if camouflage:
+                from app.managers.obfuscation import ObfuscationManager
+                log("🛡️ Camouflage Mode: ON (Single Repo)")
+                cam_paths, mapping = ObfuscationManager.camouflage_files(files)
+                active_files = cam_paths
+                restore_map = mapping
+                ObfuscationManager.save_map_file(mapping, clean_repo.split('/')[-1])
 
-        release_data = r.json()
-        upload_url_template = release_data['upload_url']
+            try:
+                for file_path in active_files:
+                    fname = os.path.basename(file_path)
+                    log(f"Uploading {fname}...")
+                    upload_url = upload_url_template.split('{')[0] + f"?name={fname}"
+                    with open(file_path, 'rb') as f:
+                        h = headers.copy()
+                        h['Content-Type'] = 'application/octet-stream'
+                        ru = requests.post(upload_url, data=f, headers=h)
+                        if ru.status_code not in [200, 201]:
+                            log(f"Failed to upload {fname}: {ru.text}")
+                        else:
+                            adata = ru.json()
+                            assets_out.append({
+                                'name': fname,
+                                'size': os.path.getsize(file_path),
+                                'url': adata.get('browser_download_url', '')
+                            })
+            finally:
+                # Cleanup
+                if camouflage:
+                    for p in active_files:
+                        try: os.remove(p)
+                        except: pass
 
-        # 2. Upload Assets
-        assets_out = []
-        for file_path in files:
-            fname = os.path.basename(file_path)
-            log(f"Uploading {fname}...")
-            upload_url = upload_url_template.split('{')[0] + f"?name={fname}"
-            with open(file_path, 'rb') as f:
-                h = headers.copy()
-                h['Content-Type'] = 'application/octet-stream'
-                ru = requests.post(upload_url, data=f, headers=h)
-                if ru.status_code not in [200, 201]:
-                    log(f"Failed to upload {fname}: {ru.text}")
-                else:
-                    adata = ru.json()
-                    assets_out.append({
-                        'name': fname,
-                        'size': os.path.getsize(file_path),
-                        'url': adata.get('browser_download_url', '')
-                    })
-
-        log(f"Published {len(assets_out)} assets.")
-        return {
-            'assets': assets_out,
-            'release_url': release_data.get('html_url', f"https://github.com/{repo}"),
-            'body': private_body, # Pass full body internally to Catalog
-            'public_body_mode': content_mode
-        }
+            return {
+                'assets': assets_out,
+                'release_url': release_data.get('html_url', f"https://github.com/{repo}"),
+                'body': private_body,
+                'public_body_mode': content_mode,
+                'restore_map': restore_map
+            }
 
     @staticmethod
     def _step_catalog(context, conf):
@@ -482,7 +520,8 @@ class WorkflowManager:
             assets=assets,
             image=image_path,
             priority=int(conf.get('priority', 1)),
-            description=final_desc
+            description=final_desc,
+            restore_map=gh_data.get('restore_map', {})
         )
 
         # Sync happens inside add_entry
