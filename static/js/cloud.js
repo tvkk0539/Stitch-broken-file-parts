@@ -166,6 +166,43 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Mc Modal Events
+    document.getElementById('mc-new-folder-btn').onclick = async () => {
+        const name = prompt("New Folder Name:");
+        if (!name) return;
+
+        if (mcContext === 'cloud') {
+            // Cloud Mkdir logic
+            // mcCurrentBrowserPath format: "remote" or "remote/path/sub"
+            let r = mcCurrentBrowserPath, p = '';
+            if (mcCurrentBrowserPath && mcCurrentBrowserPath.includes('/')) {
+                r = mcCurrentBrowserPath.split('/')[0];
+                p = mcCurrentBrowserPath.substring(mcCurrentBrowserPath.indexOf('/') + 1);
+            } else if (!mcCurrentBrowserPath) {
+                alert("Cannot create folder in root remote list.");
+                return;
+            } else {
+                // If path is just "remote", then path is empty root
+                r = mcCurrentBrowserPath;
+                p = '';
+            }
+
+            await fetch('/api/rclone/mkdir', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({remote: r, path: p, name: name})
+            });
+        } else {
+            // Local Mkdir logic
+            await fetch('/api/mkdir', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({path: mcCurrentBrowserPath || '', name: name})
+            });
+        }
+        // Refresh
+        loadMcBrowser(mcCurrentBrowserPath);
+    };
+
     document.getElementById('mc-up-btn').onclick = () => {
          if(!mcCurrentBrowserPath) return;
          if(!mcCurrentBrowserPath.includes('/')) loadMcBrowser('');
