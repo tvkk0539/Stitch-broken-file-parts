@@ -276,12 +276,16 @@ class JobManager:
             running_ids = set(self.running_jobs.keys())
 
             with log_lock:
+                # 1. Clear Job Logs
                 for jid in list(job_log_buffers.keys()):
                     if jid not in running_ids:
                         del job_log_buffers[jid]
                         # Clean listeners if any (should be none ideally)
                         if jid in job_log_listeners:
                              del job_log_listeners[jid]
+
+                # 2. Clear System Logs
+                system_log_buffer.clear()
 
     # --- Log Listener Methods ---
 
