@@ -925,6 +925,7 @@ class GitHubManager:
         Distribution Map: List of dicts [{'account_id': '1', 'repo': 'user/repo'}] defining explicit routing.
         """
         from app.managers.obfuscation import ObfuscationManager
+        from app.managers.survival_kit import SurvivalKitManager
         import time
         import random
 
@@ -1561,6 +1562,28 @@ class GitHubManager:
             # Convert map to list for storage
             # Add human size string
             spanning_info = list(spanning_map.values())
+            for item in spanning_info:
+                # Simple human size
+                s = item['size_bytes']
+                item['size_human'] = f"{s:.2f} B" # Default
+                for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                    if s < 1024:
+                        item['size_human'] = f"{s:.2f} {unit}"
+                        break
+                    s /= 1024
+                else:
+                    item['size_human'] = f"{s:.2f} PB"
+
+            # --- SURVIVAL KIT GENERATION ---
+            # We generate it in the source folder of the first file
+            if active_files and camouflage:
+                try:
+                    source_dir = os.path.dirname(active_files[0])
+                    SurvivalKitManager.generate_kit(source_dir, release_title, restore_map, spanning_info)
+                except Exception as ek:
+                    log(f"⚠️ Survival Kit generation error: {ek}")
+
+            # Return data structure for Catalog
             for item in spanning_info:
                 # Simple human size
                 s = item['size_bytes']

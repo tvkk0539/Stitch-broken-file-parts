@@ -261,6 +261,19 @@ def restore_obfuscated_files():
 
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/catalog/kit/<item_id>', methods=['POST'])
+def generate_survival_kit(item_id):
+    """Triggers generation of the Survival Kit."""
+    item = catalog_manager.get_by_id(item_id)
+    if not item: return jsonify({'error': 'Item not found'}), 404
+
+    job_id = job_manager.add_job(
+        f"Generate Survival Kit: {item['title']}",
+        CatalogManager.regenerate_kit_job,
+        args=(item_id,)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
 # --- Automation API ---
 
 workflow_manager = WorkflowManager()
