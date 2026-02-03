@@ -577,6 +577,35 @@ def trigger_cover_extract():
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/media/streams', methods=['POST'])
+def media_get_streams():
+    data = request.json
+    path = data.get('path')
+    if not path: return jsonify({'error': 'Path required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, path)
+    if not os.path.exists(abs_path): return jsonify({'error': 'File not found'}), 404
+
+    return jsonify(MediaManager.get_stream_info(abs_path))
+
+@bp.route('/api/media/extract-streams', methods=['POST'])
+def media_extract_streams():
+    data = request.json
+    path = data.get('path')
+    selections = data.get('selections', []) # List of {index, type, codec}
+
+    if not path or not selections: return jsonify({'error': 'Path and selections required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, path)
+    if not os.path.exists(abs_path): return jsonify({'error': 'File not found'}), 404
+
+    job_id = job_manager.add_job(
+        f"Extract Streams from {os.path.basename(path)}",
+        MediaManager.run_extract_streams_job,
+        args=(abs_path, selections)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
 @bp.route('/api/inspect', methods=['POST'])
 def inspect_item():
     data = request.json

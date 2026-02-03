@@ -1,16 +1,144 @@
 import os
 import subprocess
 import logging
-from app.core.job_manager import log
+import json
+from app.core.job_manager import log, job_manager
 
 logger = logging.getLogger(__name__)
 
 class MediaManager:
     """
-    Manages media-specific operations like Cover Extraction.
+    Manages media-specific operations: Cover Extraction, Stream Analysis, Stream Extraction.
     """
 
     AUDIO_EXTENSIONS = {'.mp3', '.flac', '.m4a', '.ogg', '.opus', '.wma', '.m4b', '.wav', '.aiff'}
+
+    @staticmethod
+    def get_stream_info(path):
+        """
+        Uses ffprobe to return detailed stream info.
+        Returns: list of dicts.
+        """
+        try:
+            cmd = [
+                'ffprobe', '-v', 'quiet', '-print_format', 'json',
+                '-show_streams', '-show_format', path
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode != 0:
+                return {'error': 'ffprobe failed'}
+
+            data = json.loads(res.stdout)
+            streams = []
+
+            for s in data.get('streams', []):
+                stype = s.get('codec_type')
+                if stype not in ['video', 'audio', 'subtitle']: continue
+
+                tags = s.get('tags', {})
+                lang = tags.get('language', 'und')
+                title = tags.get('title', '')
+
+                info = {
+                    'index': s.get('index'),
+                    'type': stype,
+                    'codec': s.get('codec_name', 'unknown'),
+                    'lang': lang,
+                    'title': title,
+                    'channels': s.get('channels'), # Audio only
+                    'width': s.get('width'), # Video only
+                    'height': s.get('height') # Video only
+                }
+                streams.append(info)
+
+            return {'streams': streams, 'format': data.get('format', {})}
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def run_extract_streams_job(path, selections):
+        """
+        Extracts selected streams to separate files.
+        selections: list of {index, type, codec, lang}
+        """
+        log(f"Starting Stream Extraction for: {os.path.basename(path)}")
+        job_manager.update_job_details({'action': 'Initializing Extraction...'})
+
+        base_dir = os.path.dirname(path)
+        base_name = os.path.splitext(os.path.basename(path))[0]
+
+        # Build FFmpeg command
+        # ffmpeg -i input.mkv -map 0:1 -c copy output.aac -map 0:2 -c copy output.srt ...
+        cmd = ['ffmpeg', '-y', '-i', path]
+
+        output_files = []
+
+        for sel in selections:
+            idx = sel['index']
+            stype = sel['type']
+            codec = sel['codec']
+            lang = sel.get('lang', 'und')
+
+            # Determine extension
+            ext = 'dat'
+            if stype == 'subtitle':
+                if 'subrip' in codec or 'srt' in codec: ext = 'srt'
+                elif 'ass' in codec: ext = 'ass'
+                elif 'webvtt' in codec: ext = 'vtt'
+                elif 'pgs' in codec: ext = 'sup'
+                else: ext = 'srt' # Try default container
+            elif stype == 'audio':
+                if 'aac' in codec: ext = 'aac' # or m4a
+                elif 'ac3' in codec: ext = 'ac3'
+                elif 'eac3' in codec: ext = 'eac3'
+                elif 'mp3' in codec: ext = 'mp3'
+                elif 'flac' in codec: ext = 'flac'
+                elif 'opus' in codec: ext = 'opus'
+                elif 'vorbis' in codec: ext = 'ogg'
+                else: ext = 'mka' # Generic Audio container
+            elif stype == 'video':
+                ext = 'mkv' # Always safe for video streams
+
+            # Construct Output Filename: Name.Lang.TrackID.Ext
+            # e.g. Movie.eng.2.aac
+            out_name = f"{base_name}.{lang}.track{idx}.{ext}"
+            out_path = os.path.join(base_dir, out_name)
+            output_files.append(out_name)
+
+            cmd.extend(['-map', f"0:{idx}", '-c', 'copy', out_path])
+
+        log(f"Extracting {len(selections)} streams...")
+        job_manager.update_job_details({'action': f"Extracting {len(selections)} streams", 'targets': output_files})
+
+        try:
+            if job_manager.is_cancelled(): return
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                universal_newlines=True
+            )
+            job_manager.set_current_process(process)
+
+            for line in process.stdout:
+                # FFmpeg output is noisy, we can filter or just log progress
+                if "size=" in line and "time=" in line:
+                    # Update progress? FFmpeg outputs to stderr usually, but we merged.
+                    pass
+
+            process.wait()
+
+            if process.returncode == 0:
+                log(f"Extraction Complete. Created: {', '.join(output_files)}")
+            else:
+                log(f"Extraction Failed (Code {process.returncode})")
+                job_manager.update_job_details({'error': 'FFmpeg Failed'})
+
+        except Exception as e:
+            log(f"Extraction Error: {e}")
+            job_manager.update_job_details({'error': str(e)})
 
     @staticmethod
     def run_extract_covers_job(paths, job_id=None):

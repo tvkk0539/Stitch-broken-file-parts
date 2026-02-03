@@ -315,11 +315,60 @@
                         <div class="app-desc">Download Songs, Albums, and Playlists in high quality.</div>
                     </div>
 
+                    <!-- Media Tool -->
+                    <div class="app-card" onclick="openMediaToolApp()">
+                        <svg class="app-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#00d9ff;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        <div class="app-name">Media Toolbox</div>
+                        <div class="app-desc">Extract Audio & Subtitles from video files without re-encoding.</div>
+                    </div>
+
                     <!-- Future Apps Placeholders -->
                     <div class="app-card" style="opacity:0.3; cursor:default; border-style:dashed;">
                         <svg class="app-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                         <div class="app-name">Add App</div>
                         <div class="app-desc">More tools coming soon...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: MEDIA TOOLBOX -->
+            <div id="view-media-tool" class="view-section">
+                <!-- Header -->
+                <div style="display:flex; align-items:center; margin-bottom:20px;">
+                    <button class="icon-btn" onclick="switchView('apps')" style="margin-right:15px; color:var(--text-muted);" title="Back to Apps">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    </button>
+                    <h2 style="margin:0; display:flex; align-items:center; gap:10px; color:#00d9ff;">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        Media Toolbox
+                    </h2>
+                </div>
+
+                <div style="max-width:900px; margin:0 auto;">
+                    <!-- Step 1: Select -->
+                    <div style="background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h3 style="margin:0; margin-bottom:5px;">Source File</h3>
+                                <div id="mt-file-display" style="font-family:monospace; color:var(--text-muted);">No file selected</div>
+                            </div>
+                            <button class="purple-btn" onclick="mediaTool.selectFile()">📂 Select Video</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Streams -->
+                    <div id="mt-streams-wrapper" style="background:var(--panel-bg); padding:20px; border-radius:8px; border:1px solid var(--border-color); min-height:300px;">
+                        <h3 style="margin-top:0; margin-bottom:15px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">Stream Analysis</h3>
+                        <div id="mt-streams-container">
+                            <div style="text-align:center; color:var(--text-muted); padding:50px;">Select a file to analyze streams.</div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Actions -->
+                    <div id="mt-actions-panel" style="display:none; margin-top:20px; text-align:right;">
+                        <button class="secondary" onclick="mediaTool.extractSelected()" style="padding:12px 25px; font-size:1.1em; background:#00d9ff; color:#15161e; font-weight:bold;">
+                            ⚡ Extract Selected Streams
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1040,6 +1089,18 @@
     <div id="mkdir-modal" class="modal"><div class="modal-content"><div class="modal-header"><h3>New Folder</h3></div><input type="text" id="mkdir-name" style="width:100%; padding:10px; margin-bottom:20px;"><div class="modal-actions"><button id="cancel-mkdir" class="danger">Cancel</button><button id="confirm-mkdir" class="secondary">Create</button></div></div></div>
     <div id="inspect-modal" class="modal"><div class="modal-content" style="width:600px;"><div class="modal-header"><h3>File Info</h3></div><div id="inspect-content" style="max-height:400px; overflow-y:auto;"></div><div class="modal-actions"><button id="close-inspect" class="secondary">Close</button></div></div></div>
 
+    <!-- Media File Picker Modal -->
+    <div id="media-file-picker" class="modal" style="z-index: 1050;">
+        <div class="modal-content" style="width:500px;">
+            <div class="modal-header">
+                <h3>Select Video File</h3>
+                <button class="icon-btn" onclick="document.getElementById('media-file-picker').style.display='none'">✖</button>
+            </div>
+            <div id="mfp-path" style="padding:10px; background:#1a1b26; font-family:monospace; margin-bottom:10px;">/</div>
+            <div id="mfp-list" style="height:300px; overflow-y:auto; border:1px solid var(--border-color);">Loading...</div>
+        </div>
+    </div>
+
     <!-- Media Viewer Modal -->
     <div id="media-viewer-modal" class="modal" style="z-index: 2000; background: rgba(0,0,0,0.9);">
         <div class="modal-content" style="width: auto; max-width: 90vw; max-height: 90vh; background: transparent; padding: 0; box-shadow: none; border: none; display: flex; flex-direction: column; align-items: center;">
@@ -1314,6 +1375,7 @@
     <script src="/static/js/automation.js"></script>
     <script src="/static/js/apps/github.js"></script>
     <script src="/static/js/apps/apple_music.js"></script>
+    <script src="/static/js/apps/media_tool.js"></script>
     <script src="/static/js/stealth.js"></script>
 </body>
 </html>

@@ -24,7 +24,7 @@ function switchView(viewName) {
 
     // Find item by data-view attribute for robustness
     let targetView = viewName;
-    if(viewName === 'gh-app') targetView = 'apps';
+    if(viewName === 'gh-app' || viewName === 'apple-music' || viewName === 'media-tool') targetView = 'apps';
 
     const activeNav = document.querySelector(`.nav-item[data-view="${targetView}"]`);
     if(activeNav) activeNav.classList.add('active');
@@ -213,6 +213,15 @@ async function clearLogs() {
     }
 }
 
+function openAppleMusicApp() {
+    switchView('apple-music');
+}
+
+function openMediaToolApp() {
+    switchView('media-tool');
+    if(window.mediaTool && window.mediaTool.init) window.mediaTool.init();
+}
+
 // Initialize core components on load
 document.addEventListener('DOMContentLoaded', () => {
     initLogs();
@@ -220,4 +229,5 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.catalog) window.catalog.init();
     if(window.initAutomation) window.initAutomation();
     if(window.stealth) window.stealth.init();
+    if(window.mediaTool) window.mediaTool.init();
 });
