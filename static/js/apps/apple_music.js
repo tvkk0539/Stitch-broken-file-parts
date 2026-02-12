@@ -373,6 +373,35 @@ const appleMusic = {
         const container = document.getElementById('am-config-form');
         container.innerHTML = '';
 
+        // --- Manual Sync Controls ---
+        const syncCard = document.createElement('div');
+        syncCard.className = 'config-group-card';
+        syncCard.style.cssText = `
+            background: var(--bg-dark);
+            border: 1px solid var(--accent-color);
+            padding: 15px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        `;
+        syncCard.innerHTML = `
+            <h4 style="margin:0; color:var(--accent-color); font-size:1em;">Database Management (Manual Sync)</h4>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn" onclick="appleMusic.syncImport()" style="flex:1; border:1px solid #414868; background:#1a1b26;">
+                    📥 Import (Config File &rarr; DB)
+                </button>
+                <button class="btn" onclick="appleMusic.syncExport()" style="flex:1; border:1px solid #414868; background:#1a1b26;">
+                    📤 Export (DB &rarr; Config File)
+                </button>
+            </div>
+            <small style="color:var(--text-muted); font-size:0.8em;">
+                Import loads settings from <code>config.yaml</code> into the DB. Export saves DB settings back to file.
+            </small>
+        `;
+        container.appendChild(syncCard);
+
         // Group data by schema groups
         const groups = {};
 
@@ -552,28 +581,37 @@ const appleMusic = {
     },
 
     reloadConfig: async () => {
-        if(!confirm("Reload configuration from disk?\nThis will overwrite any unsaved changes in the UI with values from the config.yaml file.")) return;
+        // Legacy Reload (Same as Import basically, but specific endpoint maybe?)
+        // The backend 'reload_config_from_disk' calls '_sync_from_yaml_to_db'
+        // So this is redundant with syncImport, but we'll keep it as "Reload UI" or just alias it.
+        appleMusic.syncImport();
+    },
 
-        const btn = document.getElementById('am-config-reload-btn');
-        if(btn) btn.disabled = true;
+    syncImport: async () => {
+        if(!confirm("Import settings from config.yaml?\nThis will overwrite the current Database values.")) return;
 
         try {
-            const res = await fetch('/api/apps/apple-music/config/reload', { method: 'POST' });
+            const res = await fetch('/api/apps/apple-music/sync/import', { method: 'POST' });
             const json = await res.json();
 
-            if (json.error) {
-                showToast("Reload Failed: " + json.error, "error");
-            } else {
-                showToast("Configuration Reloaded", "success");
-                // Refresh Form
-                appleMusic.state.config = json.data;
-                appleMusic.renderConfigForm(json.data);
+            if (json.error) showToast("Import Failed: " + json.error, "error");
+            else {
+                showToast("Import Success: " + json.message, "success");
+                appleMusic.loadConfig(); // Refresh UI
             }
-        } catch (e) {
-            showToast("Network Error: " + e, "error");
-        } finally {
-            if(btn) btn.disabled = false;
-        }
+        } catch(e) { showToast("Error: " + e, "error"); }
+    },
+
+    syncExport: async () => {
+        if(!confirm("Export settings to config.yaml?\nThis will overwrite the file with Database values.")) return;
+
+        try {
+            const res = await fetch('/api/apps/apple-music/sync/export', { method: 'POST' });
+            const json = await res.json();
+
+            if (json.error) showToast("Export Failed: " + json.error, "error");
+            else showToast("Export Success: " + json.message, "success");
+        } catch(e) { showToast("Error: " + e, "error"); }
     },
 
     // --- IMPORT / SETUP LOGIC ---

@@ -1243,6 +1243,16 @@ def apple_music_download():
 def apple_music_downloader_status():
     return jsonify(AppleMusicManager.get_downloader_status())
 
+@bp.route('/api/apps/apple-music/sync/import', methods=['POST'])
+def apple_music_sync_import():
+    """Import settings from config.yaml to DB."""
+    return jsonify(apple_music_manager.sync_yaml_to_db())
+
+@bp.route('/api/apps/apple-music/sync/export', methods=['POST'])
+def apple_music_sync_export():
+    """Export settings from DB to config.yaml."""
+    return jsonify(apple_music_manager.sync_db_to_yaml())
+
 # --- Apple Music Queue API ---
 
 @bp.route('/api/apps/apple-music/queue', methods=['GET'])
