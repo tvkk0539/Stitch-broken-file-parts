@@ -70,6 +70,13 @@ class AppleMusicDB:
             with self._get_conn() as conn:
                 rows = conn.execute("SELECT key, value FROM config").fetchall()
                 return {row['key']: row['value'] for row in rows}
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                log("AM-DB: Missing tables detected. Re-initializing...")
+                self._init_db()
+                return self.get_all() # Retry once
+            log(f"AM-DB Get All Error: {e}")
+            return {}
         except Exception as e:
             log(f"AM-DB Get All Error: {e}")
             return {}
