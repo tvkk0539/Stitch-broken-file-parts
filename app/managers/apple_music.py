@@ -87,6 +87,11 @@ class AppleMusicDB:
                 row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
                 if row:
                     return row['value']
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                self._init_db()
+                return self.get(key)
+            log(f"AM-DB Get Error: {e}")
         except Exception as e:
             log(f"AM-DB Get Error: {e}")
         return None
@@ -100,6 +105,11 @@ class AppleMusicDB:
                     (key, str(value))
                 )
                 conn.commit()
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                self._init_db()
+                return self.set(key, value)
+            log(f"AM-DB Set Error: {e}")
         except Exception as e:
             log(f"AM-DB Set Error: {e}")
 
@@ -113,6 +123,12 @@ class AppleMusicDB:
                         (k, str(v))
                     )
                 conn.commit()
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                log("AM-DB: Missing tables (bulk). Re-initializing...")
+                self._init_db()
+                return self.bulk_update(data_dict)
+            log(f"AM-DB Bulk Update Error: {e}")
         except Exception as e:
             log(f"AM-DB Bulk Update Error: {e}")
 

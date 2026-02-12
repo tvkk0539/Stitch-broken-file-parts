@@ -96,6 +96,17 @@ const mediaTool = {
             return;
         }
 
+        // Simple XSS Protection
+        const escape = (str) => {
+            if(!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        };
+
         const table = document.createElement('table');
         table.style.width = '100%';
         table.style.borderCollapse = 'collapse';
@@ -136,17 +147,17 @@ const mediaTool = {
             tr.onclick = (e) => {
                 if(e.target.type !== 'checkbox') {
                     const cb = tr.querySelector('.stream-check');
-                    cb.checked = !cb.checked;
+                    if(cb) cb.checked = !cb.checked;
                 }
             };
 
             tr.innerHTML = `
                 <td style="padding:12px 15px; font-family:monospace; color:var(--text-muted);">${s.index}</td>
                 <td style="padding:12px 15px; color:${color}; font-weight:500;">${icon} ${s.type.toUpperCase()}</td>
-                <td style="padding:12px 15px; font-family:monospace;">${s.codec}</td>
-                <td style="padding:12px 15px;">${s.lang !== 'und' ? s.lang.toUpperCase() : '<span style="opacity:0.3">-</span>'}</td>
+                <td style="padding:12px 15px; font-family:monospace;">${escape(s.codec)}</td>
+                <td style="padding:12px 15px;">${s.lang !== 'und' ? escape(s.lang.toUpperCase()) : '<span style="opacity:0.3">-</span>'}</td>
                 <td style="padding:12px 15px; font-size:0.9em; color:var(--text-muted);">
-                    ${s.title || ''}
+                    ${escape(s.title || '')}
                     ${s.width ? s.width+'x'+s.height : ''}
                     ${s.channels ? s.channels+'ch' : ''}
                 </td>

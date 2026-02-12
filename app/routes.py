@@ -587,6 +587,10 @@ def media_get_streams():
     if not path: return jsonify({'error': 'Path required'}), 400
 
     abs_path = os.path.join(DOWNLOAD_ROOT, path)
+
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied'}), 403
+
     if not os.path.exists(abs_path): return jsonify({'error': 'File not found'}), 404
 
     return jsonify(MediaManager.get_stream_info(abs_path))
@@ -600,6 +604,10 @@ def media_extract_streams():
     if not path or not selections: return jsonify({'error': 'Path and selections required'}), 400
 
     abs_path = os.path.join(DOWNLOAD_ROOT, path)
+
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied'}), 403
+
     if not os.path.exists(abs_path): return jsonify({'error': 'File not found'}), 404
 
     job_id = job_manager.add_job(
