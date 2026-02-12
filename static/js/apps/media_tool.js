@@ -19,8 +19,18 @@ const mediaTool = {
 
     loadAnalysis: async function(path) {
         this.currentFile = path;
-        document.getElementById('mt-file-display').textContent = path;
-        document.getElementById('mt-streams-container').innerHTML = '<div class="spinner-border"></div> Analyzing...';
+
+        // Update Source Inspector
+        document.getElementById('mt-file-name').textContent = path.split('/').pop();
+        document.getElementById('mt-file-meta').textContent = path;
+        document.getElementById('mt-tech-specs').style.display = 'none';
+
+        document.getElementById('mt-streams-container').innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted);">
+                <div class="spinner-border" style="margin-bottom:15px;"></div>
+                <p>Analyzing container structure...</p>
+            </div>
+        `;
         document.getElementById('mt-actions-panel').style.display = 'none';
 
         try {
@@ -33,11 +43,47 @@ const mediaTool = {
 
             if(data.error) throw new Error(data.error);
 
+            this.renderInspector(data.format, data.streams);
             this.renderStreams(data.streams);
             document.getElementById('mt-actions-panel').style.display = 'block';
         } catch(e) {
-            document.getElementById('mt-streams-container').innerHTML = `<div style="color:var(--danger-color)">Error: ${e.message}</div>`;
+            document.getElementById('mt-streams-container').innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--danger-color);">
+                    <div style="font-size:3em; margin-bottom:10px;">❌</div>
+                    <p>Analysis Failed: ${e.message}</p>
+                </div>
+            `;
         }
+    },
+
+    renderInspector: function(format, streams) {
+        const specs = document.getElementById('mt-tech-specs');
+        specs.style.display = 'block';
+
+        // Format
+        document.getElementById('mt-spec-format').textContent = format.format_long_name || format.format_name || 'Unknown';
+
+        // Duration
+        const dur = parseFloat(format.duration);
+        let durStr = '-';
+        if(!isNaN(dur)) {
+            const h = Math.floor(dur / 3600);
+            const m = Math.floor((dur % 3600) / 60);
+            const s = Math.floor(dur % 60);
+            durStr = `${h}h ${m}m ${s}s`;
+        }
+        document.getElementById('mt-spec-duration').textContent = durStr;
+
+        // Bitrate
+        const br = parseInt(format.bit_rate);
+        let brStr = '-';
+        if(!isNaN(br)) {
+            brStr = (br / 1000000).toFixed(1) + ' Mb/s';
+        }
+        document.getElementById('mt-spec-bitrate').textContent = brStr;
+
+        // Streams Count
+        document.getElementById('mt-spec-streams').textContent = streams.length;
     },
 
     renderStreams: function(streams) {
@@ -46,24 +92,23 @@ const mediaTool = {
         container.innerHTML = '';
 
         if(!streams || streams.length === 0) {
-            container.innerHTML = 'No streams found.';
+            container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">No streams found.</div>';
             return;
         }
 
         const table = document.createElement('table');
-        table.className = 'data-table'; // Assume global style or add inline
         table.style.width = '100%';
         table.style.borderCollapse = 'collapse';
 
         table.innerHTML = `
             <thead>
-                <tr style="border-bottom:1px solid var(--border-color); text-align:left; color:var(--text-muted);">
-                    <th style="padding:10px; width:40px;">Extract</th>
-                    <th style="padding:10px;">ID</th>
-                    <th style="padding:10px;">Type</th>
-                    <th style="padding:10px;">Codec</th>
-                    <th style="padding:10px;">Language</th>
-                    <th style="padding:10px;">Details</th>
+                <tr style="border-bottom:1px solid #2f334d; text-align:left; color:var(--text-muted); background:#1a1b26; font-size:0.9em;">
+                    <th style="padding:12px 15px; width:40px;">#</th>
+                    <th style="padding:12px 15px;">Type</th>
+                    <th style="padding:12px 15px;">Codec</th>
+                    <th style="padding:12px 15px;">Language</th>
+                    <th style="padding:12px 15px;">Details</th>
+                    <th style="padding:12px 15px; text-align:center;">Extract</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -73,27 +118,40 @@ const mediaTool = {
 
         streams.forEach(s => {
             const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid #2f334d';
+            tr.style.borderBottom = '1px solid #1f2335';
+            tr.style.cursor = 'pointer';
+
+            // Hover effect logic handled by CSS usually, but inline for now
+            tr.onmouseover = () => tr.style.background = '#1f2335';
+            tr.onmouseout = () => tr.style.background = 'transparent';
 
             let icon = '❓';
-            if(s.type==='video') icon = '🎬';
-            if(s.type==='audio') icon = '🔊';
-            if(s.type==='subtitle') icon = '💬';
+            let color = 'inherit';
 
-            // Auto-check logic? Maybe default off.
+            if(s.type==='video') { icon = '🎬'; color = '#7aa2f7'; }
+            if(s.type==='audio') { icon = '🔊'; color = '#9ece6a'; }
+            if(s.type==='subtitle') { icon = '💬'; color = '#e0af68'; }
+
+            // Row click toggles checkbox
+            tr.onclick = (e) => {
+                if(e.target.type !== 'checkbox') {
+                    const cb = tr.querySelector('.stream-check');
+                    cb.checked = !cb.checked;
+                }
+            };
 
             tr.innerHTML = `
-                <td style="padding:10px; text-align:center;">
-                    <input type="checkbox" class="stream-check" data-idx="${s.index}" style="transform:scale(1.2);">
-                </td>
-                <td style="padding:10px; font-family:monospace;">${s.index}</td>
-                <td style="padding:10px;">${icon} ${s.type.toUpperCase()}</td>
-                <td style="padding:10px; color:var(--accent-color);">${s.codec}</td>
-                <td style="padding:10px;">${s.lang}</td>
-                <td style="padding:10px; font-size:0.9em; color:var(--text-muted);">
+                <td style="padding:12px 15px; font-family:monospace; color:var(--text-muted);">${s.index}</td>
+                <td style="padding:12px 15px; color:${color}; font-weight:500;">${icon} ${s.type.toUpperCase()}</td>
+                <td style="padding:12px 15px; font-family:monospace;">${s.codec}</td>
+                <td style="padding:12px 15px;">${s.lang !== 'und' ? s.lang.toUpperCase() : '<span style="opacity:0.3">-</span>'}</td>
+                <td style="padding:12px 15px; font-size:0.9em; color:var(--text-muted);">
                     ${s.title || ''}
                     ${s.width ? s.width+'x'+s.height : ''}
                     ${s.channels ? s.channels+'ch' : ''}
+                </td>
+                <td style="padding:12px 15px; text-align:center;">
+                    <input type="checkbox" class="stream-check" data-idx="${s.index}" style="transform:scale(1.2); cursor:pointer;">
                 </td>
             `;
             tbody.appendChild(tr);
