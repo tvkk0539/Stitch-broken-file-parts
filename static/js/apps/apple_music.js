@@ -389,13 +389,13 @@ const appleMusic = {
         syncCard.innerHTML = `
             <h4 style="margin:0; color:var(--accent-color); font-size:1em;">Database Management (Manual Sync)</h4>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button class="btn" onclick="appleMusic.syncImport()" style="flex:1; border:1px solid #414868; background:#1a1b26; padding:10px;">
+                <button class="btn" onclick="appleMusic.syncImport()" style="flex:1; border:1px solid #414868; background:#1a1b26; color:white; padding:10px; cursor:pointer;">
                     <div style="font-weight:bold;">📥 Load Settings from File</div>
-                    <div style="font-size:0.8em; opacity:0.7;">(config.yaml &rarr; Database)</div>
+                    <div style="font-size:0.8em; opacity:0.8; color:#c0caf5;">(config.yaml &rarr; Database)</div>
                 </button>
-                <button class="btn" onclick="appleMusic.syncExport()" style="flex:1; border:1px solid #414868; background:#1a1b26; padding:10px;">
+                <button class="btn" onclick="appleMusic.syncExport()" style="flex:1; border:1px solid #414868; background:#1a1b26; color:white; padding:10px; cursor:pointer;">
                     <div style="font-weight:bold;">📤 Save Settings to File</div>
-                    <div style="font-size:0.8em; opacity:0.7;">(Database &rarr; config.yaml)</div>
+                    <div style="font-size:0.8em; opacity:0.8; color:#c0caf5;">(Database &rarr; config.yaml)</div>
                 </button>
             </div>
             <div style="color:var(--text-muted); font-size:0.85em; margin-top:5px; line-height:1.4;">
