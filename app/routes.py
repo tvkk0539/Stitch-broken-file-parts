@@ -352,7 +352,10 @@ def sync_push():
 
 @bp.route('/api/sync/status', methods=['GET'])
 def sync_status():
-    return jsonify({'configured': SyncManager.is_configured()})
+    return jsonify({
+        'configured': SyncManager.is_configured(),
+        'remote_url': SyncManager.get_remote_url()
+    })
 
 @bp.route('/api/system/stats')
 def system_stats():
