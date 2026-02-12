@@ -389,16 +389,19 @@ const appleMusic = {
         syncCard.innerHTML = `
             <h4 style="margin:0; color:var(--accent-color); font-size:1em;">Database Management (Manual Sync)</h4>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button class="btn" onclick="appleMusic.syncImport()" style="flex:1; border:1px solid #414868; background:#1a1b26;">
-                    📥 Import (Config File &rarr; DB)
+                <button class="btn" onclick="appleMusic.syncImport()" style="flex:1; border:1px solid #414868; background:#1a1b26; padding:10px;">
+                    <div style="font-weight:bold;">📥 Load Settings from File</div>
+                    <div style="font-size:0.8em; opacity:0.7;">(config.yaml &rarr; Database)</div>
                 </button>
-                <button class="btn" onclick="appleMusic.syncExport()" style="flex:1; border:1px solid #414868; background:#1a1b26;">
-                    📤 Export (DB &rarr; Config File)
+                <button class="btn" onclick="appleMusic.syncExport()" style="flex:1; border:1px solid #414868; background:#1a1b26; padding:10px;">
+                    <div style="font-weight:bold;">📤 Save Settings to File</div>
+                    <div style="font-size:0.8em; opacity:0.7;">(Database &rarr; config.yaml)</div>
                 </button>
             </div>
-            <small style="color:var(--text-muted); font-size:0.8em;">
-                Import loads settings from <code>config.yaml</code> into the DB. Export saves DB settings back to file.
-            </small>
+            <div style="color:var(--text-muted); font-size:0.85em; margin-top:5px; line-height:1.4;">
+                <div style="margin-bottom:4px;">• <strong>Load:</strong> Use this after pulling changes from GitHub to update your database.</div>
+                <div>• <strong>Save:</strong> Use this before pushing to GitHub to save your current settings to the config file.</div>
+            </div>
         `;
         container.appendChild(syncCard);
 
