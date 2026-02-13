@@ -1510,10 +1510,7 @@ class GitHubManager:
                         os.rename(file_path, fake_path)
                         final_path_to_upload = fake_path
                         restore_map[fake_name] = original_name
-                        clean_up_needed = True # Actually we just renamed it, so original path is gone.
-                        # We don't need to delete 'fake_path' if it replaced 'file_path'.
-                        # But wait, JobManager deletes the FOLDER.
-                        # If we renamed, we are fine.
+                        clean_up_needed = True
                     except Exception as e:
                         log(f"Renaming failed: {e}")
                         # Fallback to original
@@ -1528,30 +1525,42 @@ class GitHubManager:
 
                 real_upload_url = upload_url_template.split('{')[0] + f"?name={fname}"
 
-                with open(final_path_to_upload, 'rb') as f:
-                    r = requests.post(real_upload_url, data=f, headers=headers)
-                    if r.status_code not in [200, 201]:
-                        log(f"Failed upload {fname}: {r.text}")
-                        continue
+                upload_success = False
+                try:
+                    with open(final_path_to_upload, 'rb') as f:
+                        r = requests.post(real_upload_url, data=f, headers=headers)
+                        if r.status_code in [200, 201]:
+                            upload_success = True
+                            adata = r.json()
+                            uploaded_assets.append({
+                                'name': fname,
+                                'size': file_size_bytes,
+                                'url': adata.get('browser_download_url', ''),
+                                'repo': repo_full,
+                                'account_id': str(current_acc_id),
+                                'username': id_to_user.get(str(current_acc_id), 'Unknown')
+                            })
+                            current_size_gb += file_size_gb
+                            current_acc_uploaded_gb += file_size_gb
+                            # Success - Track Metadata
+                            track_spanning(current_acc_id, repo_full, current_release_url, file_size_bytes)
+                        else:
+                            log(f"Failed upload {fname}: {r.text}")
+                finally:
+                    # Rename back to original name if we camouflaged it
+                    if clean_up_needed and final_path_to_upload != file_path:
+                        try:
+                            os.rename(final_path_to_upload, file_path)
+                            # log(f"Restored original filename: {original_name}")
+                        except Exception as e:
+                            log(f"Failed to restore filename {original_name}: {e}")
 
-                    # Success - Track Metadata
-                    track_spanning(current_acc_id, repo_full, current_release_url, file_size_bytes)
+                if not upload_success:
+                    continue
 
-                    adata = r.json()
-                    uploaded_assets.append({
-                        'name': fname,
-                        'size': file_size_bytes,
-                        'url': adata.get('browser_download_url', ''),
-                        'repo': repo_full,
-                        'account_id': str(current_acc_id),
-                        'username': id_to_user.get(str(current_acc_id), 'Unknown')
-                    })
-                    current_size_gb += file_size_gb
-                    current_acc_uploaded_gb += file_size_gb
-
-                    # Rate Limit Sleep
-                    if rate_limit_sleep > 0:
-                        time.sleep(rate_limit_sleep)
+                # Rate Limit Sleep
+                if rate_limit_sleep > 0:
+                    time.sleep(rate_limit_sleep)
 
             # Save Map Logic
             if camouflage and restore_map:
