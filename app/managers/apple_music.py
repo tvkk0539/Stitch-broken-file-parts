@@ -605,7 +605,8 @@ class AppleMusicManager:
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             universal_newlines=True,
-            env={**os.environ, 'PATH': os.environ.get('PATH', '')}
+            env={**os.environ, 'PATH': os.environ.get('PATH', '')},
+            preexec_fn=os.setsid  # Create new process group for clean kill
         )
 
         job_manager.set_current_process(process)
@@ -669,7 +670,8 @@ class AppleMusicManager:
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL, # Prevent hanging on prompts
                 universal_newlines=True,
-                env={**os.environ, 'PATH': os.environ.get('PATH', '')}
+                env={**os.environ, 'PATH': os.environ.get('PATH', '')},
+                preexec_fn=os.setsid  # Create new process group for clean kill
             )
             job_manager.set_current_process(process)
             AppleMusicManager._running_process = process # Track for status polling

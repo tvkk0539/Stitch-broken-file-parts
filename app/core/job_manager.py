@@ -3,6 +3,8 @@ import queue
 import time
 import uuid
 import subprocess
+import os
+import signal
 from concurrent.futures import ThreadPoolExecutor
 
 # Global context to store current job ID in thread
@@ -233,7 +235,21 @@ class JobManager:
                 if job_id in self.active_processes:
                     proc = self.active_processes[job_id]
                     try:
-                        proc.terminate()
+                        # Attempt to kill process group to ensure children die too
+                        # Use os.killpg with SIGTERM
+                        if proc.pid:
+                            try:
+                                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                                log(f"Terminated process group for job {job_id}")
+                            except ProcessLookupError:
+                                # Process might be gone already
+                                pass
+                            except Exception as e_pg:
+                                log(f"Error terminating process group: {e_pg}. Falling back to terminate().")
+                                proc.terminate()
+                        else:
+                            proc.terminate()
+
                         log(f"Terminated process for job {job_id}")
                     except Exception as e:
                         log(f"Error terminating process: {e}")
