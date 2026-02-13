@@ -558,7 +558,10 @@ function renderStepUI(stepDiv, type, config = {}) {
          if(config.priority) contentDiv.querySelector('.wf-cat-pri').value = config.priority;
 
          const tagCont = contentDiv.querySelector('.wf-cat-tags');
-         const tagTok = createTagInput(tagCont, 'tag-datalist');
+         // Use a dummy container so tagCont is preserved
+         const dummy = document.createElement('div');
+         tagCont.appendChild(dummy);
+         const tagTok = createTagInput(dummy, 'tag-datalist');
          const tagInp = tagTok.querySelector('.tag-input');
          if(config.tags) {
              config.tags.split(',').forEach(t => addTagPill(tagTok, tagInp, t.trim()));

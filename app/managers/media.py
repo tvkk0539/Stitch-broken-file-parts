@@ -101,7 +101,11 @@ class MediaManager:
 
             # Construct Output Filename: Name.Lang.TrackID.Ext
             # e.g. Movie.eng.2.aac
-            out_name = f"{base_name}.{lang}.track{idx}.{ext}"
+            # Sanitize language to prevent path traversal
+            safe_lang = "".join([c for c in lang if c.isalnum() or c in ('-', '_')])
+            if not safe_lang: safe_lang = 'und'
+
+            out_name = f"{base_name}.{safe_lang}.track{idx}.{ext}"
             out_path = os.path.join(base_dir, out_name)
             output_files.append(out_name)
 
@@ -118,7 +122,8 @@ class MediaManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
-                universal_newlines=True
+                universal_newlines=True,
+                preexec_fn=os.setsid # Create new process group for safe cancellation
             )
             job_manager.set_current_process(process)
 

@@ -239,8 +239,13 @@ class JobManager:
                         # Use os.killpg with SIGTERM
                         if proc.pid:
                             try:
-                                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                                log(f"Terminated process group for job {job_id}")
+                                pgid = os.getpgid(proc.pid)
+                                if pgid != os.getpgrp():
+                                    os.killpg(pgid, signal.SIGTERM)
+                                    log(f"Terminated process group {pgid} for job {job_id}")
+                                else:
+                                    log(f"Process {proc.pid} shares PGID with server. Using terminate() instead.")
+                                    proc.terminate()
                             except ProcessLookupError:
                                 # Process might be gone already
                                 pass
