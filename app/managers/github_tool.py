@@ -871,6 +871,49 @@ class GitHubManager:
             return {'error': str(e)}
 
     @staticmethod
+    def get_real_repo_size_bytes(repo, account_id):
+        """
+        Calculates the TRUE size of a repository by summing:
+        1. Git Repo Size (Source)
+        2. All Release Assets Size (Binary)
+        Handles pagination for releases.
+        """
+        try:
+            # 1. Get Git Size
+            details = GitHubManager.get_repo_details(repo, account_id)
+            if 'error' in details: return 0
+
+            git_size_kb = details.get('size', 0)
+            total_bytes = git_size_kb * 1024
+
+            # 2. Get Release Assets Size
+            token = GitHubManager._get_token_for_account(account_id)
+            headers = {'Accept': 'application/vnd.github.v3+json'}
+            if token: headers['Authorization'] = f'token {token}'
+
+            page = 1
+            while True:
+                url = f"https://api.github.com/repos/{repo}/releases?per_page=100&page={page}"
+                r = requests.get(url, headers=headers, timeout=10)
+                if r.status_code != 200: break
+
+                releases = r.json()
+                if not releases or not isinstance(releases, list): break
+
+                for rel in releases:
+                    for asset in rel.get('assets', []):
+                        total_bytes += asset.get('size', 0)
+
+                if len(releases) < 100: break # Last page
+                page += 1
+
+            return total_bytes
+
+        except Exception as e:
+            log(f"Size Calc Error: {e}")
+            return 0
+
+    @staticmethod
     def find_available_pool_repo(account_id, base_name, limit_gb):
         """
         Scans for existing repositories matching base_name that have free space.
@@ -883,31 +926,23 @@ class GitHubManager:
             # Filter matching Base Name
             candidates = []
             for r in repos:
-                # Check if name starts with base_name (e.g. "Movies-")
-                # Also handle direct match "Movies"
                 r_name = r['name'].split('/')[-1]
                 if r_name.startswith(base_name):
-                    # Check size
-                    # list_user_repos doesn't return size, we need to fetch details or assume
-                    # Actually, list_user_repos (API) usually DOES return 'size' in KB.
-                    # My implementation of list_user_repos filtered fields. Let's check.
-                    # It returns: name, private, stars, updated_at, html_url. SIZE MISSING.
-                    # We need to fetch details for candidates.
-                    pass
                     candidates.append(r['name'])
 
             # Sort by name (sequential)
             candidates.sort()
 
-            limit_kb = limit_gb * 1024 * 1024
+            limit_bytes = limit_gb * 1024 * 1024 * 1024
 
             for cand in candidates:
-                details = GitHubManager.get_repo_details(cand, account_id)
-                if 'size' in details:
-                    current_kb = details['size']
-                    if current_kb < limit_kb:
-                        log(f"♻️ Pool: Found existing repo '{cand}' ({current_kb/1024:.2f}MB Used)")
-                        return cand, current_kb
+                # Use REAL size check
+                current_bytes = GitHubManager.get_real_repo_size_bytes(cand, account_id)
+
+                if current_bytes < limit_bytes:
+                    current_kb = current_bytes / 1024
+                    log(f"♻️ Pool: Found existing repo '{cand}' ({current_bytes/(1024*1024*1024):.2f}GB Used)")
+                    return cand, current_kb
 
             return None, 0
 
@@ -1027,9 +1062,10 @@ class GitHubManager:
 
             full_name = f"{owner}/{name}"
 
-            details = GitHubManager.get_repo_details(full_name, acc_id)
-            if 'error' not in details:
-                return full_name, details['size'] # size is in KB
+            # Check TRUE size (including releases)
+            # This is critical for Strict Mode to work correctly.
+            real_bytes = GitHubManager.get_real_repo_size_bytes(full_name, acc_id)
+            return full_name, real_bytes / 1024 # Convert to KB for compatibility
 
             # --- Stealth Import Logic ---
             use_stealth = False
