@@ -8,6 +8,7 @@ from app.managers.sync import SyncManager
 from app.managers.github_tool import GitHubManager
 from app.managers.obfuscation import ObfuscationManager
 from app.managers.notification import NotificationManager
+from app.managers.survival_kit import SurvivalKitManager
 from app.core.job_manager import log, job_manager
 from werkzeug.utils import secure_filename
 from PIL import Image
@@ -670,3 +671,33 @@ class CatalogManager:
         else:
             log("ℹ️ No Restore Map found. Skipping Phase 2 (Files are ready as-is).")
             NotificationManager.send_notification(f"✅ ParFix: Download Complete for {title}")
+
+    @staticmethod
+    def regenerate_kit_job(item_id, target_dir=None):
+        """
+        Regenerates a Survival Kit for an existing catalog item.
+        """
+        cm = CatalogManager()
+        item = cm.get_by_id(item_id)
+        if not item:
+            log("❌ Item not found for Kit Generation.")
+            return
+
+        title = item.get('title', 'Unknown')
+        restore_map = item.get('restore_map')
+        spanning_info = item.get('spanning_info')
+
+        if not restore_map:
+            log(f"⚠️ Cannot generate kit for '{title}': No Restore Map found.")
+            return
+
+        # Determine Output Directory
+        # Default to Downloads/Survival_Kits if not specified
+        if not target_dir:
+            base = os.environ.get('DOWNLOAD_ROOT', '/data/downloads')
+            target_dir = os.path.join(base, "Survival_Kits")
+
+        path = SurvivalKitManager.generate_kit(target_dir, title, restore_map, spanning_info or [])
+        if path:
+            log(f"✅ Survival Kit regenerated at: {path}")
+            NotificationManager.send_notification(f"✅ ParFix: Survival Kit Generated for {title}")

@@ -24,7 +24,7 @@ function switchView(viewName) {
 
     // Find item by data-view attribute for robustness
     let targetView = viewName;
-    if(viewName === 'gh-app') targetView = 'apps';
+    if(viewName === 'gh-app' || viewName === 'apple-music' || viewName === 'media-tool') targetView = 'apps';
 
     const activeNav = document.querySelector(`.nav-item[data-view="${targetView}"]`);
     if(activeNav) activeNav.classList.add('active');
@@ -82,8 +82,11 @@ function initLogs() {
     const logsView = document.getElementById('view-logs');
     if (!document.getElementById('log-tabs-container')) {
         logsView.innerHTML = `
-            <div id="log-tabs-container" style="display:flex; gap:10px; border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:10px; overflow-x:auto;">
-                <button class="log-tab active" data-id="system" onclick="switchLogTab('system')">System</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:10px;">
+                <div id="log-tabs-container" style="display:flex; gap:10px; overflow-x:auto; flex:1;">
+                    <button class="log-tab active" data-id="system" onclick="switchLogTab('system')">System</button>
+                </div>
+                <button class="secondary" onclick="clearLogs()" style="flex-shrink:0; margin-left:10px;">Clear Logs</button>
             </div>
             <div id="console">Waiting for logs...</div>
         `;
@@ -197,6 +200,28 @@ function getShortName(name) {
     return name;
 }
 
+async function clearLogs() {
+    if(confirm("Clear all logs and job history?")) {
+        try {
+            const res = await fetch('/api/jobs/history/clear', {method:'POST'});
+            if (!res.ok) throw new Error("Failed to clear");
+            document.getElementById('console').innerHTML = '';
+            showToast("Logs Cleared", "success");
+        } catch(e) {
+            showToast("Failed to clear logs", "error");
+        }
+    }
+}
+
+function openAppleMusicApp() {
+    switchView('apple-music');
+}
+
+function openMediaToolApp() {
+    switchView('media-tool');
+    if(window.mediaTool && window.mediaTool.init) window.mediaTool.init();
+}
+
 // Initialize core components on load
 document.addEventListener('DOMContentLoaded', () => {
     initLogs();
@@ -204,4 +229,5 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.catalog) window.catalog.init();
     if(window.initAutomation) window.initAutomation();
     if(window.stealth) window.stealth.init();
+    if(window.mediaTool) window.mediaTool.init();
 });

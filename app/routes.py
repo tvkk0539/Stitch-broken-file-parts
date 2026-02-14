@@ -261,6 +261,19 @@ def restore_obfuscated_files():
 
     return jsonify({'status': 'queued', 'job_id': job_id})
 
+@bp.route('/api/catalog/kit/<item_id>', methods=['POST'])
+def generate_survival_kit(item_id):
+    """Triggers generation of the Survival Kit."""
+    item = catalog_manager.get_by_id(item_id)
+    if not item: return jsonify({'error': 'Item not found'}), 404
+
+    job_id = job_manager.add_job(
+        f"Generate Survival Kit: {item['title']}",
+        CatalogManager.regenerate_kit_job,
+        args=(item_id,)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
 # --- Automation API ---
 
 workflow_manager = WorkflowManager()
@@ -339,7 +352,10 @@ def sync_push():
 
 @bp.route('/api/sync/status', methods=['GET'])
 def sync_status():
-    return jsonify({'configured': SyncManager.is_configured()})
+    return jsonify({
+        'configured': SyncManager.is_configured(),
+        'remote_url': SyncManager.get_remote_url()
+    })
 
 @bp.route('/api/system/stats')
 def system_stats():
@@ -561,6 +577,43 @@ def trigger_cover_extract():
         f"Extract Covers ({len(abs_paths)} items)",
         MediaManager.run_extract_covers_job,
         args=(abs_paths,)
+    )
+    return jsonify({'status': 'queued', 'job_id': job_id})
+
+@bp.route('/api/media/streams', methods=['POST'])
+def media_get_streams():
+    data = request.json
+    path = data.get('path')
+    if not path: return jsonify({'error': 'Path required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, path)
+
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied'}), 403
+
+    if not os.path.exists(abs_path): return jsonify({'error': 'File not found'}), 404
+
+    return jsonify(MediaManager.get_stream_info(abs_path))
+
+@bp.route('/api/media/extract-streams', methods=['POST'])
+def media_extract_streams():
+    data = request.json
+    path = data.get('path')
+    selections = data.get('selections', []) # List of {index, type, codec}
+
+    if not path or not selections: return jsonify({'error': 'Path and selections required'}), 400
+
+    abs_path = os.path.join(DOWNLOAD_ROOT, path)
+
+    if not os.path.abspath(abs_path).startswith(os.path.abspath(DOWNLOAD_ROOT)):
+        return jsonify({'error': 'Access denied'}), 403
+
+    if not os.path.exists(abs_path): return jsonify({'error': 'File not found'}), 404
+
+    job_id = job_manager.add_job(
+        f"Extract Streams from {os.path.basename(path)}",
+        MediaManager.run_extract_streams_job,
+        args=(abs_path, selections)
     )
     return jsonify({'status': 'queued', 'job_id': job_id})
 
@@ -1189,6 +1242,16 @@ def apple_music_download():
 @bp.route('/api/apps/apple-music/downloader/status', methods=['GET'])
 def apple_music_downloader_status():
     return jsonify(AppleMusicManager.get_downloader_status())
+
+@bp.route('/api/apps/apple-music/sync/import', methods=['POST'])
+def apple_music_sync_import():
+    """Import settings from config.yaml to DB."""
+    return jsonify(apple_music_manager.sync_yaml_to_db())
+
+@bp.route('/api/apps/apple-music/sync/export', methods=['POST'])
+def apple_music_sync_export():
+    """Export settings from DB to config.yaml."""
+    return jsonify(apple_music_manager.sync_db_to_yaml())
 
 # --- Apple Music Queue API ---
 

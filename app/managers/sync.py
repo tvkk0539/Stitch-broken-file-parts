@@ -41,6 +41,21 @@ class SyncManager:
         return os.path.exists(os.path.join(SyncManager.DATA_DIR, ".git"))
 
     @staticmethod
+    def get_remote_url():
+        """Returns the configured remote URL (masked) or None."""
+        if not SyncManager.is_configured():
+            return None
+
+        success, output = SyncManager._run_git(["remote", "get-url", "origin"], cwd=SyncManager.DATA_DIR)
+        if success and output:
+            # Mask token if present
+            # Format: https://TOKEN@github.com/...
+            import re
+            masked = re.sub(r'https://([^@]+)@', 'https://***@', output)
+            return masked.strip()
+        return None
+
+    @staticmethod
     def init_sync(repo_url, token):
         """
         Clones the private repo into the data/ folder.

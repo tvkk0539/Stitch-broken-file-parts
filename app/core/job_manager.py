@@ -3,6 +3,8 @@ import queue
 import time
 import uuid
 import subprocess
+import os
+import signal
 from concurrent.futures import ThreadPoolExecutor
 
 # Global context to store current job ID in thread
@@ -233,7 +235,26 @@ class JobManager:
                 if job_id in self.active_processes:
                     proc = self.active_processes[job_id]
                     try:
-                        proc.terminate()
+                        # Attempt to kill process group to ensure children die too
+                        # Use os.killpg with SIGTERM
+                        if proc.pid:
+                            try:
+                                pgid = os.getpgid(proc.pid)
+                                if pgid != os.getpgrp():
+                                    os.killpg(pgid, signal.SIGTERM)
+                                    log(f"Terminated process group {pgid} for job {job_id}")
+                                else:
+                                    log(f"Process {proc.pid} shares PGID with server. Using terminate() instead.")
+                                    proc.terminate()
+                            except ProcessLookupError:
+                                # Process might be gone already
+                                pass
+                            except Exception as e_pg:
+                                log(f"Error terminating process group: {e_pg}. Falling back to terminate().")
+                                proc.terminate()
+                        else:
+                            proc.terminate()
+
                         log(f"Terminated process for job {job_id}")
                     except Exception as e:
                         log(f"Error terminating process: {e}")
@@ -276,12 +297,16 @@ class JobManager:
             running_ids = set(self.running_jobs.keys())
 
             with log_lock:
+                # 1. Clear Job Logs
                 for jid in list(job_log_buffers.keys()):
                     if jid not in running_ids:
                         del job_log_buffers[jid]
                         # Clean listeners if any (should be none ideally)
                         if jid in job_log_listeners:
                              del job_log_listeners[jid]
+
+                # 2. Clear System Logs
+                system_log_buffer.clear()
 
     # --- Log Listener Methods ---
 

@@ -871,6 +871,49 @@ class GitHubManager:
             return {'error': str(e)}
 
     @staticmethod
+    def get_real_repo_size_bytes(repo, account_id):
+        """
+        Calculates the TRUE size of a repository by summing:
+        1. Git Repo Size (Source)
+        2. All Release Assets Size (Binary)
+        Handles pagination for releases.
+        """
+        try:
+            # 1. Get Git Size
+            details = GitHubManager.get_repo_details(repo, account_id)
+            if 'error' in details: return 0
+
+            git_size_kb = details.get('size', 0)
+            total_bytes = git_size_kb * 1024
+
+            # 2. Get Release Assets Size
+            token = GitHubManager._get_token_for_account(account_id)
+            headers = {'Accept': 'application/vnd.github.v3+json'}
+            if token: headers['Authorization'] = f'token {token}'
+
+            page = 1
+            while True:
+                url = f"https://api.github.com/repos/{repo}/releases?per_page=100&page={page}"
+                r = requests.get(url, headers=headers, timeout=10)
+                if r.status_code != 200: break
+
+                releases = r.json()
+                if not releases or not isinstance(releases, list): break
+
+                for rel in releases:
+                    for asset in rel.get('assets', []):
+                        total_bytes += asset.get('size', 0)
+
+                if len(releases) < 100: break # Last page
+                page += 1
+
+            return total_bytes
+
+        except Exception as e:
+            log(f"Size Calc Error: {e}")
+            return 0
+
+    @staticmethod
     def find_available_pool_repo(account_id, base_name, limit_gb):
         """
         Scans for existing repositories matching base_name that have free space.
@@ -883,31 +926,23 @@ class GitHubManager:
             # Filter matching Base Name
             candidates = []
             for r in repos:
-                # Check if name starts with base_name (e.g. "Movies-")
-                # Also handle direct match "Movies"
                 r_name = r['name'].split('/')[-1]
                 if r_name.startswith(base_name):
-                    # Check size
-                    # list_user_repos doesn't return size, we need to fetch details or assume
-                    # Actually, list_user_repos (API) usually DOES return 'size' in KB.
-                    # My implementation of list_user_repos filtered fields. Let's check.
-                    # It returns: name, private, stars, updated_at, html_url. SIZE MISSING.
-                    # We need to fetch details for candidates.
-                    pass
                     candidates.append(r['name'])
 
             # Sort by name (sequential)
             candidates.sort()
 
-            limit_kb = limit_gb * 1024 * 1024
+            limit_bytes = limit_gb * 1024 * 1024 * 1024
 
             for cand in candidates:
-                details = GitHubManager.get_repo_details(cand, account_id)
-                if 'size' in details:
-                    current_kb = details['size']
-                    if current_kb < limit_kb:
-                        log(f"♻️ Pool: Found existing repo '{cand}' ({current_kb/1024:.2f}MB Used)")
-                        return cand, current_kb
+                # Use REAL size check
+                current_bytes = GitHubManager.get_real_repo_size_bytes(cand, account_id)
+
+                if current_bytes < limit_bytes:
+                    current_kb = current_bytes / 1024
+                    log(f"♻️ Pool: Found existing repo '{cand}' ({current_bytes/(1024*1024*1024):.2f}GB Used)")
+                    return cand, current_kb
 
             return None, 0
 
@@ -925,6 +960,7 @@ class GitHubManager:
         Distribution Map: List of dicts [{'account_id': '1', 'repo': 'user/repo'}] defining explicit routing.
         """
         from app.managers.obfuscation import ObfuscationManager
+        from app.managers.survival_kit import SurvivalKitManager
         import time
         import random
 
@@ -1026,9 +1062,10 @@ class GitHubManager:
 
             full_name = f"{owner}/{name}"
 
-            details = GitHubManager.get_repo_details(full_name, acc_id)
-            if 'error' not in details:
-                return full_name, details['size'] # size is in KB
+            # Check TRUE size (including releases)
+            # This is critical for Strict Mode to work correctly.
+            real_bytes = GitHubManager.get_real_repo_size_bytes(full_name, acc_id)
+            return full_name, real_bytes / 1024 # Convert to KB for compatibility
 
             # --- Stealth Import Logic ---
             use_stealth = False
@@ -1509,10 +1546,7 @@ class GitHubManager:
                         os.rename(file_path, fake_path)
                         final_path_to_upload = fake_path
                         restore_map[fake_name] = original_name
-                        clean_up_needed = True # Actually we just renamed it, so original path is gone.
-                        # We don't need to delete 'fake_path' if it replaced 'file_path'.
-                        # But wait, JobManager deletes the FOLDER.
-                        # If we renamed, we are fine.
+                        clean_up_needed = True
                     except Exception as e:
                         log(f"Renaming failed: {e}")
                         # Fallback to original
@@ -1527,30 +1561,42 @@ class GitHubManager:
 
                 real_upload_url = upload_url_template.split('{')[0] + f"?name={fname}"
 
-                with open(final_path_to_upload, 'rb') as f:
-                    r = requests.post(real_upload_url, data=f, headers=headers)
-                    if r.status_code not in [200, 201]:
-                        log(f"Failed upload {fname}: {r.text}")
-                        continue
+                upload_success = False
+                try:
+                    with open(final_path_to_upload, 'rb') as f:
+                        r = requests.post(real_upload_url, data=f, headers=headers)
+                        if r.status_code in [200, 201]:
+                            upload_success = True
+                            adata = r.json()
+                            uploaded_assets.append({
+                                'name': fname,
+                                'size': file_size_bytes,
+                                'url': adata.get('browser_download_url', ''),
+                                'repo': repo_full,
+                                'account_id': str(current_acc_id),
+                                'username': id_to_user.get(str(current_acc_id), 'Unknown')
+                            })
+                            current_size_gb += file_size_gb
+                            current_acc_uploaded_gb += file_size_gb
+                            # Success - Track Metadata
+                            track_spanning(current_acc_id, repo_full, current_release_url, file_size_bytes)
+                        else:
+                            log(f"Failed upload {fname}: {r.text}")
+                finally:
+                    # Rename back to original name if we camouflaged it
+                    if clean_up_needed and final_path_to_upload != file_path:
+                        try:
+                            os.rename(final_path_to_upload, file_path)
+                            # log(f"Restored original filename: {original_name}")
+                        except Exception as e:
+                            log(f"Failed to restore filename {original_name}: {e}")
 
-                    # Success - Track Metadata
-                    track_spanning(current_acc_id, repo_full, current_release_url, file_size_bytes)
+                if not upload_success:
+                    continue
 
-                    adata = r.json()
-                    uploaded_assets.append({
-                        'name': fname,
-                        'size': file_size_bytes,
-                        'url': adata.get('browser_download_url', ''),
-                        'repo': repo_full,
-                        'account_id': str(current_acc_id),
-                        'username': id_to_user.get(str(current_acc_id), 'Unknown')
-                    })
-                    current_size_gb += file_size_gb
-                    current_acc_uploaded_gb += file_size_gb
-
-                    # Rate Limit Sleep
-                    if rate_limit_sleep > 0:
-                        time.sleep(rate_limit_sleep)
+                # Rate Limit Sleep
+                if rate_limit_sleep > 0:
+                    time.sleep(rate_limit_sleep)
 
             # Save Map Logic
             if camouflage and restore_map:
@@ -1561,6 +1607,28 @@ class GitHubManager:
             # Convert map to list for storage
             # Add human size string
             spanning_info = list(spanning_map.values())
+            for item in spanning_info:
+                # Simple human size
+                s = item['size_bytes']
+                item['size_human'] = f"{s:.2f} B" # Default
+                for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                    if s < 1024:
+                        item['size_human'] = f"{s:.2f} {unit}"
+                        break
+                    s /= 1024
+                else:
+                    item['size_human'] = f"{s:.2f} PB"
+
+            # --- SURVIVAL KIT GENERATION ---
+            # We generate it in the source folder of the first file
+            if active_files and camouflage:
+                try:
+                    source_dir = os.path.dirname(active_files[0])
+                    SurvivalKitManager.generate_kit(source_dir, release_title, restore_map, spanning_info)
+                except Exception as ek:
+                    log(f"⚠️ Survival Kit generation error: {ek}")
+
+            # Return data structure for Catalog
             for item in spanning_info:
                 # Simple human size
                 s = item['size_bytes']

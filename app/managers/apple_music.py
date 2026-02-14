@@ -70,6 +70,13 @@ class AppleMusicDB:
             with self._get_conn() as conn:
                 rows = conn.execute("SELECT key, value FROM config").fetchall()
                 return {row['key']: row['value'] for row in rows}
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                log("AM-DB: Missing tables detected. Re-initializing...")
+                self._init_db()
+                return self.get_all() # Retry once
+            log(f"AM-DB Get All Error: {e}")
+            return {}
         except Exception as e:
             log(f"AM-DB Get All Error: {e}")
             return {}
@@ -80,6 +87,11 @@ class AppleMusicDB:
                 row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
                 if row:
                     return row['value']
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                self._init_db()
+                return self.get(key)
+            log(f"AM-DB Get Error: {e}")
         except Exception as e:
             log(f"AM-DB Get Error: {e}")
         return None
@@ -93,6 +105,11 @@ class AppleMusicDB:
                     (key, str(value))
                 )
                 conn.commit()
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                self._init_db()
+                return self.set(key, value)
+            log(f"AM-DB Set Error: {e}")
         except Exception as e:
             log(f"AM-DB Set Error: {e}")
 
@@ -106,6 +123,12 @@ class AppleMusicDB:
                         (k, str(v))
                     )
                 conn.commit()
+        except sqlite3.OperationalError as e:
+            if "no such table" in str(e):
+                log("AM-DB: Missing tables (bulk). Re-initializing...")
+                self._init_db()
+                return self.bulk_update(data_dict)
+            log(f"AM-DB Bulk Update Error: {e}")
         except Exception as e:
             log(f"AM-DB Bulk Update Error: {e}")
 
@@ -220,7 +243,7 @@ class AppleMusicManager:
         self.yaml.indent(mapping=2, sequence=4, offset=2)
 
         self.db = AppleMusicDB()
-        self._ensure_synced()
+        # self._ensure_synced() # Disabled per user request for manual control
 
     def _ensure_synced(self):
         """
@@ -233,11 +256,19 @@ class AppleMusicManager:
             log("AM-Manager: DB is empty. Attempting import from config.yaml...")
             self._sync_from_yaml_to_db()
 
+    def sync_yaml_to_db(self):
+        """Public wrapper for manual import."""
+        return self._sync_from_yaml_to_db()
+
+    def sync_db_to_yaml(self):
+        """Public wrapper for manual export."""
+        return self._sync_from_db_to_yaml()
+
     def _sync_from_yaml_to_db(self):
         """Reads config.yaml (if exists) and populates DB."""
         path = self.find_config_path()
         if not path or not os.path.exists(path):
-            return
+            return {'error': 'Config file not found'}
 
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -252,8 +283,11 @@ class AppleMusicManager:
 
                 self.db.bulk_update(flat_data)
                 log(f"AM-Manager: Imported {len(flat_data)} keys from {path}")
+                return {'status': 'success', 'message': f'Imported {len(flat_data)} settings'}
+            return {'error': 'Config file is empty'}
         except Exception as e:
             log(f"AM-Manager Import Error: {e}")
+            return {'error': str(e)}
 
     def _sync_from_db_to_yaml(self):
         """
@@ -571,7 +605,8 @@ class AppleMusicManager:
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             universal_newlines=True,
-            env={**os.environ, 'PATH': os.environ.get('PATH', '')}
+            env={**os.environ, 'PATH': os.environ.get('PATH', '')},
+            preexec_fn=os.setsid  # Create new process group for clean kill
         )
 
         job_manager.set_current_process(process)
@@ -635,7 +670,8 @@ class AppleMusicManager:
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL, # Prevent hanging on prompts
                 universal_newlines=True,
-                env={**os.environ, 'PATH': os.environ.get('PATH', '')}
+                env={**os.environ, 'PATH': os.environ.get('PATH', '')},
+                preexec_fn=os.setsid  # Create new process group for clean kill
             )
             job_manager.set_current_process(process)
             AppleMusicManager._running_process = process # Track for status polling
